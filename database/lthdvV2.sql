@@ -93,6 +93,28 @@ CREATE TABLE courses (
     CHECK (price >= 0)
 );
 
+-- 1. Tạm thời tắt kiểm tra khóa ngoại để xóa dữ liệu sạch sẽ
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- 2. Xóa toàn bộ dữ liệu cũ trong bảng courses
+TRUNCATE TABLE courses;
+
+-- 3. Chèn lại dữ liệu mới với teacher_id chuẩn (ID 4, 5, 6, 7 là TEACHER)
+INSERT INTO courses (course_id, category_id, teacher_id, course_name, description, thumbnail_url, level, price, status) VALUES
+(1, 1, 4, 'Lập trình Web căn bản với HTML, CSS, JavaScript', 'Khóa học dành cho người mới bắt đầu xây dựng giao diện web.', '/courses/web-basic.jpg', 'BEGINNER', 799000.00, 'APPROVED'),
+(2, 1, 4, 'ReactJS thực chiến cho người mới', 'Học ReactJS qua dự án thực tế, xây dựng giao diện chuyên nghiệp.', '/courses/react-basic.jpg', 'INTERMEDIATE', 1299000.00, 'APPROVED'),
+(3, 2, 5, 'Facebook Ads thực chiến cho người mới', 'Nắm vững nền tảng chạy quảng cáo Facebook tối ưu chi phí.', '/courses/facebook-ads.jpg', 'BEGINNER', 990000.00, 'APPROVED'),
+(4, 2, 5, 'TikTok Content & Livestream bán hàng', 'Xây dựng kịch bản video ngắn và livestream nghìn đơn.', '/courses/tiktok-content.jpg', 'INTERMEDIATE', 1199000.00, 'APPROVED'),
+(5, 3, 6, 'Tiếng Anh giao tiếp cho người đi làm', 'Tập trung phản xạ giao tiếp công sở, họp hành và thuyết trình.', '/courses/english-office.jpg', 'BEGINNER', 890000.00, 'APPROVED'),
+(6, 4, 6, 'Excel và Power BI cho báo cáo doanh nghiệp', 'Xử lý dữ liệu và tạo dashboard báo cáo chuyên nghiệp.', '/courses/powerbi-excel.jpg', 'INTERMEDIATE', 1499000.00, 'APPROVED'),
+(7, 5, 7, 'Thiết kế bài đăng bán hàng bằng Canva', 'Tạo hình ảnh quảng cáo, banner đẹp mắt chỉ với Canva.', '/courses/canva-sale.jpg', 'BEGINNER', 699000.00, 'APPROVED'),
+(8, 6, 7, 'Kỹ năng thuyết trình tự tin', 'Rèn luyện cách trình bày và kiểm soát giọng nói trước đám đông.', '/courses/presentation.jpg', 'BEGINNER', 590000.00, 'APPROVED'),
+(9, 7, 4, 'Tài chính cá nhân cho người trẻ', 'Quản lý thu chi, tiết kiệm và đầu tư cơ bản.', '/courses/personal-finance.jpg', 'BEGINNER', 799000.00, 'APPROVED'),
+(10, 7, 5, 'Vận hành shop online trên sàn TMĐT', 'Quản lý sản phẩm, đơn hàng và chăm sóc khách hàng hiệu quả.', '/courses/ecommerce.jpg', 'INTERMEDIATE', 1099000.00, 'PENDING');
+
+-- 4. Bật lại kiểm tra khóa ngoại
+SET FOREIGN_KEY_CHECKS = 1;
+
 -- =========================
 -- 6. COURSE BATCHES
 -- Đợt mở lớp của khóa học
@@ -413,6 +435,19 @@ CREATE TABLE quizzes (
     CHECK (attempt_limit > 0)
 );
 
+-- 1. Tắt kiểm tra khóa ngoại
+SET FOREIGN_KEY_CHECKS = 0;-- 2. Làm sạch bảng quizzes (để không còn lesson_id cũ bị lỗi 1452)
+TRUNCATE TABLE quizzes;
+
+-- 3. Thực hiện lệnh thêm khóa ngoại trỏ vào lesson_id
+ALTER TABLE quizzes 
+ADD CONSTRAINT fk_quiz_lesson 
+FOREIGN KEY (lesson_id) REFERENCES lessons(lesson_id) 
+ON DELETE CASCADE;
+
+-- 4. Bật lại kiểm tra khóa ngoại
+SET FOREIGN_KEY_CHECKS = 1;
+
 -- =========================
 -- 15. QUESTIONS
 -- Câu hỏi
@@ -555,6 +590,20 @@ CREATE TABLE course_reviews (
 
     CHECK (rating BETWEEN 1 AND 5)
 );
+
+-- Thêm cột điểm đánh giá riêng cho giảng viên vào bảng đánh giá khóa học
+ALTER TABLE course_reviews 
+ADD COLUMN teacher_rating INT DEFAULT NULL AFTER rating,
+ADD COLUMN teacher_comment TEXT DEFAULT NULL AFTER comment;
+
+-- Thêm ràng buộc để điểm từ 1 đến 5
+ALTER TABLE course_reviews
+ADD CONSTRAINT chk_teacher_rating CHECK (teacher_rating BETWEEN 1 AND 5);
+
+-- (Tùy chọn) Thêm teacher_id để truy vấn nhanh hơn mà không cần JOIN qua bảng courses
+ALTER TABLE course_reviews
+ADD COLUMN teacher_id BIGINT DEFAULT NULL AFTER course_id,
+ADD FOREIGN KEY (teacher_id) REFERENCES users(user_id);
 
 -- =========================
 -- 22. DISCUSSIONS

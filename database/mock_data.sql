@@ -685,3 +685,254 @@ VALUES
 (6, 26, 'Quiz mới được mở', 'Quiz Excel và dữ liệu đã sẵn sàng để làm bài.', FALSE, '2026-06-12 09:00:00'),
 (7, 4, 'Lịch dạy mới', 'Bạn có lịch dạy Facebook Ads K02 vào ngày 05/07/2026.', FALSE, '2026-06-20 08:00:00'),
 (8, 7, 'Có bài nộp mới', 'Học viên đã nộp bài thiết kế banner sale.', FALSE, '2026-06-25 09:00:00');
+
+-- 1. Cấu trúc: Thêm cột video giới thiệu cho Khóa học (nếu chưa có)
+ALTER TABLE courses ADD COLUMN video_url VARCHAR(255) AFTER thumbnail_url;
+
+-- 2. Cập nhật Thumbnail và Video Trailer cho 10 Khóa học
+UPDATE courses SET 
+    thumbnail_url = 'https://img.freepik.com/free-vector/website-setup-concept-illustration_114360-4256.jpg',
+    video_url = 'https://www.youtube.com/watch?v=R9I85RhI7Cg' 
+WHERE course_id = 1;
+
+UPDATE courses SET 
+    thumbnail_url = 'https://img.freepik.com/free-vector/react-native-concept-illustration_114360-14283.jpg',
+    video_url = 'https://www.youtube.com/watch?v=x0fSBAgTrH8' 
+WHERE course_id = 2;
+
+UPDATE courses SET 
+    thumbnail_url = 'https://img.freepik.com/free-vector/social-media-marketing-concept-illustration_114360-2244.jpg',
+    video_url = 'https://www.youtube.com/watch?v=R-k8Bv_v96c' 
+WHERE course_id = 3;
+
+UPDATE courses SET 
+    thumbnail_url = 'https://img.freepik.com/free-vector/vlogger-concept-illustration_114360-2713.jpg',
+    video_url = 'https://www.youtube.com/watch?v=680D9G5-Ym0' 
+WHERE course_id = 4;
+
+UPDATE courses SET 
+    thumbnail_url = 'https://img.freepik.com/free-vector/english-teacher-concept-illustration_114360-7467.jpg',
+    video_url = 'https://www.youtube.com/watch?v=zIsVpLh_O_U' 
+WHERE course_id = 5;
+
+UPDATE courses SET 
+    thumbnail_url = 'https://img.freepik.com/free-vector/data-extraction-concept-illustration_114360-4766.jpg',
+    video_url = 'https://www.youtube.com/watch?v=8L1Ov4l8hzE' 
+WHERE course_id = 6;
+
+UPDATE courses SET 
+    thumbnail_url = 'https://img.freepik.com/free-vector/graphic-design-concept-illustration_114360-2023.jpg',
+    video_url = 'https://www.youtube.com/watch?v=un50Bs4BvZ8' 
+WHERE course_id = 7;
+
+UPDATE courses SET 
+    thumbnail_url = 'https://img.freepik.com/free-vector/public-speaker-concept-illustration_114360-6184.jpg',
+    video_url = 'https://www.youtube.com/watch?v=Vqf_6-uG6_Y' 
+WHERE course_id = 8;
+
+UPDATE courses SET 
+    thumbnail_url = 'https://img.freepik.com/free-vector/personal-finance-concept-illustration_114360-6043.jpg',
+    video_url = 'https://www.youtube.com/watch?v=6jT_H9Z7FmI' 
+WHERE course_id = 9;
+
+UPDATE courses SET 
+    thumbnail_url = 'https://img.freepik.com/free-vector/ecommerce-web-page-concept-illustration_114360-2065.jpg',
+    video_url = 'https://www.youtube.com/watch?v=Xp0N1f8v_4I' 
+WHERE course_id = 10;
+
+-- 3. Thêm Chương 3 cho các khóa học (Bổ sung vào danh sách 20 chương bạn đang có)
+INSERT INTO course_modules (course_id, module_title, description, order_no) VALUES
+(1, 'Javascript và DOM cơ bản', 'Tương tác với người dùng và xử lý sự kiện trên trang web.', 3),
+(2, 'Hooks và Quản lý State nâng cao', 'Sử dụng useEffect, useContext và giới thiệu Redux.', 3),
+(3, 'Tối ưu hóa chuyển đổi và Remarketing', 'Kỹ thuật bám đuổi khách hàng và tăng tỷ lệ chốt đơn.', 3),
+(4, 'Quản lý kênh và Hợp tác thương hiệu', 'Chiến lược phát triển kênh bền vững và booking.', 3),
+(5, 'Đàm phán và Ký kết hợp đồng', 'Sử dụng tiếng Anh chuyên sâu trong các tình huống khó.', 3),
+(6, 'Visualizing Data với Power BI', 'Biến các con số khô khan thành biểu đồ sinh động.', 3),
+(7, 'Thiết kế Video và Ảnh động', 'Sử dụng Canva để tạo ra nội dung động bắt mắt.', 3),
+(8, 'Thuyết trình trước ống kính và Livestream', 'Tự tin trình bày trong môi trường kỹ thuật số.', 3),
+(9, 'Đầu tư chứng khoán và Bất động sản', 'Kiến thức nền tảng để bắt đầu đầu tư an toàn.', 3),
+(10, 'Xây dựng thương hiệu cá nhân cho chủ shop', 'Tạo lòng tin và cộng đồng khách hàng trung thành.', 3);
+
+-- 4. Thêm Bài học (Lessons) mẫu có video thực tế cho các chương học
+-- (Giả sử module_id từ 1 đến 20 là cũ, 21-30 là các chương mới thêm ở trên)
+INSERT INTO lessons (module_id, lesson_title, lesson_type, video_url, duration_minutes, order_no) VALUES 
+(1, 'Cài đặt VS Code và Extension', 'VIDEO', 'https://www.youtube.com/watch?v=QwS1r1mc888', 10, 1),
+(3, 'Cài đặt môi trường Node.js', 'VIDEO', 'https://www.youtube.com/watch?v=x0fSBAgTrH8', 15, 1),
+(21, 'Thực hành: Làm trang Portfolio cá nhân', 'VIDEO', 'https://www.youtube.com/watch?v=p_S8YV9_Osk', 30, 1),
+(22, 'Sử dụng useState cho Form', 'VIDEO', 'https://www.youtube.com/watch?v=LlvBzyy-558', 25, 1);
+
+-- 1. Xóa dữ liệu cũ để làm lại cho chuẩn
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE lessons;
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- 2. THÊM BÀI HỌC CHO KHÓA 1: LẬP TRÌNH WEB (Module 1, 2, 21)
+INSERT INTO lessons (module_id, lesson_title, lesson_type, video_url, duration_minutes, order_no) VALUES 
+(1, 'Bài 1: Cài đặt công cụ lập trình', 'VIDEO', 'https://www.youtube.com/watch?v=QwS1r1mc888', 10, 1),
+(1, 'Bài 2: Cấu trúc tệp HTML chuẩn', 'VIDEO', 'https://www.youtube.com/watch?v=p_S8YV9_Osk', 15, 2),
+(2, 'Bài 1: Selector và Thuộc tính CSS', 'VIDEO', 'https://www.youtube.com/watch?v=1Rs2ND1RYYc', 20, 1),
+(2, 'Bài 2: Flexbox căn chỉnh giao diện', 'VIDEO', 'https://www.youtube.com/watch?v=9zBsdzdE4sM', 25, 2),
+(21, 'Bài 1: Khai báo biến trong JS', 'VIDEO', 'https://www.youtube.com/watch?v=W6NZfCO5SIk', 12, 1),
+(21, 'Bài 2: Thao tác với DOM', 'VIDEO', 'https://www.youtube.com/watch?v=y17RuWkWdn8', 18, 2);
+
+-- 3. THÊM BÀI HỌC CHO KHÓA 2: REACTJS (Module 3, 4, 22)
+INSERT INTO lessons (module_id, lesson_title, lesson_type, video_url, duration_minutes, order_no) VALUES 
+(3, 'Bài 1: Giới thiệu JSX', 'VIDEO', 'https://www.youtube.com/watch?v=x0fSBAgTrH8', 15, 1),
+(3, 'Bài 2: Props và State cơ bản', 'VIDEO', 'https://www.youtube.com/watch?v=LlvBzyy-558', 20, 2),
+(4, 'Bài 1: Vòng đời Component', 'VIDEO', 'https://www.youtube.com/watch?v=OIo7fJ_S3Is', 22, 1),
+(4, 'Bài 2: Xử lý sự kiện trong React', 'VIDEO', 'https://www.youtube.com/watch?v=pI_m5HAnwzU', 18, 2),
+(22, 'Bài 1: useEffect và API', 'VIDEO', 'https://www.youtube.com/watch?v=0ZJgIjIuY7U', 25, 1),
+(22, 'Bài 2: Phân trang và Router', 'VIDEO', 'https://www.youtube.com/watch?v=mno8U4T9hU4', 30, 2);
+
+-- 4. THÊM BÀI HỌC CHO KHÓA 3: FACEBOOK ADS (Module 5, 6, 23)
+INSERT INTO lessons (module_id, lesson_title, lesson_type, video_url, duration_minutes, order_no) VALUES 
+(5, 'Bài 1: Tư duy Marketing đa kênh', 'VIDEO', 'https://www.youtube.com/watch?v=R-k8Bv_v96c', 15, 1),
+(5, 'Bài 2: Nghiên cứu khách hàng mục tiêu', 'VIDEO', 'https://www.youtube.com/watch?v=Y70_I6q6_YI', 12, 2),
+(6, 'Bài 1: Cách viết Content chuyển đổi cao', 'VIDEO', 'https://www.youtube.com/watch?v=jW0iP6eW7Y8', 20, 1),
+(6, 'Bài 2: Kỹ thuật nhắm mục tiêu (Target)', 'VIDEO', 'https://www.youtube.com/watch?v=S8YV9_Osk8I', 18, 2),
+(23, 'Bài 1: Đọc chỉ số quảng cáo', 'VIDEO', 'https://www.youtube.com/watch?v=Z5X5X5X5X5X', 22, 1),
+(23, 'Bài 2: Tối ưu hóa ngân sách', 'VIDEO', 'https://www.youtube.com/watch?v=X5X5X5X5X5X', 25, 2);
+
+-- 5. THÊM BÀI HỌC CHO KHÓA 4: TIKTOK (Module 7, 8, 24)
+INSERT INTO lessons (module_id, lesson_title, lesson_type, video_url, duration_minutes, order_no) VALUES 
+(7, 'Bài 1: Kịch bản video triệu view', 'VIDEO', 'https://www.youtube.com/watch?v=680D9G5-Ym0', 10, 1),
+(7, 'Bài 2: Quy trình quay dựng điện thoại', 'VIDEO', 'https://www.youtube.com/watch?v=Q7Q7Q7Q7Q7Q', 15, 2),
+(8, 'Bài 1: Livestream bán hàng chuyên nghiệp', 'VIDEO', 'https://www.youtube.com/watch?v=W8W8W8W8W8W', 30, 1),
+(8, 'Bài 2: Chốt đơn và xử lý từ chối', 'VIDEO', 'https://www.youtube.com/watch?v=E8E8E8E8E8E', 25, 2),
+(24, 'Bài 1: Xây dựng thương hiệu cá nhân', 'VIDEO', 'https://www.youtube.com/watch?v=R9R9R9R9R9R', 20, 1),
+(24, 'Bài 2: Hợp tác với KOC/KOL', 'VIDEO', 'https://www.youtube.com/watch?v=Y0Y0Y0Y0Y0Y', 18, 2);
+
+-- BỔ SUNG VIDEO CHO CÁC KHÓA CÒN LẠI (Sử dụng URL tượng trưng để đảm bảo mỗi bài 1 video)
+-- TIẾNG ANH (9, 10, 25)
+INSERT INTO lessons (module_id, lesson_title, lesson_type, video_url, duration_minutes, order_no) VALUES 
+(9, 'Bài 1: Phát âm chuẩn IPA', 'VIDEO', 'https://www.youtube.com/watch?v=zIsVpLh_O_U', 15, 1),
+(9, 'Bài 2: Chào hỏi và tự giới thiệu', 'VIDEO', 'https://www.youtube.com/watch?v=A1A1A1A1A1A', 15, 2),
+(10, 'Bài 1: Phỏng vấn xin việc bằng tiếng Anh', 'VIDEO', 'https://www.youtube.com/watch?v=B2B2B2B2B2B', 20, 1),
+(10, 'Bài 2: Viết Email chuyên nghiệp', 'VIDEO', 'https://www.youtube.com/watch?v=C3C3C3C3C3C', 18, 2),
+(25, 'Bài 1: Đàm phán lương thưởng', 'VIDEO', 'https://www.youtube.com/watch?v=D4D4D4D4D4D', 22, 1),
+(25, 'Bài 2: Thuyết trình dự án', 'VIDEO', 'https://www.youtube.com/watch?v=E5E5E5E5E5E', 25, 2);
+
+-- EXCEL & POWER BI (11, 12, 26)
+INSERT INTO lessons (module_id, lesson_title, lesson_type, video_url, duration_minutes, order_no) VALUES 
+(11, 'Bài 1: Các hàm logic (IF, AND, OR)', 'VIDEO', 'https://www.youtube.com/watch?v=8L1Ov4l8hzE', 15, 1),
+(11, 'Bài 2: Hàm tìm kiếm VLOOKUP/XLOOKUP', 'VIDEO', 'https://www.youtube.com/watch?v=F6F6F6F6F6F', 15, 2),
+(12, 'Bài 1: Trực quan hóa dữ liệu', 'VIDEO', 'https://www.youtube.com/watch?v=G7G7G7G7G7G', 20, 1),
+(12, 'Bài 2: Dashboard báo cáo tự động', 'VIDEO', 'https://www.youtube.com/watch?v=H8H8H8H8H8H', 25, 2),
+(26, 'Bài 1: Kết nối dữ liệu từ nhiều nguồn', 'VIDEO', 'https://www.youtube.com/watch?v=I9I9I9I9I9I', 20, 1),
+(26, 'Bài 2: DAX cơ bản trong Power BI', 'VIDEO', 'https://www.youtube.com/watch?v=J0J0J0J0J0J', 30, 2);
+
+-- CANVA (13, 14, 27)
+INSERT INTO lessons (module_id, lesson_title, lesson_type, video_url, duration_minutes, order_no) VALUES 
+(13, 'Bài 1: Công cụ và Layout cơ bản', 'VIDEO', 'https://www.youtube.com/watch?v=un50Bs4BvZ8', 12, 1),
+(13, 'Bài 2: Phối màu và chọn Font chữ', 'VIDEO', 'https://www.youtube.com/watch?v=K1K1K1K1K1K', 15, 2),
+(14, 'Bài 1: Thiết kế Ads Image', 'VIDEO', 'https://www.youtube.com/watch?v=L2L2L2L2L2L', 18, 1),
+(14, 'Bài 2: Thiết kế Banner Website', 'VIDEO', 'https://www.youtube.com/watch?v=M3M3M3M3M3M', 20, 2),
+(27, 'Bài 1: Làm Video ngắn trên Canva', 'VIDEO', 'https://www.youtube.com/watch?v=N4N4N4N4N4N', 15, 1),
+(27, 'Bài 2: Tạo CV chuyên nghiệp', 'VIDEO', 'https://www.youtube.com/watch?v=O5O5O5O5O5O', 12, 2);
+
+-- THUYẾT TRÌNH (15, 16, 28)
+INSERT INTO lessons (module_id, lesson_title, lesson_type, video_url, duration_minutes, order_no) VALUES 
+(15, 'Bài 1: Cấu trúc bài nói thu hút', 'VIDEO', 'https://www.youtube.com/watch?v=Vqf_6-uG6_Y', 15, 1),
+(15, 'Bài 2: Kỹ thuật mở đầu ấn tượng', 'VIDEO', 'https://www.youtube.com/watch?v=P6P6P6P6P6P', 12, 2),
+(16, 'Bài 1: Ngôn ngữ hình thể', 'VIDEO', 'https://www.youtube.com/watch?v=Q7Q7Q7Q7Q7Q', 20, 1),
+(16, 'Bài 2: Làm chủ sân khấu', 'VIDEO', 'https://www.youtube.com/watch?v=R8R8R8R8R8R', 22, 2),
+(28, 'Bài 1: Kỹ thuật kể chuyện (Storytelling)', 'VIDEO', 'https://www.youtube.com/watch?v=S9S9S9S9S9S', 25, 1),
+(28, 'Bài 2: Trình bày trước camera', 'VIDEO', 'https://www.youtube.com/watch?v=T0T0T0T0T0T', 18, 2);
+
+-- TÀI CHÍNH (17, 18, 29)
+INSERT INTO lessons (module_id, lesson_title, lesson_type, video_url, duration_minutes, order_no) VALUES 
+(17, 'Bài 1: Theo dõi dòng tiền cá nhân', 'VIDEO', 'https://www.youtube.com/watch?v=6jT_H9Z7FmI', 15, 1),
+(17, 'Bài 2: Cách giảm nợ hiệu quả', 'VIDEO', 'https://www.youtube.com/watch?v=U1U1U1U1U1U', 18, 2),
+(18, 'Bài 1: Chứng khoán là gì?', 'VIDEO', 'https://www.youtube.com/watch?v=V2V2V2V2V2V', 20, 1),
+(18, 'Bài 2: Đầu tư thụ động thông qua Quỹ', 'VIDEO', 'https://www.youtube.com/watch?v=W3W3W3W3W3W', 25, 2),
+(29, 'Bài 1: Bảo hiểm và quản trị rủi ro', 'VIDEO', 'https://www.youtube.com/watch?v=X4X4X4X4X4X', 22, 1),
+(29, 'Bài 2: Tự do tài chính trước tuổi 40', 'VIDEO', 'https://www.youtube.com/watch?v=Y5Y5Y5Y5Y5Y', 30, 2);
+
+-- THƯƠNG MẠI ĐIỆN TỬ (19, 20, 30)
+INSERT INTO lessons (module_id, lesson_title, lesson_type, video_url, duration_minutes, order_no) VALUES 
+(19, 'Bài 1: Đăng ký shop trên sàn Shopee/Lazada', 'VIDEO', 'https://www.youtube.com/watch?v=Xp0N1f8v_4I', 12, 1),
+(19, 'Bài 2: Nghiên cứu đối thủ cạnh tranh', 'VIDEO', 'https://www.youtube.com/watch?v=Z6Z6Z6Z6Z6Z', 15, 2),
+(20, 'Bài 1: Xử lý đơn hàng và đóng gói', 'VIDEO', 'https://www.youtube.com/watch?v=A7A7A7A7A7A', 18, 1),
+(20, 'Bài 2: Chăm sóc khách hàng sau mua', 'VIDEO', 'https://www.youtube.com/watch?v=B8B8B8B8B8B', 15, 2),
+(30, 'Bài 1: Marketing nội sàn (đấu thầu từ khóa)', 'VIDEO', 'https://www.youtube.com/watch?v=C9C9C9C9C9C', 20, 1),
+(30, 'Bài 2: Xây dựng khách hàng trung thành', 'VIDEO', 'https://www.youtube.com/watch?v=D0D0D0D0D0D', 22, 2);
+
+-- KHÓA 1: LẬP TRÌNH WEB (Module 1, 2, 21)
+UPDATE lessons SET content = 'Hướng dẫn tải và cài đặt Visual Studio Code, các Extension quan trọng để hỗ trợ code nhanh hơn.' WHERE lesson_id = 1;
+UPDATE lessons SET content = 'Tìm hiểu về khai báo văn bản HTML5, cấu trúc các thẻ lồng nhau và cách tổ chức thư mục dự án.' WHERE lesson_id = 2;
+UPDATE lessons SET content = 'Học cách sử dụng Class, ID và các bộ chọn phức tạp để định dạng giao diện website.' WHERE lesson_id = 3;
+UPDATE lessons SET content = 'Thực hành dàn trang với Flexbox, hiểu về trục chính (main axis) và trục phụ (cross axis).' WHERE lesson_id = 4;
+UPDATE lessons SET content = 'Cách sử dụng biến let, const, các kiểu dữ liệu nguyên thủy và toán tử trong Javascript.' WHERE lesson_id = 5;
+UPDATE lessons SET content = 'Sử dụng querySelector để lấy phần tử và thay đổi nội dung, màu sắc thông qua sự kiện người dùng.' WHERE lesson_id = 6;
+
+-- KHÓA 2: REACTJS (Module 3, 4, 22)
+UPDATE lessons SET content = 'Lý do ReactJS dẫn đầu thị trường và cách cài đặt môi trường với Node.js mới nhất.' WHERE lesson_id = 7;
+UPDATE lessons SET content = 'Hiểu về cú pháp JSX, cách truyền dữ liệu qua Props và quản lý trạng thái cục bộ với State.' WHERE lesson_id = 8;
+UPDATE lessons SET content = 'Tìm hiểu các giai đoạn Mounting, Updating và Unmounting của một Component.' WHERE lesson_id = 9;
+UPDATE lessons SET content = 'Cách lắng nghe sự kiện onClick, onChange và xử lý dữ liệu từ các ô nhập liệu (Form).' WHERE lesson_id = 10;
+UPDATE lessons SET content = 'Sử dụng useEffect để Fetch dữ liệu từ API và quản lý dependencies để tránh lặp vô hạn.' WHERE lesson_id = 11;
+UPDATE lessons SET content = 'Tổ chức điều hướng trang web với React Router DOM và tạo các Custom Hook dùng chung.' WHERE lesson_id = 12;
+
+-- KHÓA 3: FACEBOOK ADS (Module 5, 6, 23)
+UPDATE lessons SET content = 'Phân tích hành vi người dùng trên mạng xã hội và cách Facebook phân phối quảng cáo.' WHERE lesson_id = 13;
+UPDATE lessons SET content = 'Sử dụng công cụ để xác định chính xác đối tượng mục tiêu dựa trên sở thích và hành vi.' WHERE lesson_id = 14;
+UPDATE lessons SET content = 'Công thức viết tiêu đề thu hút và cách thiết kế hình ảnh/video đạt tỷ lệ click (CTR) cao.' WHERE lesson_id = 15;
+UPDATE lessons SET content = 'Cách setup chiến dịch quảng cáo chuẩn để tiếp cận đúng khách hàng tiềm năng với chi phí rẻ.' WHERE lesson_id = 16;
+UPDATE lessons SET content = 'Đọc và hiểu các chỉ số quan trọng như CPM, CPC, CPP để đánh giá hiệu quả quảng cáo.' WHERE lesson_id = 17;
+UPDATE lessons SET content = 'Kỹ thuật tăng ngân sách mà không bị "nát" tệp khách hàng và cách chạy remarketing.' WHERE lesson_id = 18;
+
+-- KHÓA 4: TIKTOK CONTENT (Module 7, 8, 24)
+UPDATE lessons SET content = 'Công thức 3 giây đầu để giữ chân người xem và cấu trúc kịch bản video dễ lên xu hướng.' WHERE lesson_id = 19;
+UPDATE lessons SET content = 'Hướng dẫn sử dụng điện thoại để quay video, cách setup ánh sáng và dùng CapCut edit chuyên nghiệp.' WHERE lesson_id = 20;
+UPDATE lessons SET content = 'Các bước chuẩn bị trước khi lên sóng, cách tương tác với người xem và thúc đẩy mua hàng.' WHERE lesson_id = 21;
+UPDATE lessons SET content = 'Nghệ thuật xử lý các câu hỏi khó của khách và chốt đơn nhanh chóng ngay trên livestream.' WHERE lesson_id = 22;
+UPDATE lessons SET content = 'Xác định phong cách cá nhân (Concept) để tạo sự khác biệt và thu hút fan trung thành.' WHERE lesson_id = 23;
+UPDATE lessons SET content = 'Quy trình làm việc với nhãn hàng, cách báo giá và xây dựng profile chuyên nghiệp để nhận booking.' WHERE lesson_id = 24;
+
+-- KHÓA 5: TIẾNG ANH (Module 9, 10, 25)
+UPDATE lessons SET content = 'Luyện tập 44 âm trong bảng phiên âm quốc tế IPA để nói tiếng Anh tự nhiên như người bản xứ.' WHERE lesson_id = 25;
+UPDATE lessons SET content = 'Các mẫu câu giao tiếp cơ bản khi gặp gỡ đồng nghiệp và đối tác trong môi trường công sở.' WHERE lesson_id = 26;
+UPDATE lessons SET content = 'Chuẩn bị câu trả lời cho các câu hỏi tuyển dụng phổ biến và cách thể hiện sự tự tin.' WHERE lesson_id = 27;
+UPDATE lessons SET content = 'Cấu trúc một email công việc chuyên nghiệp từ tiêu đề, nội dung đến phần ký tên.' WHERE lesson_id = 28;
+UPDATE lessons SET content = 'Kỹ năng thương lượng mức lương và các điều khoản hợp đồng bằng tiếng Anh chuyên ngành.' WHERE lesson_id = 29;
+UPDATE lessons SET content = 'Cách sử dụng slide và ngôn ngữ dẫn dắt để có một buổi thuyết trình dự án ấn tượng.' WHERE lesson_id = 30;
+
+-- KHÓA 6: EXCEL & POWER BI (Module 11, 12, 26)
+UPDATE lessons SET content = 'Làm chủ các hàm điều kiện IF, AND, OR để xử lý các bài toán logic phức tạp trong bảng tính.' WHERE lesson_id = 31;
+UPDATE lessons SET content = 'Cách sử dụng hàm VLOOKUP và XLOOKUP để tìm kiếm dữ liệu chính xác giữa các bảng.' WHERE lesson_id = 32;
+UPDATE lessons SET content = 'Biến những con số khô khan thành biểu đồ cột, tròn, đường để dễ dàng theo dõi xu hướng.' WHERE lesson_id = 33;
+UPDATE lessons SET content = 'Xây dựng hệ thống báo cáo tự động cập nhật dữ liệu giúp tiết kiệm thời gian hàng ngày.' WHERE lesson_id = 34;
+UPDATE lessons SET content = 'Kết nối Power BI với Excel, SQL và các nguồn web để tập hợp dữ liệu về một nơi.' WHERE lesson_id = 35;
+UPDATE lessons SET content = 'Làm quen với ngôn ngữ DAX để tạo ra các chỉ số đo lường (Measures) nâng cao.' WHERE lesson_id = 36;
+
+-- KHÓA 7: THIẾT KẾ CANVA (Module 13, 14, 27)
+UPDATE lessons SET content = 'Khám phá kho thư viện khổng lồ của Canva và cách sử dụng lưới (Grid) trong thiết kế.' WHERE lesson_id = 37;
+UPDATE lessons SET content = 'Nguyên tắc bánh xe màu sắc và cách kết hợp phông chữ có chân/không chân hài hòa.' WHERE lesson_id = 38;
+UPDATE lessons SET content = 'Thiết kế các mẫu ảnh quảng cáo Facebook, Instagram đúng kích thước và thu hút.' WHERE lesson_id = 39;
+UPDATE lessons SET content = 'Tạo banner cho website hoặc ảnh bìa Fanpage chuyên nghiệp chỉ trong vài phút.' WHERE lesson_id = 40;
+UPDATE lessons SET content = 'Sử dụng tính năng video của Canva để làm các đoạn clip ngắn (Reels/TikTok) bắt mắt.' WHERE lesson_id = 41;
+UPDATE lessons SET content = 'Cách tạo một bản CV ấn tượng, chuyên nghiệp giúp bạn nổi bật trong mắt nhà tuyển dụng.' WHERE lesson_id = 42;
+
+-- KHÓA 8: KỸ NĂNG THUYẾT TRÌNH (Module 15, 16, 28)
+UPDATE lessons SET content = 'Sắp xếp ý tưởng theo mô hình kim tự tháp để người nghe dễ dàng nắm bắt thông tin.' WHERE lesson_id = 43;
+UPDATE lessons SET content = '5 cách mở đầu bài nói cực kỳ ấn tượng để phá vỡ tảng băng và thu hút sự chú ý.' WHERE lesson_id = 44;
+UPDATE lessons SET content = 'Sử dụng tay, ánh mắt và di chuyển trên sân khấu để tăng sự thuyết phục cho lời nói.' WHERE lesson_id = 45;
+UPDATE lessons SET content = 'Cách điều tiết nhịp thở và giọng nói để giữ được năng lượng trong suốt buổi thuyết trình.' WHERE lesson_id = 46;
+UPDATE lessons SET content = 'Nghệ thuật lồng ghép các câu chuyện thực tế vào bài nói để chạm đến cảm xúc khán giả.' WHERE lesson_id = 47;
+UPDATE lessons SET content = 'Kỹ thuật set up khung hình, ánh sáng và cách nhìn vào ống kính khi nói chuyện online.' WHERE lesson_id = 48;
+
+-- KHÓA 9: TÀI CHÍNH CÁ NHÂN (Module 17, 18, 29)
+UPDATE lessons SET content = 'Sử dụng app hoặc sổ tay để ghi chép chi tiêu, phân loại các khoản chi thiết yếu và xa xỉ.' WHERE lesson_id = 49;
+UPDATE lessons SET content = 'Chiến lược hòn tuyết lăn để xử lý các khoản nợ và cách sử dụng thẻ tín dụng thông minh.' WHERE lesson_id = 50;
+UPDATE lessons SET content = 'Tìm hiểu về thị trường chứng khoán, cách mở tài khoản và đọc bảng điện cơ bản.' WHERE lesson_id = 51;
+UPDATE lessons SET content = 'Lợi ích của việc đầu tư dài hạn vào các quỹ chỉ số để tối ưu hóa lãi suất kép.' WHERE lesson_id = 52;
+UPDATE lessons SET content = 'Hiểu về các loại bảo hiểm nhân thọ, phi nhân thọ và cách bảo vệ tài sản trước rủi ro.' WHERE lesson_id = 53;
+UPDATE lessons SET content = 'Lập lộ trình tiết kiệm và đầu tư để đạt được mục tiêu nghỉ hưu sớm và tự do tài chính.' WHERE lesson_id = 54;
+
+-- KHÓA 10: THƯƠNG MẠI ĐIỆN TỬ (Module 19, 20, 30)
+UPDATE lessons SET content = 'Quy trình tạo shop chuẩn SEO trên Shopee, Lazada và cách tối ưu tên gian hàng.' WHERE lesson_id = 55;
+UPDATE lessons SET content = 'Cách sử dụng công cụ để xem đối thủ đang bán gì chạy nhất và định giá sản phẩm cạnh tranh.' WHERE lesson_id = 56;
+UPDATE lessons SET content = 'Xây dựng quy trình đóng gói nhanh, chuyên nghiệp để giảm tỷ lệ hoàn hàng và tăng đánh giá 5 sao.' WHERE lesson_id = 57;
+UPDATE lessons SET content = 'Nghệ thuật chat với khách hàng và cách biến những khiếu nại thành cơ hội bán hàng lại.' WHERE lesson_id = 58;
+UPDATE lessons SET content = 'Tìm hiểu cách chạy quảng cáo từ khóa nội sàn để tăng lượt hiển thị sản phẩm lên trang đầu.' WHERE lesson_id = 59;
+UPDATE lessons SET content = 'Tạo các chương trình khuyến mãi, voucher và quà tặng để giữ chân khách hàng cũ.' WHERE lesson_id = 60;

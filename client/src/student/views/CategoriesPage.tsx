@@ -7,59 +7,83 @@ function CategoriesPage() {
   return (
     <main className="sp-category-page">
       <section className="sp-category-hero">
-        <h1>Master your craft with expert precision.</h1>
+        <h1>Làm chủ kỹ năng của bạn với độ chính xác của một chuyên gia.</h1>
+
         <p>
-          Access a curated selection of advanced courses designed for the modern
-          intellectual. From digital strategy to fine arts.
+          Khám phá bộ sưu tập các khóa học chuyên sâu được tuyển chọn dành cho
+          người học hiện đại. Từ công nghệ, kinh doanh đến thiết kế và nghệ
+          thuật sáng tạo.
         </p>
+
         <div className="sp-hero-search">
           <Icon name="search" />
-          <input placeholder="Search for 'Digital Typography' or 'Data Science'..." />
-          <button type="button">Explore</button>
+          <input placeholder="Tìm kiếm 'Lập trình Web' hoặc 'Khoa học Dữ liệu'..." />
+          <button type="button">Khám phá</button>
         </div>
       </section>
+
       <div className="sp-results-layout">
         <aside className="sp-filter-panel compact">
           <h2>
-            <Icon name="filter_list" /> Filters
+            <Icon name="filter_list" /> Bộ lọc
           </h2>
+
           <FilterGroup
-            title="Category"
-            items={["Design & Arts", "Technology", "Business", "Humanities"]}
+            title="Danh mục"
+            items={[
+              "Thiết kế & Nghệ thuật",
+              "Công nghệ thông tin",
+              "Kinh doanh",
+              "Khoa học xã hội",
+            ]}
             checkedIndex={0}
           />
+
           <div className="sp-slider">
-            <h3>Price Range</h3>
+            <h3>Mức học phí</h3>
+
             <input type="range" defaultValue="55" />
+
             <p>
-              <span>$0</span>
-              <span>$500+</span>
+              <span>0đ</span>
+              <span>10.000.000đ+</span>
             </p>
           </div>
+
           <div className="sp-rating-toggle">
-            <h3>Min. Rating</h3>
+            <h3>Đánh giá tối thiểu</h3>
+
             <button type="button">4.0+</button>
+
             <button className="active" type="button">
               4.5+
             </button>
           </div>
         </aside>
+
         <section>
           <div className="sp-results-head">
             <h2>
-              842 results for <span>"Design"</span>
+              Tìm thấy <span>842</span> khóa học thuộc lĩnh vực{" "}
+              <span>"Thiết kế"</span>
             </h2>
+
             <button type="button">
-              Most Popular <Icon name="expand_more" />
+              Phổ biến nhất <Icon name="expand_more" />
             </button>
           </div>
+
           <div className="sp-course-grid">
             {courses.map((course) => (
-              <CourseCard key={`category-${course.title}`} course={course} />
+              <CourseCard
+                key={`category-${course.title}`}
+                course={course}
+              />
             ))}
           </div>
+
           <button className="sp-load-more" type="button">
-            Load More Courses
+            Xem thêm khóa học
           </button>
         </section>
       </div>

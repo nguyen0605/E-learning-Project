@@ -11,7 +11,7 @@ function WishlistItem({ title, price, image }: WishlistItemProps) {
       <div>
         <h3>{title}</h3>
         <strong>{price}</strong>
-        <button type="button">Add to Cart</button>
+        <button type="button">Thêm vào giỏ hàng</button>
       </div>
     </article>
   );

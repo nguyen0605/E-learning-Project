@@ -11,7 +11,7 @@ function CourseMiniCard({ course }: CourseMiniCardProps) {
       <img src={course.image} alt={course.title} />
       <span>{course.category}</span>
       <div className="sp-stars">
-        â˜…â˜…â˜…â˜…â˜… <small>(1,209 reviews)</small>
+        <small>(1,209 reviews)</small>
       </div>
       <h3>{course.title}</h3>
       <p>{course.author}</p>

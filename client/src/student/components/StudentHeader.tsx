@@ -7,10 +7,10 @@ type StudentHeaderProps = {
 };
 
 const navItems: Array<{ label: string; view: StudentView }> = [
-  { label: "Courses", view: "courses" },
-  { label: "Categories", view: "categories" },
-  { label: "Cart", view: "cart" },
-  { label: "Interaction", view: "interaction" },
+  { label: "Khoá học", view: "courses" },
+  { label: "Sản phẩm", view: "categories" },
+  { label: "Giỏ hàng", view: "cart" },
+  { label: "Tương tác", view: "interaction" },
 ];
 
 function StudentHeader({ activeView, onNavigate }: StudentHeaderProps) {
@@ -40,7 +40,7 @@ function StudentHeader({ activeView, onNavigate }: StudentHeaderProps) {
           type="button"
           onClick={() => onNavigate("exam")}
         >
-          Exam
+          Bài kiểm tra
         </button>
       </nav>
       <div className="sp-header-actions">

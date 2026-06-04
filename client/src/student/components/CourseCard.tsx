@@ -23,11 +23,11 @@ function CourseCard({ course }: CourseCardProps) {
         <div className="sp-course-footer">
           <div>
             <p>
-              â˜… {course.rating} <small>(1.2k)</small>
+             {course.rating} <small>(1.2k)</small>
             </p>
             <strong>{course.price}</strong>
           </div>
-          <button type="button">Enroll</button>
+          <button type="button">Thêm </button>
         </div>
       </div>
     </article>

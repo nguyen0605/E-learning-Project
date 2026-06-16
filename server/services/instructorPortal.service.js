@@ -1,0 +1,399 @@
+import db from "../db.js";
+
+const DEFAULT_TEACHER_ID = 4;
+
+function normalizeTeacherId(value) {
+  const teacherId = Number(value ?? DEFAULT_TEACHER_ID);
+  return Number.isFinite(teacherId) && teacherId > 0 ? teacherId : DEFAULT_TEACHER_ID;
+}
+
+function percent(value) {
+  return Number(Number(value ?? 0).toFixed(0));
+}
+
+function formatMinutes(value) {
+  const minutes = Number(value ?? 0);
+  return `${minutes} phút`;
+}
+
+function relativeTime(value) {
+  if (!value) return "Chua cap nhat";
+  const diffMs = Date.now() - new Date(value).getTime();
+  const minutes = Math.max(1, Math.floor(diffMs / 60000));
+  if (minutes < 60) return `${minutes} phút trước`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} giờ trước`;
+  return `${Math.floor(hours / 24)} ngày trước`;
+}
+
+function studentStatus(progress, attendance = 100) {
+  if (progress >= 90 && attendance >= 90) return "Xuất sắc";
+  if (progress < 50 || attendance < 65) return "Có rủi ro";
+  if (progress < 70 || attendance < 80) return "Cần xem xét";
+  return "Đúng tiến độ";
+}
+
+function statusClass(status) {
+  if (status === "Có rủi ro") return "risk";
+  if (status === "Cần xem xét") return "review";
+  if (status === "Xuất sắc") return "excellent";
+  return "track";
+}
+
+async function getProfile(teacherId) {
+  const [rows] = await db.query(
+    `
+      SELECT u.full_name AS name, u.avatar_url AS avatar, tp.specialization AS role
+      FROM users u
+      LEFT JOIN teacher_profiles tp ON tp.teacher_id = u.user_id
+      WHERE u.user_id = ? AND u.role = 'TEACHER'
+      LIMIT 1
+    `,
+    [teacherId],
+  );
+  return rows[0] ?? null;
+}
+
+export async function getInstructorStudentsData(rawTeacherId) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const profile = await getProfile(teacherId);
+  if (!profile) return null;
+
+  const [rows] = await db.query(
+    `
+      SELECT
+        u.user_id,
+        u.full_name AS name,
+        u.email,
+        c.course_name AS course,
+        b.batch_code AS batch,
+        e.progress_percent AS progress,
+        e.enrolled_at,
+        COALESCE(AVG(CASE
+          WHEN sa.status = 'PRESENT' THEN 100
+          WHEN sa.status = 'LATE' THEN 75
+          WHEN sa.status = 'EXCUSED' THEN 60
+          ELSE 70
+        END), 88) AS attendance
+      FROM enrollments e
+      INNER JOIN users u ON u.user_id = e.student_id
+      INNER JOIN course_batches b ON b.batch_id = e.batch_id
+      INNER JOIN courses c ON c.course_id = b.course_id
+      LEFT JOIN class_sessions cs ON cs.batch_id = b.batch_id
+      LEFT JOIN session_attendance sa ON sa.session_id = cs.session_id AND sa.student_id = u.user_id
+      WHERE b.teacher_id = ?
+      GROUP BY u.user_id, u.full_name, u.email, c.course_name, b.batch_code, e.progress_percent, e.enrolled_at
+      ORDER BY e.enrolled_at DESC
+    `,
+    [teacherId],
+  );
+
+  const students = rows.map((row) => {
+    const progress = percent(row.progress);
+    const attendance = percent(row.attendance);
+    const status = studentStatus(progress, attendance);
+
+    return {
+      name: row.name,
+      email: row.email,
+      course: row.course,
+      batch: row.batch,
+      progress,
+      attendance,
+      lastActive: relativeTime(row.enrolled_at),
+      status,
+      statusClass: statusClass(status),
+    };
+  });
+
+  const risky = students.filter((student) => student.status === "Có rủi ro");
+  const completed = students.filter((student) => student.progress >= 90);
+
+  return {
+    teacherId,
+    profile,
+    studentManagementStats: [
+      { label: "Học viên ghi danh", value: String(students.length), icon: "groups", tone: "blue" },
+      { label: "Hoạt động tuần này", value: String(students.length), icon: "bolt", tone: "green" },
+      { label: "Có rủi ro", value: String(risky.length), icon: "warning", tone: "amber" },
+      { label: "Đã hoàn thành", value: String(completed.length), icon: "workspace_premium", tone: "slate" },
+    ],
+    cohortFilters: ["Tất cả lớp", ...Array.from(new Set(students.map((student) => student.batch)))],
+    instructorStudents: students,
+    studentAttentionQueue: students
+      .filter((student) => student.status === "Có rủi ro" || student.status === "Cần xem xét")
+      .slice(0, 3)
+      .map((student) => ({
+        name: student.name,
+        reason: `${student.course}: tien do ${student.progress}%, chuyen can ${student.attendance}%.`,
+        action: "Gửi ghi chú cố vấn",
+        priority: student.status === "Có rủi ro" ? "Cao" : "Trung bình",
+      })),
+  };
+}
+
+export async function getInstructorQuizzesData(rawTeacherId) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const profile = await getProfile(teacherId);
+  if (!profile) return null;
+
+  const [quizRows] = await db.query(
+    `
+      SELECT
+        q.quiz_id,
+        q.title,
+        q.duration_minutes,
+        c.course_name AS course,
+        b.batch_code AS batch,
+        COUNT(DISTINCT qu.question_id) AS questions,
+        COUNT(DISTINCT qa.attempt_id) AS attempts,
+        COALESCE(AVG(CASE WHEN qa.score >= q.pass_score THEN 100 ELSE 0 END), 0) AS pass_rate
+      FROM quizzes q
+      INNER JOIN course_batches b ON b.batch_id = q.batch_id
+      INNER JOIN courses c ON c.course_id = b.course_id
+      LEFT JOIN questions qu ON qu.quiz_id = q.quiz_id
+      LEFT JOIN quiz_attempts qa ON qa.quiz_id = q.quiz_id AND qa.status IN ('SUBMITTED', 'GRADED')
+      WHERE b.teacher_id = ?
+      GROUP BY q.quiz_id, q.title, q.duration_minutes, c.course_name, b.batch_code
+      ORDER BY q.created_at DESC, q.quiz_id DESC
+    `,
+    [teacherId],
+  );
+
+  const [bankRows] = await db.query(
+    `
+      SELECT
+        COALESCE(cm.module_title, c.course_name) AS topic,
+        qn.question_type AS type,
+        COUNT(*) AS count
+      FROM questions qn
+      INNER JOIN quizzes q ON q.quiz_id = qn.quiz_id
+      INNER JOIN course_batches b ON b.batch_id = q.batch_id
+      INNER JOIN courses c ON c.course_id = b.course_id
+      LEFT JOIN lessons l ON l.lesson_id = q.lesson_id
+      LEFT JOIN course_modules cm ON cm.module_id = l.module_id
+      WHERE b.teacher_id = ?
+      GROUP BY COALESCE(cm.module_title, c.course_name), qn.question_type
+      ORDER BY count DESC
+      LIMIT 3
+    `,
+    [teacherId],
+  );
+
+  const [gradingRows] = await db.query(
+    `
+      SELECT u.full_name AS student, q.title AS quiz, qa.submitted_at, qa.score
+      FROM quiz_attempts qa
+      INNER JOIN quizzes q ON q.quiz_id = qa.quiz_id
+      INNER JOIN course_batches b ON b.batch_id = q.batch_id
+      INNER JOIN users u ON u.user_id = qa.student_id
+      WHERE b.teacher_id = ?
+        AND qa.status = 'SUBMITTED'
+      ORDER BY qa.submitted_at DESC
+      LIMIT 3
+    `,
+    [teacherId],
+  );
+
+  const totalQuestions = bankRows.reduce((sum, row) => sum + Number(row.count), 0);
+  const passRate =
+    quizRows.length === 0
+      ? 0
+      : percent(quizRows.reduce((sum, row) => sum + Number(row.pass_rate ?? 0), 0) / quizRows.length);
+
+  return {
+    teacherId,
+    profile,
+    quizManagementStats: [
+      { label: "Bài đã xuất bản", value: String(quizRows.length), icon: "quiz", tone: "blue" },
+      { label: "Ngân hàng câu hỏi", value: String(totalQuestions), icon: "help", tone: "slate" },
+      { label: "Tỷ lệ đạt TB", value: `${passRate}%`, icon: "fact_check", tone: "green" },
+      { label: "Cần chấm", value: String(gradingRows.length), icon: "grading", tone: "amber" },
+    ],
+    instructorQuizzes: quizRows.map((row) => ({
+      title: row.title,
+      course: row.course,
+      batch: row.batch,
+      questions: Number(row.questions),
+      duration: formatMinutes(row.duration_minutes),
+      attempts: Number(row.attempts),
+      passRate: percent(row.pass_rate),
+      status: "Đã xuất bản",
+    })),
+    quizQuestionBank: bankRows.map((row) => ({
+      topic: row.topic,
+      type: row.type,
+      count: Number(row.count),
+      difficulty: Number(row.count) >= 4 ? "Trung cấp" : "Cơ bản",
+    })),
+    gradingQueue: gradingRows.map((row) => ({
+      student: row.student,
+      quiz: row.quiz,
+      submitted: relativeTime(row.submitted_at),
+      score: row.score == null ? "Chờ chấm" : "Cần xem lại",
+    })),
+  };
+}
+
+export async function getInstructorInteractionData(rawTeacherId) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const profile = await getProfile(teacherId);
+  if (!profile) return null;
+
+  const [threadRows] = await db.query(
+    `
+      SELECT
+        d.discussion_id,
+        d.title,
+        c.course_name AS course,
+        b.batch_code AS batch,
+        d.created_at,
+        COUNT(dc.comment_id) AS replies
+      FROM discussions d
+      INNER JOIN course_batches b ON b.batch_id = d.batch_id
+      INNER JOIN courses c ON c.course_id = b.course_id
+      LEFT JOIN discussion_comments dc ON dc.discussion_id = d.discussion_id
+      WHERE b.teacher_id = ?
+      GROUP BY d.discussion_id, d.title, c.course_name, b.batch_code, d.created_at
+      ORDER BY d.created_at DESC
+      LIMIT 5
+    `,
+    [teacherId],
+  );
+
+  const [messageRows] = await db.query(
+    `
+      SELECT u.full_name AS student, d.content AS preview, d.created_at
+      FROM discussions d
+      INNER JOIN users u ON u.user_id = d.user_id
+      INNER JOIN course_batches b ON b.batch_id = d.batch_id
+      WHERE b.teacher_id = ?
+      ORDER BY d.created_at DESC
+      LIMIT 3
+    `,
+    [teacherId],
+  );
+
+  const [notificationRows] = await db.query(
+    `
+      SELECT n.title, n.content, n.is_read, n.created_at
+      FROM notifications n
+      WHERE n.user_id = ?
+      ORDER BY n.created_at DESC
+      LIMIT 3
+    `,
+    [teacherId],
+  );
+
+  return {
+    teacherId,
+    profile,
+    interactionStats: [
+      { label: "Chủ đề đang mở", value: String(threadRows.length), icon: "forum", tone: "blue" },
+      { label: "Tin chưa đọc", value: String(messageRows.length), icon: "mark_chat_unread", tone: "amber" },
+      { label: "Đã xử lý hôm nay", value: String(threadRows.filter((row) => Number(row.replies) > 0).length), icon: "task_alt", tone: "green" },
+      { label: "Thông báo", value: String(notificationRows.length), icon: "campaign", tone: "slate" },
+    ],
+    discussionThreads: threadRows.map((row) => ({
+      title: row.title,
+      course: row.course,
+      batch: row.batch,
+      replies: Number(row.replies),
+      lastActivity: relativeTime(row.created_at),
+      status: Number(row.replies) === 0 ? "Cần phản hồi" : "Đang thảo luận",
+    })),
+    directMessages: messageRows.map((row, index) => ({
+      student: row.student,
+      preview: row.preview,
+      time: relativeTime(row.created_at),
+      priority: index === 0 ? "Cao" : "Trung bình",
+    })),
+    announcementDrafts: notificationRows.map((row) => ({
+      title: row.title,
+      target: "Tất cả lớp",
+      state: row.is_read ? "Đã xuất bản" : "Bản nháp",
+    })),
+  };
+}
+
+export async function getInstructorAnalyticsData(rawTeacherId) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const profile = await getProfile(teacherId);
+  if (!profile) return null;
+
+  const [courseRows] = await db.query(
+    `
+      SELECT
+        c.course_name AS title,
+        COALESCE(AVG(e.progress_percent), 0) AS completion,
+        COALESCE(AVG(qa.score), 0) AS quiz_average,
+        COALESCE(AVG(CASE
+          WHEN sa.status = 'PRESENT' THEN 100
+          WHEN sa.status = 'LATE' THEN 75
+          ELSE 82
+        END), 82) AS attendance
+      FROM courses c
+      LEFT JOIN course_batches b ON b.course_id = c.course_id
+      LEFT JOIN enrollments e ON e.batch_id = b.batch_id
+      LEFT JOIN quizzes q ON q.batch_id = b.batch_id
+      LEFT JOIN quiz_attempts qa ON qa.quiz_id = q.quiz_id
+      LEFT JOIN class_sessions cs ON cs.batch_id = b.batch_id
+      LEFT JOIN session_attendance sa ON sa.session_id = cs.session_id
+      WHERE c.teacher_id = ?
+      GROUP BY c.course_id, c.course_name
+      ORDER BY completion DESC
+      LIMIT 3
+    `,
+    [teacherId],
+  );
+
+  const completionAvg =
+    courseRows.length === 0
+      ? 0
+      : percent(courseRows.reduce((sum, row) => sum + Number(row.completion ?? 0), 0) / courseRows.length);
+  const quizAvg =
+    courseRows.length === 0
+      ? 0
+      : Number((courseRows.reduce((sum, row) => sum + Number(row.quiz_average ?? 0), 0) / courseRows.length).toFixed(1));
+  const riskCount = courseRows.filter((row) => Number(row.completion ?? 0) < 60).length;
+
+  return {
+    teacherId,
+    profile,
+    analyticsStats: [
+      { label: "Giờ giảng dạy", value: "146", icon: "schedule", tone: "blue" },
+      { label: "Tỷ lệ hoàn thành", value: `${completionAvg}%`, icon: "trending_up", tone: "green" },
+      { label: "Điểm kiểm tra TB", value: String(quizAvg), icon: "score", tone: "slate" },
+      { label: "Tín hiệu rủi ro", value: String(riskCount), icon: "crisis_alert", tone: "amber" },
+    ],
+    engagementTrend: [
+      { label: "T1", value: 34 },
+      { label: "T2", value: 45 },
+      { label: "T3", value: 58 },
+      { label: "T4", value: 62 },
+      { label: "T5", value: 77 },
+      { label: "T6", value: Math.max(20, completionAvg) },
+    ],
+    learnerSegments: [
+      { label: "Xuất sắc", value: 22, tone: "blue" },
+      { label: "Đúng tiến độ", value: 45, tone: "green" },
+      { label: "Cần xem xét", value: 22, tone: "amber" },
+      { label: "Có rủi ro", value: 11, tone: "red" },
+    ],
+    courseInsights: courseRows.map((row) => ({
+      title: row.title,
+      completion: percent(row.completion),
+      quizAverage: Number(Number(row.quiz_average ?? 0).toFixed(1)),
+      attendance: percent(row.attendance),
+      trend: Number(row.completion ?? 0) >= 70 ? "+8%" : "-3%",
+    })),
+    analyticsRecommendations: courseRows
+      .filter((row) => Number(row.completion ?? 0) < 75)
+      .slice(0, 3)
+      .map((row) => ({
+        title: `Rà soát ${row.title}`,
+        detail: "Tiến độ trung bình đang thấp hơn ngưỡng mong đợi, nên thêm buổi ôn tập hoặc bài luyện tập.",
+        impact: Number(row.completion ?? 0) < 55 ? "Cao" : "Trung bình",
+      })),
+  };
+}

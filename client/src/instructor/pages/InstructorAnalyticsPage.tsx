@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import InstructorLayout from "../components/InstructorLayout";
 import {
   analyticsRecommendations,
@@ -7,7 +8,61 @@ import {
   learnerSegments,
 } from "../data/instructorMockData";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+const DEFAULT_TEACHER_ID = 4;
+
+type AnalyticsStat = (typeof analyticsStats)[number];
+type EngagementItem = (typeof engagementTrend)[number];
+type LearnerSegment = (typeof learnerSegments)[number];
+type CourseInsight = (typeof courseInsights)[number];
+type AnalyticsRecommendation = (typeof analyticsRecommendations)[number];
+
+type InstructorAnalyticsApiResponse = {
+  success: boolean;
+  data: {
+    analyticsStats: AnalyticsStat[];
+    engagementTrend: EngagementItem[];
+    learnerSegments: LearnerSegment[];
+    courseInsights: CourseInsight[];
+    analyticsRecommendations: AnalyticsRecommendation[];
+  };
+};
+
 function InstructorAnalyticsPage() {
+  const [pageData, setPageData] =
+    useState<InstructorAnalyticsApiResponse["data"] | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadAnalytics() {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/instructor/analytics?teacherId=${DEFAULT_TEACHER_ID}`,
+          { signal: controller.signal },
+        );
+        if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
+
+        const payload = (await response.json()) as InstructorAnalyticsApiResponse;
+        if (!payload.success) throw new Error("Analytics API returned unsuccessful response.");
+
+        setPageData(payload.data);
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+        console.error(error);
+      }
+    }
+
+    loadAnalytics();
+    return () => controller.abort();
+  }, []);
+
+  const displayedStats = pageData?.analyticsStats ?? analyticsStats;
+  const displayedEngagementTrend = pageData?.engagementTrend ?? engagementTrend;
+  const displayedLearnerSegments = pageData?.learnerSegments ?? learnerSegments;
+  const displayedCourseInsights = pageData?.courseInsights ?? courseInsights;
+  const displayedRecommendations = pageData?.analyticsRecommendations ?? analyticsRecommendations;
+
   return (
     <InstructorLayout activePage="analytics">
       <section className="instructor-hero instructor-analytics-hero">
@@ -32,7 +87,7 @@ function InstructorAnalyticsPage() {
       </section>
 
       <section className="instructor-stat-grid" aria-label="Tổng quan phân tích">
-        {analyticsStats.map((stat) => (
+        {displayedStats.map((stat) => (
           <article className="instructor-stat-card" key={stat.label}>
             <div className={`instructor-stat-icon ${stat.tone}`}>
               <span className="material-symbols-outlined">{stat.icon}</span>
@@ -40,7 +95,7 @@ function InstructorAnalyticsPage() {
             <p>{stat.label}</p>
             <div>
               <strong>{stat.value}</strong>
-              <span>Trong 30 ngày gần nhất</span>
+              <span>{pageData ? "Dữ liệu từ backend" : "Trong 30 ngày gần nhất"}</span>
             </div>
           </article>
         ))}
@@ -55,9 +110,8 @@ function InstructorAnalyticsPage() {
             </div>
             <strong>+18%</strong>
           </div>
-
           <div className="instructor-analytics-chart">
-            {engagementTrend.map((item) => (
+            {displayedEngagementTrend.map((item) => (
               <div className="instructor-analytics-column" key={item.label}>
                 <span style={{ height: `${item.value}%` }} />
                 <p>{item.label}</p>
@@ -74,9 +128,8 @@ function InstructorAnalyticsPage() {
             </div>
             <span className="material-symbols-outlined">donut_large</span>
           </div>
-
           <div className="instructor-segment-list">
-            {learnerSegments.map((segment) => (
+            {displayedLearnerSegments.map((segment) => (
               <div className="instructor-segment-item" key={segment.label}>
                 <div>
                   <span className={`instructor-segment-dot ${segment.tone}`} />
@@ -96,13 +149,10 @@ function InstructorAnalyticsPage() {
               <p className="instructor-eyebrow">Khóa học</p>
               <h3>Thông tin hiệu suất</h3>
             </div>
-            <button className="instructor-ghost-button" type="button">
-              So sánh
-            </button>
+            <button className="instructor-ghost-button" type="button">So sánh</button>
           </div>
-
           <div className="instructor-insight-list">
-            {courseInsights.map((course) => (
+            {displayedCourseInsights.map((course) => (
               <article className="instructor-insight-card" key={course.title}>
                 <div>
                   <h4>{course.title}</h4>
@@ -125,9 +175,8 @@ function InstructorAnalyticsPage() {
             </div>
             <span className="material-symbols-outlined">tips_and_updates</span>
           </div>
-
           <div className="instructor-recommendation-list">
-            {analyticsRecommendations.map((item) => (
+            {displayedRecommendations.map((item) => (
               <article className="instructor-recommendation-card" key={item.title}>
                 <div>
                   <h4>{item.title}</h4>

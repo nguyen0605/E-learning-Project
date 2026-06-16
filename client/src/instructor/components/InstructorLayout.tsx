@@ -10,9 +10,20 @@ import "../pages/InstructorPortal.css";
 type InstructorLayoutProps = {
   activePage: InstructorNavKey;
   children: ReactNode;
+  profile?: {
+    name: string;
+    role: string;
+    avatar?: string | null;
+  };
 };
 
-function InstructorLayout({ activePage, children }: InstructorLayoutProps) {
+function InstructorLayout({ activePage, children, profile }: InstructorLayoutProps) {
+  const displayedProfile = {
+    ...instructorProfile,
+    ...profile,
+    avatar: profile?.avatar || instructorProfile.avatar,
+  };
+
   return (
     <div className="instructor-shell">
       <aside className="instructor-sidebar">
@@ -67,10 +78,10 @@ function InstructorLayout({ activePage, children }: InstructorLayoutProps) {
               <span className="instructor-notification-dot" />
             </button>
             <div className="instructor-profile-chip">
-              <img alt="" src={instructorProfile.avatar} />
+              <img alt="" src={displayedProfile.avatar} />
               <div>
-                <p>{instructorProfile.name}</p>
-                <span>{instructorProfile.role}</span>
+                <p>{displayedProfile.name}</p>
+                <span>{displayedProfile.role}</span>
               </div>
             </div>
           </div>

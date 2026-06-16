@@ -1,5 +1,6 @@
 import express from "express";
 import adminRoutes from "./routes/admin.routes.js";
+import instructorRoutes from "./routes/instructor.routes.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -26,6 +27,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/admin", adminRoutes);
+app.use("/api/instructor", instructorRoutes);
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);

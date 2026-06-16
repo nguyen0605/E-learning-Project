@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import InstructorLayout from "../components/InstructorLayout";
 import {
   analyticsBars,
@@ -7,13 +8,86 @@ import {
   teachingSchedule,
 } from "../data/instructorMockData";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+const DEFAULT_TEACHER_ID = 4;
+
+type DashboardStat = (typeof dashboardStats)[number];
+type TeachingScheduleItem = (typeof teachingSchedule)[number];
+type AnalyticsBar = (typeof analyticsBars)[number];
+type CoursePerformanceItem = (typeof coursePerformance)[number];
+type StudentSignal = (typeof studentSignals)[number];
+
+type InstructorDashboardApiResponse = {
+  success: boolean;
+  data: {
+    teacherId: number;
+    profile: {
+      name: string;
+      role: string;
+      avatar: string | null;
+      workplace?: string | null;
+    };
+    dashboardStats: DashboardStat[];
+    teachingSchedule: TeachingScheduleItem[];
+    analyticsBars: AnalyticsBar[];
+    coursePerformance: CoursePerformanceItem[];
+    studentSignals: StudentSignal[];
+    generatedAt: string;
+  };
+};
+
 function InstructorDashboardPage() {
+  const [dashboard, setDashboard] =
+    useState<InstructorDashboardApiResponse["data"] | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadDashboard() {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/instructor/dashboard?teacherId=${DEFAULT_TEACHER_ID}`,
+          { signal: controller.signal },
+        );
+
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as InstructorDashboardApiResponse;
+
+        if (!payload.success) {
+          throw new Error("Instructor dashboard API returned unsuccessful response.");
+        }
+
+        setDashboard(payload.data);
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+
+        console.error(error);
+      }
+    }
+
+    loadDashboard();
+
+    return () => controller.abort();
+  }, []);
+
+  const displayedDashboardStats = dashboard?.dashboardStats ?? dashboardStats;
+  const displayedTeachingSchedule = dashboard?.teachingSchedule ?? teachingSchedule;
+  const displayedAnalyticsBars = dashboard?.analyticsBars ?? analyticsBars;
+  const displayedCoursePerformance = dashboard?.coursePerformance ?? coursePerformance;
+  const displayedStudentSignals = dashboard?.studentSignals ?? studentSignals;
+  const instructorName = dashboard?.profile.name ?? "thay Minh Anh";
+
   return (
-    <InstructorLayout activePage="dashboard">
+    <InstructorLayout activePage="dashboard" profile={dashboard?.profile}>
       <section className="instructor-hero">
         <div>
           <p className="instructor-eyebrow">Không gian giảng viên</p>
-          <h2>Chào mừng thầy Minh Anh</h2>
+          <h2>Chào mừng {instructorName}</h2>
           <p>
             Theo dõi lịch dạy, tiến độ học viên, hiệu suất khóa học và các bài
             cần xử lý trong một không gian quản lý rõ ràng.
@@ -26,7 +100,7 @@ function InstructorDashboardPage() {
       </section>
 
       <section className="instructor-stat-grid" aria-label="Tổng quan giảng viên">
-        {dashboardStats.map((stat) => (
+        {displayedDashboardStats.map((stat) => (
           <article className="instructor-stat-card" key={stat.label}>
             <div className={`instructor-stat-icon ${stat.tone}`}>
               <span className="material-symbols-outlined">{stat.icon}</span>
@@ -51,7 +125,7 @@ function InstructorDashboardPage() {
           </div>
 
           <div className="instructor-schedule-list">
-            {teachingSchedule.map((item) => (
+            {displayedTeachingSchedule.map((item) => (
               <div className="instructor-schedule-item" key={item.title}>
                 <time>{item.time}</time>
                 <div>
@@ -76,7 +150,7 @@ function InstructorDashboardPage() {
           </div>
 
           <div className="instructor-bar-chart">
-            {analyticsBars.map((bar) => (
+            {displayedAnalyticsBars.map((bar) => (
               <div className="instructor-bar-column" key={bar.label}>
                 <span style={{ height: `${bar.value}%` }} />
                 <p>{bar.label}</p>
@@ -99,7 +173,7 @@ function InstructorDashboardPage() {
           </div>
 
           <div className="instructor-course-list">
-            {coursePerformance.map((course) => (
+            {displayedCoursePerformance.map((course) => (
               <div className="instructor-course-row" key={course.title}>
                 <div>
                   <h4>{course.title}</h4>
@@ -130,7 +204,7 @@ function InstructorDashboardPage() {
           </div>
 
           <div className="instructor-student-list">
-            {studentSignals.map((student) => (
+            {displayedStudentSignals.map((student) => (
               <div className="instructor-student-item" key={student.name}>
                 <div className="instructor-student-avatar">
                   {student.name

@@ -416,6 +416,7 @@ CREATE TABLE assignment_submissions (
 CREATE TABLE quizzes (
     quiz_id BIGINT PRIMARY KEY AUTO_INCREMENT,
     batch_id BIGINT NOT NULL,
+    lesson_id BIGINT,
 
     title VARCHAR(200) NOT NULL,
     description TEXT,

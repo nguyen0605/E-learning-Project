@@ -43,3 +43,22 @@ VALUES
 (15, '2001-01-08', 'FEMALE', 'TP.HCM'),
 (16, '2001-01-09', 'MALE', 'TP.HCM'),
 (17, '2001-01-10', 'FEMALE', 'TP.HCM');
+
+ Admin:c
+      - admin1@elearning.vn / Password123
+      - admin2@elearning.vn / Password123
+
+  - Giảng viên:
+      - gv01@elearning.vn / Password123
+      - gv02@elearning.vn / Password123
+      - gv03@elearning.vn / Password123
+
+  - Học viên:
+      - hv01@elearning.vn / Password123
+      - hv02@elearning.vn / Password123
+      - hv03@elearning.vn / Password123
+      - hv04@elearning.vn / Password123
+      - hv05@elearning.vn / Password123
+
+  - Tài khoản test:
+      - student@example.com / 12345678

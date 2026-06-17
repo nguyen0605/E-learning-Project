@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getAuthHeaders } from "../../auth/authHeaders";
 import "../../index.css";
 
 type AdminPage =
@@ -156,6 +157,7 @@ function AdminDashboardPage({
         setError("");
 
         const response = await fetch(`${API_BASE_URL}/api/admin/dashboard`, {
+          headers: getAuthHeaders(),
           signal: controller.signal,
         });
 

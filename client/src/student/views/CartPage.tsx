@@ -1,107 +1,163 @@
+import { useEffect, useState } from "react";
 import Icon from "../components/Icon";
-import WishlistItem from "../components/WishlistItem";
-import { courseImages } from "../data/courseData";
+import { getCart, removeCartItem } from "../services/studentCartApi";
+import type { StudentCart } from "../types/cart.types";
 
-const cartItems = [
-  ["Advanced Cybersecurity Architectures", "Technology", "$124.00", "$189.00", courseImages[0]],
-  ["Data Analytics: The Strategic Narrative", "Business", "$89.00", "", courseImages[2]],
-] as const;
+const fallbackImage =
+  "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80";
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("vi-VN", {
+    currency: "VND",
+    maximumFractionDigits: 0,
+    style: "currency",
+  }).format(value);
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("vi-VN").format(new Date(value));
+}
+
+function getCourseImage(thumbnailUrl: string | null) {
+  return thumbnailUrl?.startsWith("http") ? thumbnailUrl : fallbackImage;
+}
 
 function CartPage() {
+  const [cart, setCart] = useState<StudentCart | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [removingId, setRemovingId] = useState<number | null>(null);
+
+  async function loadCart() {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const nextCart = await getCart();
+      setCart(nextCart);
+    } catch (cartError) {
+      setError(
+        cartError instanceof Error
+          ? cartError.message
+          : "Không thể tải giỏ hàng.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadCart();
+  }, []);
+
+  async function handleRemoveItem(cartItemId: number) {
+    setRemovingId(cartItemId);
+    setError("");
+
+    try {
+      await removeCartItem(cartItemId);
+      await loadCart();
+    } catch (removeError) {
+      setError(
+        removeError instanceof Error
+          ? removeError.message
+          : "Không thể xóa khóa học khỏi giỏ hàng.",
+      );
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  const items = cart?.items ?? [];
+  const summary = cart?.summary ?? {
+    discount: 0,
+    itemCount: 0,
+    subtotal: 0,
+    tax: 0,
+    total: 0,
+  };
+
   return (
     <main className="sp-cart-page">
       <section>
         <h1>Giỏ hàng</h1>
-        <p>Bạn đã chọn 2 khóa học để nâng cao kiến thức và kỹ năng.</p>
+        <p>
+          Bạn đã chọn {summary.itemCount} khóa học để nâng cao kiến thức và kỹ
+          năng.
+        </p>
 
-        {cartItems.map(([title, tag, price, oldPrice, image]) => (
-          <article className="sp-cart-item" key={title}>
-            <img src={image} alt={title} />
+        {isLoading ? <p className="sp-state-line">Đang tải giỏ hàng...</p> : null}
+        {error ? <p className="sp-state-line error">{error}</p> : null}
+
+        {!isLoading && !error && items.length === 0 ? (
+          <div className="sp-empty-cart">
+            <Icon name="shopping_cart" />
+            <h2>Giỏ hàng đang trống</h2>
+            <p>Hãy mở một khóa học và bấm “Thêm vào giỏ hàng”.</p>
+          </div>
+        ) : null}
+
+        {items.map((item) => (
+          <article className="sp-cart-item" key={item.id}>
+            <img src={getCourseImage(item.course.thumbnailUrl)} alt={item.course.name} />
 
             <div>
-              <span>{tag}</span>
+              <span>{item.category.name}</span>
 
-              <h2>{title}</h2>
+              <h2>{item.course.name}</h2>
 
-              <p>Giảng viên: TS. Marcus Thorne • Thời lượng: 12 tuần</p>
+              <p>
+                Giảng viên: {item.teacher.fullName} • Lớp: {item.batch.name} •{" "}
+                {formatDate(item.batch.startDate)} - {formatDate(item.batch.endDate)}
+              </p>
 
               <div>
-                <button type="button">
-                  <Icon name="delete" /> Xóa khỏi giỏ hàng
-                </button>
-
-                <button type="button">
-                  <Icon name="favorite" /> Lưu để học sau
+                <button
+                  disabled={removingId === item.id}
+                  onClick={() => void handleRemoveItem(item.id)}
+                  type="button"
+                >
+                  <Icon name="delete" />{" "}
+                  {removingId === item.id ? "Đang xóa..." : "Xóa khỏi giỏ hàng"}
                 </button>
               </div>
             </div>
 
-            <strong>
-              {price}
-              <small>{oldPrice}</small>
-            </strong>
+            <strong>{formatCurrency(item.priceSnapshot)}</strong>
           </article>
         ))}
-
-        <div className="sp-wishlist">
-          <h2>
-            Khóa học yêu thích
-            <button type="button">Xem tất cả</button>
-          </h2>
-
-          <div>
-            <WishlistItem
-              title="Tâm lý học trong thiết kế giao diện"
-              price="$45.00"
-              image={courseImages[1]}
-            />
-
-            <WishlistItem
-              title="Kinh tế học toàn cầu cơ bản"
-              price="$62.00"
-              image={courseImages[2]}
-            />
-          </div>
-        </div>
       </section>
 
       <aside className="sp-order-card">
         <h2>Tóm tắt đơn hàng</h2>
 
         <p>
-          <span>Giá gốc</span>
-          <strong>$278.00</strong>
+          <span>Tạm tính</span>
+          <strong>{formatCurrency(summary.subtotal)}</strong>
         </p>
 
         <p className="discount">
           <span>Giảm giá</span>
-          <strong>-$65.00</strong>
+          <strong>-{formatCurrency(summary.discount)}</strong>
         </p>
 
         <p>
-          <span>Thuế (5%)</span>
-          <strong>$10.65</strong>
+          <span>Thuế</span>
+          <strong>{formatCurrency(summary.tax)}</strong>
         </p>
 
         <hr />
 
         <p className="total">
           <span>Tổng thanh toán</span>
-          <strong>$223.65</strong>
+          <strong>{formatCurrency(summary.total)}</strong>
         </p>
 
-        <label>Mã giảm giá</label>
-
-        <div className="sp-coupon">
-          <input value="SCHOLAR20" readOnly />
-          <button type="button">Áp dụng</button>
-        </div>
-
-        <button className="sp-checkout" type="button">
+        <button className="sp-checkout" disabled={items.length === 0} type="button">
           Tiến hành thanh toán
         </button>
 
-        <small>Cam kết hoàn tiền trong vòng 30 ngày</small>
+        <small>Giỏ hàng được lưu theo tài khoản học viên của bạn.</small>
       </aside>
     </main>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getAuthHeaders } from "../../auth/authHeaders";
 import "../../index.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -170,7 +171,9 @@ function CourseManagementPage({
 
     async function loadCourses() {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/admin/courses`);
+        const response = await fetch(`${API_BASE_URL}/api/admin/courses`, {
+          headers: getAuthHeaders(),
+        });
         if (!response.ok) throw new Error(`Failed with ${response.status}`);
 
         const result = (await response.json()) as CoursesApiResponse;

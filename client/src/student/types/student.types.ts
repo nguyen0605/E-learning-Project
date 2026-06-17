@@ -1,9 +1,12 @@
 export type StudentView =
   | "home"
   | "courses"
+  | "myCourses"
   | "categories"
   | "cart"
   | "lesson"
+  | "learning"
+  | "courseDetail"
   | "exam"
   | "interaction";
 

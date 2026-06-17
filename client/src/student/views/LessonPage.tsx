@@ -40,11 +40,7 @@ function LessonPage() {
           <button className="active" type="button">
             Tổng quan
           </button>
-
-          <button type="button">Ghi chú</button>
-
           <button type="button">Tài liệu</button>
-
           <button type="button">Đánh giá</button>
         </nav>
 
@@ -54,8 +50,6 @@ function LessonPage() {
               Trong bài học này, bạn sẽ tìm hiểu sâu hơn về tác động của khoảng
               trắng trong thiết kế, tâm lý học thị giác và cách sử dụng màu sắc
               để tạo nên những trải nghiệm người dùng trực quan và hiệu quả.
-              Bạn sẽ học cách xây dựng các giao diện hiện đại, chuyên nghiệp và
-              mang lại cảm giác tự nhiên cho người sử dụng.
             </p>
 
             <div className="sp-learn-list">
@@ -77,9 +71,7 @@ function LessonPage() {
                 src="https://api.dicebear.com/9.x/personas/svg?seed=Julian"
                 alt=""
               />
-
               <strong>Julian Vane</strong>
-
               <small>Chuyên gia Thiết kế UI/UX</small>
             </p>
           </aside>
@@ -88,21 +80,6 @@ function LessonPage() {
 
       <aside className="sp-lesson-side">
         <CourseContent />
-
-        <div className="sp-notes">
-          <h2>
-            <Icon name="speaker_notes" /> Ghi chú nhanh
-            <button type="button">Xem tất cả</button>
-          </h2>
-
-          <textarea placeholder="Nhập ghi chú của bạn tại thời điểm 12:45..." />
-
-          <div>
-            <small>Đang tự động lưu...</small>
-
-            <button type="button">Lưu ghi chú</button>
-          </div>
-        </div>
       </aside>
     </main>
   );

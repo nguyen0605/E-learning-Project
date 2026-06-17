@@ -936,3 +936,12 @@ UPDATE lessons SET content = 'Xây dựng quy trình đóng gói nhanh, chuyên 
 UPDATE lessons SET content = 'Nghệ thuật chat với khách hàng và cách biến những khiếu nại thành cơ hội bán hàng lại.' WHERE lesson_id = 58;
 UPDATE lessons SET content = 'Tìm hiểu cách chạy quảng cáo từ khóa nội sàn để tăng lượt hiển thị sản phẩm lên trang đầu.' WHERE lesson_id = 59;
 UPDATE lessons SET content = 'Tạo các chương trình khuyến mãi, voucher và quà tặng để giữ chân khách hàng cũ.' WHERE lesson_id = 60;
+
+-- 5. Bổ sung URL video dành riêng cho web
+UPDATE lessons
+SET video_web_url = CASE
+    WHEN lesson_type <> 'VIDEO' THEN NULL
+    WHEN MOD(lesson_id, 3) = 1 THEN 'https://www.w3schools.com/html/mov_bbb.mp4'
+    WHEN MOD(lesson_id, 3) = 2 THEN 'https://www.w3schools.com/html/movie.mp4'
+    ELSE 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
+END;

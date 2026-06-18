@@ -19,16 +19,19 @@ function formatCurrencyLabel(value) {
   const amount = Number(value ?? 0);
 
   if (amount >= 1000000) {
-    return `${Math.round(amount / 1000000)} trieu`;
+    return `${Math.round(amount / 1000000)} triệu`;
   }
 
   return new Intl.NumberFormat("vi-VN").format(amount);
 }
 
-function toLearningModeLabel(mode) {
-  if (mode === "OFFLINE") return "Trực tiếp";
-  if (mode === "HYBRID") return "Kết hợp";
-  return "Trực tuyến";
+function toOnlinePlatformLabel(platform) {
+  if (platform === "GOOGLE_MEET") return "Google Meet";
+  if (platform === "MICROSOFT_TEAMS") return "Microsoft Teams";
+  if (platform === "JITSI") return "Jitsi";
+  if (platform === "INTERNAL_ROOM") return "Phòng nội bộ";
+  if (platform === "OTHER") return "Khác";
+  return "Zoom";
 }
 
 function toCourseStatusLabel(status) {
@@ -165,8 +168,8 @@ async function getTeachingSchedule(teacherId) {
   return rows.map((row) => ({
     time: row.time,
     title: row.title,
-    batch: row.batch ?? "Chua co ma lop",
-    mode: String(row.platform ?? "ONLINE").replaceAll("_", " "),
+    batch: row.batch ?? "Chưa có mã lớp",
+    mode: toOnlinePlatformLabel(row.platform),
     status: toSessionStatusLabel(row.status),
   }));
 }
@@ -239,8 +242,9 @@ async function getCoursePerformance(teacherId) {
   );
 
   return rows.map((row) => ({
+    id: Number(row.id),
     title: row.title,
-      category: row.category ?? "Chưa phân loại",
+    category: row.category ?? "Chưa phân loại",
     students: Number(row.students ?? 0),
     completion: formatPercentage(row.completion),
     rating: formatRating(row.rating),
@@ -280,6 +284,7 @@ async function getStudentSignals(teacherId) {
     const progress = formatPercentage(row.progress);
 
     return {
+      id: Number(row.id),
       name: row.name,
       course: row.course,
       progress,
@@ -314,7 +319,7 @@ export async function getInstructorDashboardData(rawTeacherId) {
     teacherId,
     profile: {
       name: profile.name,
-      role: profile.specialization ?? "Giang vien",
+      role: profile.specialization ?? "Giảng viên",
       avatar: profile.avatar,
       workplace: profile.workplace,
     },

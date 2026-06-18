@@ -40,6 +40,18 @@ function statusClass(status) {
   return "track";
 }
 
+function formatDateTimeInput(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const pad = (input) => String(input).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join("-") + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 async function getProfile(teacherId) {
   const [rows] = await db.query(
     `
@@ -54,15 +66,146 @@ async function getProfile(teacherId) {
   return rows[0] ?? null;
 }
 
+export async function getInstructorProfileData(rawTeacherId) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const [rows] = await db.query(
+    `
+      SELECT
+        u.user_id AS id,
+        u.full_name AS name,
+        u.email,
+        u.phone,
+        u.avatar_url AS avatar,
+        u.status,
+        tp.bio,
+        tp.specialization,
+        tp.experience_years AS experienceYears,
+        tp.qualification,
+        tp.workplace
+      FROM users u
+      LEFT JOIN teacher_profiles tp ON tp.teacher_id = u.user_id
+      WHERE u.user_id = ? AND u.role = 'TEACHER'
+      LIMIT 1
+    `,
+    [teacherId],
+  );
+
+  const profile = rows[0];
+  if (!profile) return null;
+
+  return {
+    id: profile.id,
+    name: profile.name,
+    email: profile.email,
+    phone: profile.phone ?? "",
+    avatar: profile.avatar,
+    status: profile.status,
+    role: profile.specialization ?? "Giảng viên",
+    bio: profile.bio ?? "",
+    specialization: profile.specialization ?? "",
+    experienceYears: Number(profile.experienceYears ?? 0),
+    qualification: profile.qualification ?? "",
+    workplace: profile.workplace ?? "",
+  };
+}
+
+export async function updateInstructorProfile(rawTeacherId, profileData) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const name = String(profileData?.name ?? "").trim();
+  const phone = String(profileData?.phone ?? "").trim();
+  const avatar = String(profileData?.avatar ?? "").trim();
+  const bio = String(profileData?.bio ?? "").trim();
+  const specialization = String(profileData?.specialization ?? "").trim();
+  const qualification = String(profileData?.qualification ?? "").trim();
+  const workplace = String(profileData?.workplace ?? "").trim();
+  const experienceYears = Math.max(0, Number(profileData?.experienceYears ?? 0) || 0);
+
+  if (!name) throw new Error("Instructor name is required.");
+  if (avatar && !/^https?:\/\//i.test(avatar)) {
+    throw new Error("Avatar URL must start with http:// or https://.");
+  }
+
+  const [teacherRows] = await db.query(
+    `
+      SELECT user_id
+      FROM users
+      WHERE user_id = ? AND role = 'TEACHER'
+      LIMIT 1
+    `,
+    [teacherId],
+  );
+
+  if (!teacherRows[0]) return null;
+
+  await db.query(
+    `
+      UPDATE users
+      SET full_name = ?, phone = ?, avatar_url = ?
+      WHERE user_id = ? AND role = 'TEACHER'
+    `,
+    [name, phone || null, avatar || null, teacherId],
+  );
+
+  await db.query(
+    `
+      INSERT INTO teacher_profiles (
+        teacher_id,
+        bio,
+        specialization,
+        experience_years,
+        qualification,
+        workplace
+      ) VALUES (?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        bio = VALUES(bio),
+        specialization = VALUES(specialization),
+        experience_years = VALUES(experience_years),
+        qualification = VALUES(qualification),
+        workplace = VALUES(workplace)
+    `,
+    [
+      teacherId,
+      bio || null,
+      specialization || null,
+      experienceYears,
+      qualification || null,
+      workplace || null,
+    ],
+  );
+
+  return getInstructorProfileData(teacherId);
+}
+
+async function ensureStudentInterventionTable() {
+  await db.query(
+    `
+      CREATE TABLE IF NOT EXISTS instructor_student_interventions (
+        intervention_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        teacher_id BIGINT NOT NULL,
+        student_id BIGINT NOT NULL,
+        batch_id BIGINT NOT NULL,
+        note TEXT NOT NULL,
+        next_action VARCHAR(255),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (teacher_id) REFERENCES users(user_id),
+        FOREIGN KEY (student_id) REFERENCES users(user_id),
+        FOREIGN KEY (batch_id) REFERENCES course_batches(batch_id) ON DELETE CASCADE
+      )
+    `,
+  );
+}
+
 export async function getInstructorStudentsData(rawTeacherId) {
   const teacherId = normalizeTeacherId(rawTeacherId);
   const profile = await getProfile(teacherId);
   if (!profile) return null;
+  await ensureStudentInterventionTable();
 
   const [rows] = await db.query(
     `
       SELECT
         u.user_id,
+        b.batch_id AS batchId,
         u.full_name AS name,
         u.email,
         c.course_name AS course,
@@ -82,10 +225,34 @@ export async function getInstructorStudentsData(rawTeacherId) {
       LEFT JOIN class_sessions cs ON cs.batch_id = b.batch_id
       LEFT JOIN session_attendance sa ON sa.session_id = cs.session_id AND sa.student_id = u.user_id
       WHERE b.teacher_id = ?
-      GROUP BY u.user_id, u.full_name, u.email, c.course_name, b.batch_code, e.progress_percent, e.enrolled_at
+      GROUP BY u.user_id, b.batch_id, u.full_name, u.email, c.course_name, b.batch_code, e.progress_percent, e.enrolled_at
       ORDER BY e.enrolled_at DESC
     `,
     [teacherId],
+  );
+
+  const [interventionRows] = await db.query(
+    `
+      SELECT
+        i.intervention_id AS id,
+        i.student_id AS studentId,
+        i.batch_id AS batchId,
+        i.note,
+        i.next_action AS nextAction,
+        i.created_at AS createdAt
+      FROM instructor_student_interventions i
+      INNER JOIN (
+        SELECT student_id, batch_id, MAX(created_at) AS createdAt
+        FROM instructor_student_interventions
+        WHERE teacher_id = ?
+        GROUP BY student_id, batch_id
+      ) latest
+        ON latest.student_id = i.student_id
+        AND latest.batch_id = i.batch_id
+        AND latest.createdAt = i.created_at
+      WHERE i.teacher_id = ?
+    `,
+    [teacherId, teacherId],
   );
 
   const students = rows.map((row) => {
@@ -94,6 +261,8 @@ export async function getInstructorStudentsData(rawTeacherId) {
     const status = studentStatus(progress, attendance);
 
     return {
+      id: row.user_id,
+      batchId: row.batchId,
       name: row.name,
       email: row.email,
       course: row.course,
@@ -103,6 +272,12 @@ export async function getInstructorStudentsData(rawTeacherId) {
       lastActive: relativeTime(row.enrolled_at),
       status,
       statusClass: statusClass(status),
+      latestIntervention:
+        interventionRows.find(
+          (intervention) =>
+            Number(intervention.studentId) === Number(row.user_id) &&
+            Number(intervention.batchId) === Number(row.batchId),
+        ) ?? null,
     };
   });
 
@@ -124,11 +299,57 @@ export async function getInstructorStudentsData(rawTeacherId) {
       .filter((student) => student.status === "Có rủi ro" || student.status === "Cần xem xét")
       .slice(0, 3)
       .map((student) => ({
+        studentId: student.id,
+        batchId: student.batchId,
         name: student.name,
         reason: `${student.course}: tien do ${student.progress}%, chuyen can ${student.attendance}%.`,
         action: "Gửi ghi chú cố vấn",
         priority: student.status === "Có rủi ro" ? "Cao" : "Trung bình",
       })),
+  };
+}
+
+export async function createInstructorStudentIntervention(rawTeacherId, rawStudentId, interventionData) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const studentId = Number(rawStudentId);
+  const batchId = Number(interventionData?.batchId);
+  const note = String(interventionData?.note ?? "").trim();
+  const nextAction = String(interventionData?.nextAction ?? "").trim();
+
+  if (!Number.isFinite(studentId) || studentId <= 0) throw new Error("Invalid student id.");
+  if (!Number.isFinite(batchId) || batchId <= 0) throw new Error("Invalid batch id.");
+  if (!note) throw new Error("Intervention note is required.");
+
+  await ensureStudentInterventionTable();
+
+  const [accessRows] = await db.query(
+    `
+      SELECT e.student_id AS studentId
+      FROM enrollments e
+      INNER JOIN course_batches b ON b.batch_id = e.batch_id
+      WHERE e.student_id = ? AND e.batch_id = ? AND b.teacher_id = ?
+      LIMIT 1
+    `,
+    [studentId, batchId, teacherId],
+  );
+
+  if (!accessRows[0]) throw new Error("Student not found for this instructor.");
+
+  const [result] = await db.query(
+    `
+      INSERT INTO instructor_student_interventions (teacher_id, student_id, batch_id, note, next_action)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+    [teacherId, studentId, batchId, note, nextAction || null],
+  );
+
+  return {
+    id: result.insertId,
+    studentId,
+    batchId,
+    note,
+    nextAction,
+    createdAt: new Date().toISOString(),
   };
 }
 
@@ -195,6 +416,66 @@ export async function getInstructorQuizzesData(rawTeacherId) {
     [teacherId],
   );
 
+  const [assignmentRows] = await db.query(
+    `
+      SELECT
+        a.assignment_id AS id,
+        a.batch_id AS batchId,
+        a.title,
+        a.description,
+        a.due_date AS dueDate,
+        a.max_score AS maxScore,
+        c.course_name AS course,
+        b.batch_code AS batch,
+        COUNT(s.submission_id) AS submissions,
+        SUM(CASE WHEN s.submission_id IS NOT NULL AND s.score IS NULL THEN 1 ELSE 0 END) AS pendingSubmissions
+      FROM assignments a
+      INNER JOIN course_batches b ON b.batch_id = a.batch_id
+      INNER JOIN courses c ON c.course_id = b.course_id
+      LEFT JOIN assignment_submissions s ON s.assignment_id = a.assignment_id
+      WHERE b.teacher_id = ?
+      GROUP BY a.assignment_id, a.batch_id, a.title, a.description, a.due_date, a.max_score, c.course_name, b.batch_code
+      ORDER BY a.due_date DESC, a.assignment_id DESC
+    `,
+    [teacherId],
+  );
+
+  const [batchRows] = await db.query(
+    `
+      SELECT
+        b.batch_id AS id,
+        b.batch_code AS batchCode,
+        c.course_name AS courseName
+      FROM course_batches b
+      INNER JOIN courses c ON c.course_id = b.course_id
+      WHERE b.teacher_id = ?
+      ORDER BY b.batch_code ASC, b.batch_id ASC
+    `,
+    [teacherId],
+  );
+
+  const [submissionRows] = await db.query(
+    `
+      SELECT
+        s.submission_id AS id,
+        s.assignment_id AS assignmentId,
+        u.full_name AS student,
+        s.file_url AS fileUrl,
+        s.content,
+        s.submitted_at AS submittedAt,
+        s.score,
+        s.feedback,
+        s.graded_at AS gradedAt
+      FROM assignment_submissions s
+      INNER JOIN assignments a ON a.assignment_id = s.assignment_id
+      INNER JOIN course_batches b ON b.batch_id = a.batch_id
+      INNER JOIN users u ON u.user_id = s.student_id
+      WHERE b.teacher_id = ?
+      ORDER BY s.submitted_at DESC, s.submission_id DESC
+    `,
+    [teacherId],
+  );
+
   const totalQuestions = bankRows.reduce((sum, row) => sum + Number(row.count), 0);
   const passRate =
     quizRows.length === 0
@@ -208,7 +489,12 @@ export async function getInstructorQuizzesData(rawTeacherId) {
       { label: "Bài đã xuất bản", value: String(quizRows.length), icon: "quiz", tone: "blue" },
       { label: "Ngân hàng câu hỏi", value: String(totalQuestions), icon: "help", tone: "slate" },
       { label: "Tỷ lệ đạt TB", value: `${passRate}%`, icon: "fact_check", tone: "green" },
-      { label: "Cần chấm", value: String(gradingRows.length), icon: "grading", tone: "amber" },
+      {
+        label: "Cần chấm",
+        value: String(gradingRows.length + submissionRows.filter((row) => row.score == null).length),
+        icon: "grading",
+        tone: "amber",
+      },
     ],
     instructorQuizzes: quizRows.map((row) => ({
       title: row.title,
@@ -232,7 +518,209 @@ export async function getInstructorQuizzesData(rawTeacherId) {
       submitted: relativeTime(row.submitted_at),
       score: row.score == null ? "Chờ chấm" : "Cần xem lại",
     })),
+    batchOptions: batchRows.map((row) => ({
+      id: row.id,
+      batchCode: row.batchCode,
+      courseName: row.courseName,
+    })),
+    assignmentItems: assignmentRows.map((assignment) => ({
+      id: assignment.id,
+      title: assignment.title,
+      description: assignment.description ?? "",
+      course: assignment.course,
+      batch: assignment.batch,
+      dueDateInput: assignment.dueDate ? formatDateTimeInput(assignment.dueDate) : "",
+      dueDate: assignment.dueDate ? new Date(assignment.dueDate).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" }) : "Chưa có hạn",
+      maxScore: assignment.maxScore == null ? "10" : String(Number(assignment.maxScore)),
+      submissions: Number(assignment.submissions ?? 0),
+      pendingSubmissions: Number(assignment.pendingSubmissions ?? 0),
+      submissionItems: submissionRows
+        .filter((submission) => submission.assignmentId === assignment.id)
+        .map((submission) => ({
+          id: submission.id,
+          student: submission.student,
+          fileUrl: submission.fileUrl ?? "",
+          content: submission.content ?? "",
+          submitted: relativeTime(submission.submittedAt),
+          score: submission.score == null ? "" : String(Number(submission.score)),
+          feedback: submission.feedback ?? "",
+          gradedAt: submission.gradedAt ? relativeTime(submission.gradedAt) : "",
+          status: submission.score == null ? "Chờ chấm" : "Đã chấm",
+        })),
+    })),
   };
+}
+
+export async function createInstructorAssignment(rawTeacherId, assignmentData) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const batchId = Number(assignmentData?.batchId);
+  const title = String(assignmentData?.title ?? "").trim();
+  const description = String(assignmentData?.description ?? "").trim();
+  const dueDate = String(assignmentData?.dueDate ?? "").trim().replace("T", " ");
+  const maxScore = Number(assignmentData?.maxScore ?? 10);
+
+  if (!Number.isFinite(batchId) || batchId <= 0) throw new Error("Invalid batch id.");
+  if (!title) throw new Error("Assignment title is required.");
+  if (!dueDate) throw new Error("Due date is required.");
+  if (!Number.isFinite(maxScore) || maxScore <= 0) throw new Error("Max score must be greater than 0.");
+
+  const [batchRows] = await db.query(
+    `
+      SELECT batch_id AS id
+      FROM course_batches
+      WHERE batch_id = ? AND teacher_id = ?
+      LIMIT 1
+    `,
+    [batchId, teacherId],
+  );
+
+  if (!batchRows[0]) throw new Error("Batch not found for this instructor.");
+
+  const [result] = await db.query(
+    `
+      INSERT INTO assignments (batch_id, title, description, due_date, max_score)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+    [batchId, title, description, dueDate, maxScore],
+  );
+
+  return {
+    id: result.insertId,
+    batchId,
+    title,
+    description,
+    dueDate,
+    dueDateInput: formatDateTimeInput(dueDate),
+    maxScore: String(maxScore),
+  };
+}
+
+export async function updateInstructorAssignment(rawTeacherId, rawAssignmentId, assignmentData) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const assignmentId = Number(rawAssignmentId);
+  const batchId = Number(assignmentData?.batchId);
+  const title = String(assignmentData?.title ?? "").trim();
+  const description = String(assignmentData?.description ?? "").trim();
+  const dueDate = String(assignmentData?.dueDate ?? "").trim().replace("T", " ");
+  const maxScore = Number(assignmentData?.maxScore ?? 10);
+
+  if (!Number.isFinite(assignmentId) || assignmentId <= 0) throw new Error("Invalid assignment id.");
+  if (!Number.isFinite(batchId) || batchId <= 0) throw new Error("Invalid batch id.");
+  if (!title) throw new Error("Assignment title is required.");
+  if (!dueDate) throw new Error("Due date is required.");
+  if (!Number.isFinite(maxScore) || maxScore <= 0) throw new Error("Max score must be greater than 0.");
+
+  const [assignmentRows] = await db.query(
+    `
+      SELECT a.assignment_id AS id
+      FROM assignments a
+      INNER JOIN course_batches b ON b.batch_id = a.batch_id
+      WHERE a.assignment_id = ? AND b.teacher_id = ?
+      LIMIT 1
+    `,
+    [assignmentId, teacherId],
+  );
+
+  if (!assignmentRows[0]) throw new Error("Assignment not found for this instructor.");
+
+  const [batchRows] = await db.query(
+    `
+      SELECT batch_id AS id
+      FROM course_batches
+      WHERE batch_id = ? AND teacher_id = ?
+      LIMIT 1
+    `,
+    [batchId, teacherId],
+  );
+
+  if (!batchRows[0]) throw new Error("Batch not found for this instructor.");
+
+  await db.query(
+    `
+      UPDATE assignments
+      SET batch_id = ?, title = ?, description = ?, due_date = ?, max_score = ?
+      WHERE assignment_id = ?
+    `,
+    [batchId, title, description, dueDate, maxScore, assignmentId],
+  );
+
+  return {
+    id: assignmentId,
+    batchId,
+    title,
+    description,
+    dueDate,
+    maxScore: String(maxScore),
+  };
+}
+
+export async function deleteInstructorAssignment(rawTeacherId, rawAssignmentId) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const assignmentId = Number(rawAssignmentId);
+
+  if (!Number.isFinite(assignmentId) || assignmentId <= 0) throw new Error("Invalid assignment id.");
+
+  const [assignmentRows] = await db.query(
+    `
+      SELECT a.assignment_id AS id
+      FROM assignments a
+      INNER JOIN course_batches b ON b.batch_id = a.batch_id
+      WHERE a.assignment_id = ? AND b.teacher_id = ?
+      LIMIT 1
+    `,
+    [assignmentId, teacherId],
+  );
+
+  if (!assignmentRows[0]) throw new Error("Assignment not found for this instructor.");
+
+  await db.query(
+    `
+      DELETE FROM assignments
+      WHERE assignment_id = ?
+    `,
+    [assignmentId],
+  );
+
+  return { id: assignmentId };
+}
+
+export async function gradeInstructorAssignmentSubmission(rawTeacherId, rawAssignmentId, rawSubmissionId, gradeData) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const assignmentId = Number(rawAssignmentId);
+  const submissionId = Number(rawSubmissionId);
+  const score = Number(gradeData?.score);
+  const feedback = String(gradeData?.feedback ?? "").trim();
+
+  if (!Number.isFinite(assignmentId) || assignmentId <= 0) throw new Error("Invalid assignment id.");
+  if (!Number.isFinite(submissionId) || submissionId <= 0) throw new Error("Invalid submission id.");
+  if (!Number.isFinite(score) || score < 0) throw new Error("Score must be zero or greater.");
+
+  const [submissionRows] = await db.query(
+    `
+      SELECT a.max_score AS maxScore
+      FROM assignment_submissions s
+      INNER JOIN assignments a ON a.assignment_id = s.assignment_id
+      INNER JOIN course_batches b ON b.batch_id = a.batch_id
+      WHERE s.submission_id = ? AND s.assignment_id = ? AND b.teacher_id = ?
+      LIMIT 1
+    `,
+    [submissionId, assignmentId, teacherId],
+  );
+
+  const submission = submissionRows[0];
+  if (!submission) throw new Error("Submission not found.");
+  if (score > Number(submission.maxScore ?? 0)) throw new Error("Score cannot be greater than max score.");
+
+  await db.query(
+    `
+      UPDATE assignment_submissions
+      SET score = ?, feedback = ?, graded_at = NOW(), graded_by = ?
+      WHERE submission_id = ?
+    `,
+    [score, feedback, teacherId, submissionId],
+  );
+
+  return { id: submissionId, assignmentId, score: String(score), feedback };
 }
 
 export async function getInstructorInteractionData(rawTeacherId) {
@@ -245,6 +733,9 @@ export async function getInstructorInteractionData(rawTeacherId) {
       SELECT
         d.discussion_id,
         d.title,
+        d.content,
+        d.user_id AS authorId,
+        u.full_name AS author,
         c.course_name AS course,
         b.batch_code AS batch,
         d.created_at,
@@ -252,11 +743,31 @@ export async function getInstructorInteractionData(rawTeacherId) {
       FROM discussions d
       INNER JOIN course_batches b ON b.batch_id = d.batch_id
       INNER JOIN courses c ON c.course_id = b.course_id
+      INNER JOIN users u ON u.user_id = d.user_id
       LEFT JOIN discussion_comments dc ON dc.discussion_id = d.discussion_id
       WHERE b.teacher_id = ?
-      GROUP BY d.discussion_id, d.title, c.course_name, b.batch_code, d.created_at
+      GROUP BY d.discussion_id, d.title, d.content, d.user_id, u.full_name, c.course_name, b.batch_code, d.created_at
       ORDER BY d.created_at DESC
       LIMIT 5
+    `,
+    [teacherId],
+  );
+
+  const [commentRows] = await db.query(
+    `
+      SELECT
+        dc.comment_id AS id,
+        dc.discussion_id AS discussionId,
+        dc.user_id AS userId,
+        u.full_name AS author,
+        dc.content,
+        dc.created_at
+      FROM discussion_comments dc
+      INNER JOIN discussions d ON d.discussion_id = dc.discussion_id
+      INNER JOIN course_batches b ON b.batch_id = d.batch_id
+      INNER JOIN users u ON u.user_id = dc.user_id
+      WHERE b.teacher_id = ?
+      ORDER BY dc.created_at ASC, dc.comment_id ASC
     `,
     [teacherId],
   );
@@ -276,31 +787,127 @@ export async function getInstructorInteractionData(rawTeacherId) {
 
   const [notificationRows] = await db.query(
     `
-      SELECT n.title, n.content, n.is_read, n.created_at
+      SELECT n.notification_id AS id, n.title, n.content, n.is_read, n.created_at
       FROM notifications n
       WHERE n.user_id = ?
       ORDER BY n.created_at DESC
-      LIMIT 3
+      LIMIT 8
     `,
     [teacherId],
   );
+
+  const [pendingCourseRows] = await db.query(
+    `
+      SELECT course_id AS id, course_name AS title, updated_at
+      FROM courses
+      WHERE teacher_id = ? AND status = 'PENDING'
+      ORDER BY updated_at DESC, course_id DESC
+      LIMIT 4
+    `,
+    [teacherId],
+  );
+
+  const [gradingRows] = await db.query(
+    `
+      SELECT qa.attempt_id AS id, u.full_name AS student, q.title AS quiz, qa.submitted_at
+      FROM quiz_attempts qa
+      INNER JOIN quizzes q ON q.quiz_id = qa.quiz_id
+      INNER JOIN course_batches b ON b.batch_id = q.batch_id
+      INNER JOIN users u ON u.user_id = qa.student_id
+      WHERE b.teacher_id = ? AND qa.status = 'SUBMITTED'
+      ORDER BY qa.submitted_at DESC, qa.attempt_id DESC
+      LIMIT 4
+    `,
+    [teacherId],
+  );
+
+  const [upcomingSessionRows] = await db.query(
+    `
+      SELECT cs.session_id AS id, cs.session_title AS title, c.course_name AS course, b.batch_code AS batch, cs.start_time
+      FROM class_sessions cs
+      INNER JOIN course_batches b ON b.batch_id = cs.batch_id
+      INNER JOIN courses c ON c.course_id = b.course_id
+      WHERE cs.teacher_id = ?
+        AND cs.status IN ('SCHEDULED', 'LIVE')
+        AND cs.start_time >= NOW()
+      ORDER BY cs.start_time ASC
+      LIMIT 4
+    `,
+    [teacherId],
+  );
+
+  const reminderTasks = [
+    ...pendingCourseRows.map((row) => ({
+      id: `course-${row.id}`,
+      title: row.title,
+      detail: "Khóa học đang chờ admin duyệt.",
+      category: "Khóa chờ duyệt",
+      tone: "amber",
+      icon: "pending_actions",
+      time: relativeTime(row.updated_at),
+    })),
+    ...threadRows
+      .filter((row) => Number(row.replies) === 0)
+      .slice(0, 4)
+      .map((row) => ({
+        id: `discussion-${row.discussion_id}`,
+        title: row.title,
+        detail: `${row.course} · ${row.batch}`,
+        category: "Học viên hỏi",
+        tone: "blue",
+        icon: "forum",
+        time: relativeTime(row.created_at),
+      })),
+    ...gradingRows.map((row) => ({
+      id: `grading-${row.id}`,
+      title: row.student,
+      detail: row.quiz,
+      category: "Bài cần chấm",
+      tone: "red",
+      icon: "grading",
+      time: relativeTime(row.submitted_at),
+    })),
+    ...upcomingSessionRows.map((row) => ({
+      id: `session-${row.id}`,
+      title: row.title,
+      detail: `${row.course} · ${row.batch}`,
+      category: "Lịch sắp tới",
+      tone: "green",
+      icon: "event_upcoming",
+      time: relativeTime(row.start_time),
+    })),
+  ].slice(0, 10);
+
+  const unreadNotifications = notificationRows.filter((row) => !row.is_read).length;
 
   return {
     teacherId,
     profile,
     interactionStats: [
       { label: "Chủ đề đang mở", value: String(threadRows.length), icon: "forum", tone: "blue" },
-      { label: "Tin chưa đọc", value: String(messageRows.length), icon: "mark_chat_unread", tone: "amber" },
+      { label: "Tin chưa đọc", value: String(unreadNotifications), icon: "mark_chat_unread", tone: "amber" },
       { label: "Đã xử lý hôm nay", value: String(threadRows.filter((row) => Number(row.replies) > 0).length), icon: "task_alt", tone: "green" },
-      { label: "Thông báo", value: String(notificationRows.length), icon: "campaign", tone: "slate" },
+      { label: "Nhắc việc", value: String(reminderTasks.length), icon: "notifications_active", tone: "slate" },
     ],
     discussionThreads: threadRows.map((row) => ({
+      id: row.discussion_id,
       title: row.title,
+      content: row.content,
+      author: row.author,
       course: row.course,
       batch: row.batch,
       replies: Number(row.replies),
       lastActivity: relativeTime(row.created_at),
       status: Number(row.replies) === 0 ? "Cần phản hồi" : "Đang thảo luận",
+      comments: commentRows
+        .filter((comment) => comment.discussionId === row.discussion_id)
+        .map((comment) => ({
+          id: comment.id,
+          author: comment.author,
+          isTeacher: Number(comment.userId) === teacherId,
+          content: comment.content,
+          time: relativeTime(comment.created_at),
+        })),
     })),
     directMessages: messageRows.map((row, index) => ({
       student: row.student,
@@ -311,8 +918,84 @@ export async function getInstructorInteractionData(rawTeacherId) {
     announcementDrafts: notificationRows.map((row) => ({
       title: row.title,
       target: "Tất cả lớp",
-      state: row.is_read ? "Đã xuất bản" : "Bản nháp",
+      state: row.is_read ? "Đã đọc" : "Chưa đọc",
     })),
+    notificationItems: notificationRows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      content: row.content,
+      isRead: Boolean(row.is_read),
+      time: relativeTime(row.created_at),
+    })),
+    reminderTasks,
+  };
+}
+
+export async function markInstructorNotificationRead(rawTeacherId, rawNotificationId) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const notificationId = Number(rawNotificationId);
+
+  if (!Number.isFinite(notificationId) || notificationId <= 0) {
+    throw new Error("Invalid notification id.");
+  }
+
+  const [result] = await db.query(
+    `
+      UPDATE notifications
+      SET is_read = TRUE
+      WHERE notification_id = ? AND user_id = ?
+    `,
+    [notificationId, teacherId],
+  );
+
+  if (result.affectedRows === 0) {
+    throw new Error("Notification not found.");
+  }
+
+  return { id: notificationId, isRead: true };
+}
+
+export async function createInstructorDiscussionComment(rawTeacherId, rawDiscussionId, commentData) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const discussionId = Number(rawDiscussionId);
+  const content = String(commentData?.content ?? "").trim();
+
+  if (!Number.isFinite(discussionId) || discussionId <= 0) {
+    throw new Error("Invalid discussion id.");
+  }
+
+  if (!content) {
+    throw new Error("Comment content is required.");
+  }
+
+  const [discussionRows] = await db.query(
+    `
+      SELECT d.discussion_id AS id
+      FROM discussions d
+      INNER JOIN course_batches b ON b.batch_id = d.batch_id
+      WHERE d.discussion_id = ? AND b.teacher_id = ?
+      LIMIT 1
+    `,
+    [discussionId, teacherId],
+  );
+
+  if (!discussionRows[0]) {
+    throw new Error("Discussion not found.");
+  }
+
+  const [result] = await db.query(
+    `
+      INSERT INTO discussion_comments (discussion_id, user_id, content, created_at)
+      VALUES (?, ?, ?, NOW())
+    `,
+    [discussionId, teacherId, content],
+  );
+
+  return {
+    id: result.insertId,
+    discussionId,
+    authorId: teacherId,
+    content,
   };
 }
 

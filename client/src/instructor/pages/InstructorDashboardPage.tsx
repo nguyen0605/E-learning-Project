@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { NavLink } from "react-router-dom";
+import { instructorApiRequest } from "../api/instructorApi";
+import { getInstructorAuthTeacherId } from "../auth/instructorAuth";
 import InstructorLayout from "../components/InstructorLayout";
 import {
   analyticsBars,
@@ -8,14 +11,17 @@ import {
   teachingSchedule,
 } from "../data/instructorMockData";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-const DEFAULT_TEACHER_ID = 4;
+const DEFAULT_TEACHER_ID = getInstructorAuthTeacherId();
 
 type DashboardStat = (typeof dashboardStats)[number];
 type TeachingScheduleItem = (typeof teachingSchedule)[number];
 type AnalyticsBar = (typeof analyticsBars)[number];
-type CoursePerformanceItem = (typeof coursePerformance)[number];
-type StudentSignal = (typeof studentSignals)[number];
+type CoursePerformanceItem = (typeof coursePerformance)[number] & {
+  id?: number;
+};
+type StudentSignal = (typeof studentSignals)[number] & {
+  id?: number;
+};
 
 type InstructorDashboardApiResponse = {
   success: boolean;
@@ -45,16 +51,13 @@ function InstructorDashboardPage() {
 
     async function loadDashboard() {
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/instructor/dashboard?teacherId=${DEFAULT_TEACHER_ID}`,
-          { signal: controller.signal },
+        const payload = await instructorApiRequest<InstructorDashboardApiResponse>(
+          "/api/instructor/dashboard",
+          {
+            query: { teacherId: DEFAULT_TEACHER_ID },
+            signal: controller.signal,
+          },
         );
-
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-
-        const payload = (await response.json()) as InstructorDashboardApiResponse;
 
         if (!payload.success) {
           throw new Error("Instructor dashboard API returned unsuccessful response.");
@@ -78,9 +81,10 @@ function InstructorDashboardPage() {
   const displayedDashboardStats = dashboard?.dashboardStats ?? dashboardStats;
   const displayedTeachingSchedule = dashboard?.teachingSchedule ?? teachingSchedule;
   const displayedAnalyticsBars = dashboard?.analyticsBars ?? analyticsBars;
-  const displayedCoursePerformance = dashboard?.coursePerformance ?? coursePerformance;
-  const displayedStudentSignals = dashboard?.studentSignals ?? studentSignals;
-  const instructorName = dashboard?.profile.name ?? "thay Minh Anh";
+  const displayedCoursePerformance: CoursePerformanceItem[] =
+    dashboard?.coursePerformance ?? coursePerformance;
+  const displayedStudentSignals: StudentSignal[] = dashboard?.studentSignals ?? studentSignals;
+  const instructorName = dashboard?.profile.name ?? "thầy Minh Anh";
 
   return (
     <InstructorLayout activePage="dashboard" profile={dashboard?.profile}>
@@ -93,10 +97,10 @@ function InstructorDashboardPage() {
             cần xử lý trong một không gian quản lý rõ ràng.
           </p>
         </div>
-        <button className="instructor-primary-button" type="button">
+        <NavLink className="instructor-primary-button" to="/instructor/courses?importLessons=1">
           <span className="material-symbols-outlined">auto_stories</span>
           Chuẩn bị bài học hôm nay
-        </button>
+        </NavLink>
       </section>
 
       <section className="instructor-stat-grid" aria-label="Tổng quan giảng viên">
@@ -125,18 +129,22 @@ function InstructorDashboardPage() {
           </div>
 
           <div className="instructor-schedule-list">
-            {displayedTeachingSchedule.map((item) => (
-              <div className="instructor-schedule-item" key={item.title}>
-                <time>{item.time}</time>
-                <div>
-                  <h4>{item.title}</h4>
-                  <p>
-                    {item.batch} · {item.mode}
-                  </p>
+            {displayedTeachingSchedule.length === 0 ? (
+              <p className="instructor-empty-state">Chưa có buổi học sắp tới.</p>
+            ) : (
+              displayedTeachingSchedule.map((item) => (
+                <div className="instructor-schedule-item" key={`${item.time}-${item.title}`}>
+                  <time>{item.time}</time>
+                  <div>
+                    <h4>{item.title}</h4>
+                    <p>
+                      {item.batch} · {item.mode}
+                    </p>
+                  </div>
+                  <span>{item.status}</span>
                 </div>
-                <span>{item.status}</span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </article>
 
@@ -167,30 +175,38 @@ function InstructorDashboardPage() {
               <p className="instructor-eyebrow">Khóa học</p>
               <h3>Tổng quan hiệu suất</h3>
             </div>
-            <button className="instructor-ghost-button" type="button">
+            <NavLink className="instructor-ghost-button" to="/instructor/courses">
               Xem tất cả
-            </button>
+            </NavLink>
           </div>
 
           <div className="instructor-course-list">
-            {displayedCoursePerformance.map((course) => (
-              <div className="instructor-course-row" key={course.title}>
-                <div>
-                  <h4>{course.title}</h4>
-                  <p>{course.category}</p>
-                </div>
-                <div className="instructor-course-meta">
-                  <span>{course.students} học viên</span>
-                  <span>{course.rating} đánh giá</span>
-                  <span>{course.revenue}</span>
-                </div>
-                <div className="instructor-progress-track">
-                  <span style={{ width: `${course.completion}%` }} />
-                </div>
-                <strong>{course.completion}%</strong>
-                <em>{course.status}</em>
-              </div>
-            ))}
+            {displayedCoursePerformance.length === 0 ? (
+              <p className="instructor-empty-state">Chưa có dữ liệu hiệu suất khóa học.</p>
+            ) : (
+              displayedCoursePerformance.map((course) => (
+                <NavLink
+                  className="instructor-course-row"
+                  key={course.title}
+                  to={course.id ? `/instructor/courses?courseId=${course.id}` : "/instructor/courses"}
+                >
+                  <div>
+                    <h4>{course.title}</h4>
+                    <p>{course.category}</p>
+                  </div>
+                  <div className="instructor-course-meta">
+                    <span>{course.students} học viên</span>
+                    <span>{course.rating} đánh giá</span>
+                    <span>{course.revenue}</span>
+                  </div>
+                  <div className="instructor-progress-track">
+                    <span style={{ width: `${course.completion}%` }} />
+                  </div>
+                  <strong>{course.completion}%</strong>
+                  <em>{course.status}</em>
+                </NavLink>
+              ))
+            )}
           </div>
         </article>
 
@@ -204,23 +220,37 @@ function InstructorDashboardPage() {
           </div>
 
           <div className="instructor-student-list">
-            {displayedStudentSignals.map((student) => (
-              <div className="instructor-student-item" key={student.name}>
-                <div className="instructor-student-avatar">
-                  {student.name
-                    .split(" ")
-                    .slice(-2)
-                    .map((part) => part[0])
-                    .join("")}
-                </div>
-                <div>
-                  <h4>{student.name}</h4>
-                  <p>{student.course}</p>
-                  <span>{student.note}</span>
-                </div>
-                <strong>{student.progress}%</strong>
-              </div>
-            ))}
+            {displayedStudentSignals.length === 0 ? (
+              <p className="instructor-empty-state">Chưa có học viên cần theo dõi.</p>
+            ) : (
+              displayedStudentSignals.map((student) => {
+                const studentDetailQuery = student.id
+                  ? `studentId=${student.id}`
+                  : `studentName=${encodeURIComponent(student.name)}`;
+
+                return (
+                <NavLink
+                  className="instructor-student-item"
+                  key={`${student.name}-${student.course}`}
+                  to={`/instructor/students?${studentDetailQuery}`}
+                >
+                  <div className="instructor-student-avatar">
+                    {student.name
+                      .split(" ")
+                      .slice(-2)
+                      .map((part) => part[0])
+                      .join("")}
+                  </div>
+                  <div>
+                    <h4>{student.name}</h4>
+                    <p>{student.course}</p>
+                    <span>{student.note}</span>
+                  </div>
+                  <strong>{student.progress}%</strong>
+                </NavLink>
+                );
+              })
+            )}
           </div>
         </article>
       </section>

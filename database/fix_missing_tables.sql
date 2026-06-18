@@ -117,3 +117,16 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS instructor_student_interventions (
+    intervention_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    teacher_id BIGINT NOT NULL,
+    student_id BIGINT NOT NULL,
+    batch_id BIGINT NOT NULL,
+    note TEXT NOT NULL,
+    next_action VARCHAR(255),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (teacher_id) REFERENCES users(user_id),
+    FOREIGN KEY (student_id) REFERENCES users(user_id),
+    FOREIGN KEY (batch_id) REFERENCES course_batches(batch_id) ON DELETE CASCADE
+);

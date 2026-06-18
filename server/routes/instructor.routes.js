@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { loginInstructor, registerInstructor } from "../services/instructorAuth.service.js";
 import { getInstructorDashboardData } from "../services/instructorDashboard.service.js";
 import {
   createInstructorCourse,
@@ -18,10 +19,15 @@ import {
   deleteInstructorQuestion,
   getInstructorCourseDetail,
   getInstructorCoursesPageData,
+  getInstructorSessionAttendance,
+  generateInstructorRecurringSessions,
+  gradeInstructorQuizAttempt,
+  respondInstructorCourseReview,
   reorderInstructorLessons,
   reorderInstructorModules,
   updateInstructorCourse,
   updateInstructorCourseWorkflowStatus,
+  updateInstructorSessionAttendance,
   updateInstructorBatch,
   updateInstructorSession,
   updateInstructorModule,
@@ -30,10 +36,19 @@ import {
   updateInstructorQuestion,
 } from "../services/instructorCourses.service.js";
 import {
+  createInstructorAssignment,
+  createInstructorDiscussionComment,
+  createInstructorStudentIntervention,
+  deleteInstructorAssignment,
+  gradeInstructorAssignmentSubmission,
   getInstructorAnalyticsData,
   getInstructorInteractionData,
+  getInstructorProfileData,
   getInstructorQuizzesData,
   getInstructorStudentsData,
+  markInstructorNotificationRead,
+  updateInstructorProfile,
+  updateInstructorAssignment,
 } from "../services/instructorPortal.service.js";
 
 const router = Router();
@@ -46,6 +61,32 @@ function handleRouteError(res, error, message) {
     message,
   });
 }
+
+router.post("/auth/login", async (req, res) => {
+  try {
+    const data = await loginInstructor(req.body ?? {});
+    res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to login instructor.");
+  }
+});
+
+router.post("/auth/register", async (req, res) => {
+  try {
+    const data = await registerInstructor(req.body ?? {});
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to register instructor.");
+  }
+});
 
 router.get("/dashboard", async (req, res) => {
   try {
@@ -64,6 +105,44 @@ router.get("/dashboard", async (req, res) => {
     });
   } catch (error) {
     handleRouteError(res, error, "Failed to load instructor dashboard data.");
+  }
+});
+
+router.get("/profile", async (req, res) => {
+  try {
+    const data = await getInstructorProfileData(req.query.teacherId);
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: "Instructor not found.",
+      });
+    }
+
+    res.json({ success: true, data });
+  } catch (error) {
+    handleRouteError(res, error, "Failed to load instructor profile.");
+  }
+});
+
+router.put("/profile", async (req, res) => {
+  try {
+    const data = await updateInstructorProfile(req.query.teacherId, req.body ?? {});
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: "Instructor not found.",
+      });
+    }
+
+    res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes("required") || error.message.includes("Avatar URL"))) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to update instructor profile.");
   }
 });
 
@@ -295,6 +374,31 @@ router.delete("/courses/:courseId/batches/:batchId", async (req, res) => {
   }
 });
 
+router.post("/courses/:courseId/batches/:batchId/sessions/generate", async (req, res) => {
+  try {
+    const data = await generateInstructorRecurringSessions(
+      req.query.teacherId,
+      req.params.courseId,
+      req.params.batchId,
+      req.body ?? {},
+    );
+
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("required") ||
+        error.message.includes("Invalid") ||
+        error.message.includes("not found") ||
+        error.message.includes("later"))
+    ) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to generate recurring sessions.");
+  }
+});
+
 router.post("/courses/:courseId/batches/:batchId/sessions", async (req, res) => {
   try {
     const sessionData = req.body ?? {};
@@ -333,6 +437,50 @@ router.put("/courses/:courseId/batches/:batchId/sessions/:sessionId", async (req
     }
 
     handleRouteError(res, error, "Failed to update session.");
+  }
+});
+
+router.get("/courses/:courseId/batches/:batchId/sessions/:sessionId/attendance", async (req, res) => {
+  try {
+    const data = await getInstructorSessionAttendance(
+      req.query.teacherId,
+      req.params.courseId,
+      req.params.batchId,
+      req.params.sessionId,
+    );
+
+    res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes("Invalid") || error.message.includes("not found"))) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to load session attendance.");
+  }
+});
+
+router.put("/courses/:courseId/batches/:batchId/sessions/:sessionId/attendance", async (req, res) => {
+  try {
+    const data = await updateInstructorSessionAttendance(
+      req.query.teacherId,
+      req.params.courseId,
+      req.params.batchId,
+      req.params.sessionId,
+      req.body ?? {},
+    );
+
+    res.json({ success: true, data });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("Invalid") ||
+        error.message.includes("required") ||
+        error.message.includes("not found"))
+    ) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to update session attendance.");
   }
 });
 
@@ -540,6 +688,45 @@ router.delete("/courses/:courseId/quizzes/:quizId/questions/:questionId", async 
   }
 });
 
+router.patch("/courses/:courseId/quizzes/:quizId/attempts/:attemptId/grade", async (req, res) => {
+  try {
+    const data = await gradeInstructorQuizAttempt(
+      req.query.teacherId,
+      req.params.courseId,
+      req.params.quizId,
+      req.params.attemptId,
+      req.body ?? {},
+    );
+
+    res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes("Invalid") || error.message.includes("not found") || error.message.includes("Score"))) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to grade quiz attempt.");
+  }
+});
+
+router.patch("/courses/:courseId/reviews/:reviewId/respond", async (req, res) => {
+  try {
+    const data = await respondInstructorCourseReview(
+      req.query.teacherId,
+      req.params.courseId,
+      req.params.reviewId,
+      req.body ?? {},
+    );
+
+    res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes("Invalid") || error.message.includes("not found") || error.message.includes("required"))) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to update review response.");
+  }
+});
+
 router.post("/courses/:courseId/lessons/import", async (req, res) => {
   try {
     const { moduleId, lessons } = req.body ?? {};
@@ -592,6 +779,29 @@ router.get("/students", async (req, res) => {
   }
 });
 
+router.post("/students/:studentId/interventions", async (req, res) => {
+  try {
+    const data = await createInstructorStudentIntervention(
+      req.query.teacherId,
+      req.params.studentId,
+      req.body ?? {},
+    );
+
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("Invalid") ||
+        error.message.includes("required") ||
+        error.message.includes("not found"))
+    ) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to create student intervention.");
+  }
+});
+
 router.get("/quizzes", async (req, res) => {
   try {
     const data = await getInstructorQuizzesData(req.query.teacherId);
@@ -603,6 +813,79 @@ router.get("/quizzes", async (req, res) => {
     res.json({ success: true, data });
   } catch (error) {
     handleRouteError(res, error, "Failed to load instructor quizzes data.");
+  }
+});
+
+router.post("/assignments", async (req, res) => {
+  try {
+    const data = await createInstructorAssignment(req.query.teacherId, req.body ?? {});
+
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("Invalid") ||
+        error.message.includes("required") ||
+        error.message.includes("greater") ||
+        error.message.includes("not found"))
+    ) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to create assignment.");
+  }
+});
+
+router.patch("/assignments/:assignmentId", async (req, res) => {
+  try {
+    const data = await updateInstructorAssignment(req.query.teacherId, req.params.assignmentId, req.body ?? {});
+
+    res.json({ success: true, data });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("Invalid") ||
+        error.message.includes("required") ||
+        error.message.includes("greater") ||
+        error.message.includes("not found"))
+    ) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to update assignment.");
+  }
+});
+
+router.delete("/assignments/:assignmentId", async (req, res) => {
+  try {
+    const data = await deleteInstructorAssignment(req.query.teacherId, req.params.assignmentId);
+
+    res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes("Invalid") || error.message.includes("not found"))) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to delete assignment.");
+  }
+});
+
+router.patch("/assignments/:assignmentId/submissions/:submissionId/grade", async (req, res) => {
+  try {
+    const data = await gradeInstructorAssignmentSubmission(
+      req.query.teacherId,
+      req.params.assignmentId,
+      req.params.submissionId,
+      req.body ?? {},
+    );
+
+    res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes("Invalid") || error.message.includes("not found") || error.message.includes("Score"))) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to grade assignment submission.");
   }
 });
 
@@ -631,6 +914,38 @@ router.get("/analytics", async (req, res) => {
     res.json({ success: true, data });
   } catch (error) {
     handleRouteError(res, error, "Failed to load instructor analytics data.");
+  }
+});
+
+router.patch("/notifications/:notificationId/read", async (req, res) => {
+  try {
+    const data = await markInstructorNotificationRead(req.query.teacherId, req.params.notificationId);
+
+    res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes("Invalid") || error.message.includes("not found"))) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to mark notification as read.");
+  }
+});
+
+router.post("/discussions/:discussionId/comments", async (req, res) => {
+  try {
+    const data = await createInstructorDiscussionComment(
+      req.query.teacherId,
+      req.params.discussionId,
+      req.body ?? {},
+    );
+
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes("Invalid") || error.message.includes("not found") || error.message.includes("required"))) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    handleRouteError(res, error, "Failed to create discussion comment.");
   }
 });
 

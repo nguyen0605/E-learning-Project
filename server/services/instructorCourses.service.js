@@ -7,6 +7,10 @@ function normalizeTeacherId(value) {
   return Number.isFinite(teacherId) && teacherId > 0 ? teacherId : DEFAULT_TEACHER_ID;
 }
 
+function percent(value) {
+  return Number(Number(value ?? 0).toFixed(0));
+}
+
 function formatDuration(minutes) {
   const total = Number(minutes ?? 0);
   const hours = Math.floor(total / 60);
@@ -134,6 +138,49 @@ function toDateTimeLocalValue(value) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
+function parseDateOnly(value) {
+  if (!value) return null;
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  const [year, month, day] = String(value).slice(0, 10).split("-").map(Number);
+  if (!year || !month || !day) return null;
+
+  return new Date(year, month - 1, day);
+}
+
+function formatDateOnly(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateTimeSql(date) {
+  const datePart = formatDateOnly(date);
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${datePart} ${hours}:${minutes}:${seconds}`;
+}
+
+function combineDateAndTime(date, time) {
+  const [hours, minutes] = String(time).split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes, 0);
+}
+
+function timeToMinutes(value) {
+  const [hours, minutes] = String(value).split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
 function mapBatchRow(row) {
   const start = row.start_date ? new Date(row.start_date) : null;
   const end = row.end_date ? new Date(row.end_date) : null;
@@ -151,6 +198,7 @@ function mapBatchRow(row) {
         ? `${formatDateText(start)} - ${formatDateText(end)}`
         : "Chưa cập nhật",
     students: `${Number(row.enrolled_students ?? 0)} / ${Number(row.max_students ?? 0)}`,
+    enrolledStudents: Number(row.enrolled_students ?? 0),
     mode: toLearningModeLabel(row.learning_mode),
     platform: toOnlinePlatformLabel(row.online_platform),
     status: toBatchStatusLabel(row.status),
@@ -165,6 +213,7 @@ function mapBatchRow(row) {
     learningMode: toLearningModeValue(toLearningModeLabel(row.learning_mode)),
     learningModeValue: row.learning_mode,
     onlinePlatform: toOnlinePlatformValue(row.online_platform),
+    defaultMeetingUrl: row.default_meeting_url ?? row.defaultMeetingUrl ?? "",
     note: row.note ?? "",
     sessions: [],
   };
@@ -192,6 +241,19 @@ function mapSessionRow(row) {
     recordingUrl: row.recordingUrl ?? "",
     note: row.note ?? "",
   };
+}
+
+function normalizeAttendanceStatus(value) {
+  const status = String(value ?? "ABSENT").toUpperCase();
+  if (["PRESENT", "ABSENT", "LATE", "EXCUSED"].includes(status)) return status;
+  return "ABSENT";
+}
+
+function toAttendanceStatusLabel(status) {
+  if (status === "PRESENT") return "Có mặt";
+  if (status === "LATE") return "Đi trễ";
+  if (status === "EXCUSED") return "Vắng phép";
+  return "Vắng";
 }
 
 function mapQuizRow(row) {
@@ -574,6 +636,7 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
           b.min_students,
           b.learning_mode,
           b.online_platform,
+          b.default_meeting_url,
           b.tuition_fee,
           b.status,
           b.max_students,
@@ -582,7 +645,7 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
         FROM course_batches b
         LEFT JOIN enrollments e ON e.batch_id = b.batch_id AND e.status IN ('ACTIVE', 'COMPLETED')
         WHERE b.teacher_id = ? AND b.course_id = ?
-        GROUP BY b.batch_id, b.batch_code, b.batch_name, b.start_date, b.end_date, b.enrollment_start_date, b.enrollment_deadline, b.min_students, b.learning_mode, b.online_platform, b.tuition_fee, b.status, b.max_students, b.note
+        GROUP BY b.batch_id, b.batch_code, b.batch_name, b.start_date, b.end_date, b.enrollment_start_date, b.enrollment_deadline, b.min_students, b.learning_mode, b.online_platform, b.default_meeting_url, b.tuition_fee, b.status, b.max_students, b.note
         ORDER BY b.start_date DESC, b.batch_id DESC
       `,
       [teacherId, courseId],
@@ -748,9 +811,11 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
     db.query(
       `
         SELECT
+          r.review_id AS id,
           u.full_name AS student,
           r.rating,
           r.comment,
+          r.teacher_comment AS teacherComment,
           r.created_at
         FROM course_reviews r
         INNER JOIN users u ON u.user_id = r.student_id
@@ -845,9 +910,11 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
         })),
     })),
     reviews: reviews.map((review) => ({
+      id: review.review_id ?? review.id,
       student: review.student,
       rating: Number(review.rating ?? 0),
       comment: review.comment,
+      teacherComment: review.teacherComment ?? null,
       createdAt: review.created_at,
     })),
     quizzes: quizzes.map((quiz) => {
@@ -864,9 +931,28 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
 
           return mapQuestionRow(question, options);
         });
+      const attemptItems = quizAttempts
+        .filter((attempt) => attempt.quizId === quiz.id)
+        .map((attempt) => {
+          const answers = quizAnswers
+            .filter((answer) => answer.attemptId === attempt.id)
+            .map((answer) => ({
+              id: answer.id,
+              questionId: answer.questionId,
+              questionText: answer.questionText,
+              questionType: answer.questionType,
+              optionId: answer.optionId,
+              optionText: answer.optionText ?? "",
+              isCorrect: answer.isCorrect == null ? null : Boolean(answer.isCorrect),
+              essayAnswer: answer.essayAnswer ?? "",
+            }));
+
+          return mapQuizAttemptRow(attempt, answers);
+        });
       return {
         ...mapQuizRow(quiz),
         questionItems,
+        attemptItems,
       };
     }),
     generatedAt: new Date().toISOString(),
@@ -2171,6 +2257,83 @@ export async function deleteInstructorQuestion(rawTeacherId, rawCourseId, rawQui
   return { id: questionId, quizId };
 }
 
+export async function gradeInstructorQuizAttempt(rawTeacherId, rawCourseId, rawQuizId, rawAttemptId, gradeData) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const courseId = Number(rawCourseId);
+  const quizId = Number(rawQuizId);
+  const attemptId = Number(rawAttemptId);
+  const score = Number(gradeData?.score);
+
+  if (!Number.isFinite(courseId) || courseId <= 0) throw new Error("Invalid course id.");
+  if (!Number.isFinite(quizId) || quizId <= 0) throw new Error("Invalid quiz id.");
+  if (!Number.isFinite(attemptId) || attemptId <= 0) throw new Error("Invalid attempt id.");
+  if (!Number.isFinite(score) || score < 0) throw new Error("Score must be zero or greater.");
+
+  const [attemptRows] = await db.query(
+    `
+      SELECT
+        qa.attempt_id AS id,
+        q.max_score AS maxScore
+      FROM quiz_attempts qa
+      INNER JOIN quizzes q ON q.quiz_id = qa.quiz_id
+      INNER JOIN course_batches b ON b.batch_id = q.batch_id
+      WHERE qa.attempt_id = ? AND qa.quiz_id = ? AND b.teacher_id = ? AND b.course_id = ?
+      LIMIT 1
+    `,
+    [attemptId, quizId, teacherId, courseId],
+  );
+
+  const attempt = attemptRows[0];
+  if (!attempt) throw new Error("Attempt not found for this quiz.");
+  if (score > Number(attempt.maxScore ?? 0)) throw new Error("Score cannot be greater than max score.");
+
+  await db.query(
+    `
+      UPDATE quiz_attempts
+      SET score = ?, status = 'GRADED', submitted_at = COALESCE(submitted_at, NOW())
+      WHERE attempt_id = ?
+    `,
+    [score, attemptId],
+  );
+
+  return { id: attemptId, quizId, score: String(score), status: "GRADED" };
+}
+
+export async function respondInstructorCourseReview(rawTeacherId, rawCourseId, rawReviewId, reviewData) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const courseId = Number(rawCourseId);
+  const reviewId = Number(rawReviewId);
+  const teacherComment = String(reviewData?.teacherComment ?? reviewData?.comment ?? "").trim();
+
+  if (!Number.isFinite(courseId) || courseId <= 0) throw new Error("Invalid course id.");
+  if (!Number.isFinite(reviewId) || reviewId <= 0) throw new Error("Invalid review id.");
+  if (!teacherComment) throw new Error("Teacher comment is required.");
+
+  const [reviewRows] = await db.query(
+    `
+      SELECT r.review_id AS id
+      FROM course_reviews r
+      INNER JOIN courses c ON c.course_id = r.course_id
+      WHERE r.review_id = ? AND r.course_id = ? AND c.teacher_id = ?
+      LIMIT 1
+    `,
+    [reviewId, courseId, teacherId],
+  );
+
+  if (!reviewRows[0]) throw new Error("Review not found for this course.");
+
+  await db.query(
+    `
+      UPDATE course_reviews
+      SET teacher_comment = ?
+      WHERE review_id = ?
+    `,
+    [teacherComment, reviewId],
+  );
+
+  return { id: reviewId, teacherComment };
+}
+
 export async function bulkImportInstructorLessons(rawTeacherId, rawCourseId, rawModuleId, lessonItems) {
   const teacherId = normalizeTeacherId(rawTeacherId);
   const courseId = Number(rawCourseId);
@@ -2692,6 +2855,171 @@ export async function createInstructorSession(rawTeacherId, rawCourseId, rawBatc
   return mapSessionRow(rows[0]);
 }
 
+export async function generateInstructorRecurringSessions(rawTeacherId, rawCourseId, rawBatchId, scheduleData) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const courseId = Number(rawCourseId);
+  const batchId = Number(rawBatchId);
+  const weekdays = Array.isArray(scheduleData?.weekdays)
+    ? [...new Set(scheduleData.weekdays.map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))]
+    : [];
+  const startTime = String(scheduleData?.startTime ?? "").trim();
+  const endTime = String(scheduleData?.endTime ?? "").trim();
+  const titlePrefix = String(scheduleData?.titlePrefix ?? "Buổi học").trim() || "Buổi học";
+  const description = String(scheduleData?.description ?? "").trim();
+  const meetingUrl = String(scheduleData?.meetingUrl ?? "").trim();
+  const meetingPassword = String(scheduleData?.meetingPassword ?? "").trim();
+  const platform = String(scheduleData?.platform ?? "").trim();
+  const status = String(scheduleData?.status ?? "SCHEDULED").toUpperCase();
+  const note = String(scheduleData?.note ?? "").trim();
+
+  if (!Number.isFinite(courseId) || courseId <= 0) throw new Error("Invalid course id.");
+  if (!Number.isFinite(batchId) || batchId <= 0) throw new Error("Invalid batch id.");
+  if (weekdays.length === 0) throw new Error("At least one weekday is required.");
+  if (!startTime || !endTime) throw new Error("Start time and end time are required.");
+
+  const startMinutes = timeToMinutes(startTime);
+  const endMinutes = timeToMinutes(endTime);
+  if (startMinutes == null || endMinutes == null) throw new Error("Invalid session time.");
+  if (endMinutes <= startMinutes) throw new Error("End time must be later than start time.");
+
+  const course = await assertInstructorCourseOwnership(teacherId, courseId);
+  if (!course) throw new Error("Course not found for this instructor.");
+
+  const [batchRows] = await db.query(
+    `
+      SELECT
+        batch_id AS id,
+        batch_code AS code,
+        start_date,
+        end_date,
+        online_platform,
+        default_meeting_url
+      FROM course_batches
+      WHERE batch_id = ? AND teacher_id = ? AND course_id = ?
+      LIMIT 1
+    `,
+    [batchId, teacherId, courseId],
+  );
+
+  const batch = batchRows[0];
+  if (!batch) throw new Error("Batch not found for this course.");
+
+  const rangeStart = parseDateOnly(batch.start_date);
+  const rangeEnd = parseDateOnly(batch.end_date);
+  if (!rangeStart || !rangeEnd) throw new Error("Batch start date and end date are required.");
+  if (rangeEnd < rangeStart) throw new Error("Batch end date must be later than start date.");
+
+  const [existingRows] = await db.query(
+    `
+      SELECT start_time
+      FROM class_sessions
+      WHERE batch_id = ? AND teacher_id = ? AND start_time BETWEEN ? AND ?
+    `,
+    [
+      batchId,
+      teacherId,
+      `${formatDateOnly(rangeStart)} 00:00:00`,
+      `${formatDateOnly(rangeEnd)} 23:59:59`,
+    ],
+  );
+
+  const existingStarts = new Set(existingRows.map((row) => formatDateTimeSql(new Date(row.start_time))));
+  const rowsToInsert = [];
+  const createdStartTimes = [];
+  let sessionIndex = 1;
+  let skippedCount = 0;
+
+  for (const date = new Date(rangeStart); date <= rangeEnd; date.setDate(date.getDate() + 1)) {
+    if (!weekdays.includes(date.getDay())) continue;
+
+    const sessionStart = combineDateAndTime(date, startTime);
+    const sessionEnd = combineDateAndTime(date, endTime);
+    if (!sessionStart || !sessionEnd) continue;
+
+    const startSql = formatDateTimeSql(sessionStart);
+    const endSql = formatDateTimeSql(sessionEnd);
+    if (existingStarts.has(startSql)) {
+      skippedCount += 1;
+      continue;
+    }
+
+    existingStarts.add(startSql);
+    createdStartTimes.push(startSql);
+    rowsToInsert.push([
+      batchId,
+      teacherId,
+      `${titlePrefix} ${sessionIndex}`,
+      description || null,
+      startSql,
+      endSql,
+      meetingUrl || batch.default_meeting_url || null,
+      meetingPassword || null,
+      toSessionPlatformValue(platform || batch.online_platform),
+      toSessionStatusValue(status),
+      null,
+      note || null,
+    ]);
+    sessionIndex += 1;
+  }
+
+  if (rowsToInsert.length > 0) {
+    await db.query(
+      `
+        INSERT INTO class_sessions (
+          batch_id,
+          teacher_id,
+          session_title,
+          session_description,
+          start_time,
+          end_time,
+          meeting_url,
+          meeting_password,
+          platform,
+          status,
+          recording_url,
+          note
+        ) VALUES ?
+      `,
+      [rowsToInsert],
+    );
+  }
+
+  let sessions = [];
+  if (createdStartTimes.length > 0) {
+    const placeholders = createdStartTimes.map(() => "?").join(", ");
+    const [rows] = await db.query(
+      `
+        SELECT
+          s.session_id AS id,
+          s.batch_id AS batchId,
+          s.session_title AS title,
+          s.session_description AS description,
+          s.start_time,
+          s.end_time,
+          s.meeting_url AS meetingUrl,
+          s.meeting_password AS meetingPassword,
+          s.platform,
+          s.status,
+          s.recording_url AS recordingUrl,
+          s.note
+        FROM class_sessions s
+        WHERE s.batch_id = ? AND s.teacher_id = ? AND s.start_time IN (${placeholders})
+        ORDER BY s.start_time ASC, s.session_id ASC
+      `,
+      [batchId, teacherId, ...createdStartTimes],
+    );
+    sessions = rows.map(mapSessionRow);
+  }
+
+  return {
+    batchId,
+    courseId,
+    generatedCount: rowsToInsert.length,
+    skippedCount,
+    sessions,
+  };
+}
+
 export async function updateInstructorSession(rawTeacherId, rawCourseId, rawBatchId, rawSessionId, sessionData) {
   const teacherId = normalizeTeacherId(rawTeacherId);
   const courseId = Number(rawCourseId);
@@ -2825,6 +3153,155 @@ export async function deleteInstructorSession(rawTeacherId, rawCourseId, rawBatc
   );
 
   return { id: sessionId, batchId, courseId };
+}
+
+export async function getInstructorSessionAttendance(rawTeacherId, rawCourseId, rawBatchId, rawSessionId) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const courseId = Number(rawCourseId);
+  const batchId = Number(rawBatchId);
+  const sessionId = Number(rawSessionId);
+
+  if (!Number.isFinite(courseId) || courseId <= 0) throw new Error("Invalid course id.");
+  if (!Number.isFinite(batchId) || batchId <= 0) throw new Error("Invalid batch id.");
+  if (!Number.isFinite(sessionId) || sessionId <= 0) throw new Error("Invalid session id.");
+
+  const [sessionRows] = await db.query(
+    `
+      SELECT
+        s.session_id AS id,
+        s.batch_id AS batchId,
+        s.session_title AS title,
+        s.start_time,
+        s.end_time,
+        b.batch_code AS batchCode,
+        c.course_name AS courseTitle
+      FROM class_sessions s
+      INNER JOIN course_batches b ON b.batch_id = s.batch_id
+      INNER JOIN courses c ON c.course_id = b.course_id
+      WHERE s.session_id = ? AND s.batch_id = ? AND b.course_id = ? AND b.teacher_id = ?
+      LIMIT 1
+    `,
+    [sessionId, batchId, courseId, teacherId],
+  );
+
+  const session = sessionRows[0];
+  if (!session) throw new Error("Session not found for this batch.");
+
+  const [studentRows] = await db.query(
+    `
+      SELECT
+        u.user_id AS studentId,
+        u.full_name AS studentName,
+        u.email,
+        e.progress_percent AS progress,
+        COALESCE(sa.status, 'ABSENT') AS status,
+        COALESCE(sa.duration_minutes, 0) AS durationMinutes,
+        sa.note
+      FROM enrollments e
+      INNER JOIN users u ON u.user_id = e.student_id
+      LEFT JOIN session_attendance sa
+        ON sa.session_id = ? AND sa.student_id = e.student_id
+      WHERE e.batch_id = ? AND e.status IN ('ACTIVE', 'COMPLETED', 'PENDING')
+      ORDER BY u.full_name ASC, u.user_id ASC
+    `,
+    [sessionId, batchId],
+  );
+
+  const students = studentRows.map((row) => ({
+    studentId: row.studentId,
+    studentName: row.studentName,
+    email: row.email,
+    progress: percent(row.progress),
+    status: normalizeAttendanceStatus(row.status),
+    statusLabel: toAttendanceStatusLabel(normalizeAttendanceStatus(row.status)),
+    durationMinutes: Number(row.durationMinutes ?? 0),
+    note: row.note ?? "",
+  }));
+
+  return {
+    session: {
+      id: session.id,
+      batchId: session.batchId,
+      title: session.title,
+      batchCode: session.batchCode,
+      courseTitle: session.courseTitle,
+      startLabel: session.start_time
+        ? new Date(session.start_time).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })
+        : "",
+      endLabel: session.end_time
+        ? new Date(session.end_time).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })
+        : "",
+    },
+    summary: {
+      total: students.length,
+      present: students.filter((student) => student.status === "PRESENT").length,
+      late: students.filter((student) => student.status === "LATE").length,
+      excused: students.filter((student) => student.status === "EXCUSED").length,
+      absent: students.filter((student) => student.status === "ABSENT").length,
+    },
+    students,
+  };
+}
+
+export async function updateInstructorSessionAttendance(rawTeacherId, rawCourseId, rawBatchId, rawSessionId, attendanceData) {
+  const teacherId = normalizeTeacherId(rawTeacherId);
+  const courseId = Number(rawCourseId);
+  const batchId = Number(rawBatchId);
+  const sessionId = Number(rawSessionId);
+  const attendances = Array.isArray(attendanceData?.attendances) ? attendanceData.attendances : [];
+
+  if (!Number.isFinite(courseId) || courseId <= 0) throw new Error("Invalid course id.");
+  if (!Number.isFinite(batchId) || batchId <= 0) throw new Error("Invalid batch id.");
+  if (!Number.isFinite(sessionId) || sessionId <= 0) throw new Error("Invalid session id.");
+  if (attendances.length === 0) throw new Error("Attendance list is required.");
+
+  const [sessionRows] = await db.query(
+    `
+      SELECT s.session_id AS id
+      FROM class_sessions s
+      INNER JOIN course_batches b ON b.batch_id = s.batch_id
+      WHERE s.session_id = ? AND s.batch_id = ? AND b.course_id = ? AND b.teacher_id = ?
+      LIMIT 1
+    `,
+    [sessionId, batchId, courseId, teacherId],
+  );
+
+  if (!sessionRows[0]) throw new Error("Session not found for this batch.");
+
+  const [enrollmentRows] = await db.query(
+    `
+      SELECT student_id AS studentId
+      FROM enrollments
+      WHERE batch_id = ? AND status IN ('ACTIVE', 'COMPLETED', 'PENDING')
+    `,
+    [batchId],
+  );
+  const enrolledStudentIds = new Set(enrollmentRows.map((row) => Number(row.studentId)));
+
+  for (const item of attendances) {
+    const studentId = Number(item?.studentId);
+    if (!Number.isFinite(studentId) || studentId <= 0 || !enrolledStudentIds.has(studentId)) {
+      throw new Error("Invalid student id.");
+    }
+
+    const status = normalizeAttendanceStatus(item?.status);
+    const durationMinutes = Math.max(0, Number(item?.durationMinutes ?? 0) || 0);
+    const note = String(item?.note ?? "").trim();
+
+    await db.query(
+      `
+        INSERT INTO session_attendance (session_id, student_id, status, duration_minutes, note)
+        VALUES (?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          status = VALUES(status),
+          duration_minutes = VALUES(duration_minutes),
+          note = VALUES(note)
+      `,
+      [sessionId, studentId, status, durationMinutes, note || null],
+    );
+  }
+
+  return getInstructorSessionAttendance(teacherId, courseId, batchId, sessionId);
 }
 
 export async function deleteInstructorLesson(rawTeacherId, rawCourseId, rawLessonId) {

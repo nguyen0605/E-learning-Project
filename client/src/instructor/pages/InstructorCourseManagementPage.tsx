@@ -1,278 +1,58 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import InstructorLayout from "../components/InstructorLayout";
+import { getInstructorAuthTeacherId } from "../auth/instructorAuth";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   courseBatches,
   courseManagementStats,
   instructorCourses,
   lessonPlanner,
 } from "../data/instructorMockData";
-
+import type {
+  BatchFormData,
+  ConfirmDialogState,
+  CourseDetail,
+  CourseDetailApiResponse,
+  CourseDetailTab,
+  CourseEditFormData,
+  CourseFilter,
+  CourseQuiz,
+  CourseQuizAttempt,
+  CourseQuizQuestion,
+  CourseSession,
+  CourseUpdateApiResponse,
+  CourseWorkflowAction,
+  InstructorCourseItem,
+  InstructorCoursesApiResponse,
+  InstructorToast,
+  LessonImportFormData,
+  QuizFormData,
+  QuizQuestionFormData,
+  RecurringScheduleFormData,
+  RecurringScheduleApiResponse,
+  SessionAttendanceApiResponse,
+  SessionAttendanceData,
+  SessionFormData,
+  AttendanceStudent,
+} from "../types/instructorCourseTypes";
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-const DEFAULT_TEACHER_ID = 4;
+const DEFAULT_TEACHER_ID = getInstructorAuthTeacherId();
 const COURSE_FALLBACK_IMAGES = [
   "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=600&q=80",
   "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=600&q=80",
   "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=600&q=80",
 ];
 
-type CourseManagementStat = (typeof courseManagementStats)[number];
-type InstructorCourse = (typeof instructorCourses)[number];
-type InstructorCourseItem = InstructorCourse & {
-  id?: number;
-  categoryId?: number;
-  description?: string | null;
-  statusTone?: string;
-  workflowStatus?: string;
-};
-type CourseBatch = (typeof courseBatches)[number];
-type LessonPlannerItem = (typeof lessonPlanner)[number];
-
-type CourseQuiz = {
-  id: number;
-  batchId: number;
-  batchCode: string;
-  lessonId: number | null;
-  lessonTitle: string;
-  title: string;
-  description: string;
-  durationMinutes: number;
-  duration: string;
-  maxScore: string;
-  passScore: string;
-  attemptLimit: number;
-  questions: number;
-  attempts: number;
-  createdAt: string;
-  questionItems: CourseQuizQuestion[];
-};
-
-type CourseQuizQuestion = {
-  id: number;
-  quizId: number;
-  text: string;
-  type: string;
-  score: string;
-  options: Array<{ id: number; text: string; isCorrect: boolean }>;
-};
-
-type CourseDetail = {
-  id?: number;
-  categoryId?: number;
-  title: string;
-  description: string | null;
-  thumbnail: string | null;
-  category: string;
-  level: string;
-  status: string;
-  statusTone?: string;
-  workflowStatus?: string;
-  price: string;
-  duration: string;
-  rating: number;
-  overview: Array<{ label: string; value: string; icon: string }>;
-  batches: Array<{
-    id: number;
-    code: string;
-    name: string;
-    dates: string;
-    students: string;
-    mode: string;
-    platform: string;
-    status: string;
-    statusValue?: string;
-    startDate?: string;
-    endDate?: string;
-    enrollmentStartDate?: string;
-    enrollmentDeadline?: string;
-    minStudents?: number;
-    maxStudents?: number;
-    tuitionFee?: string;
-    learningModeValue?: string;
-    onlinePlatform?: string;
-    note?: string;
-    sessions?: CourseSession[];
-  }>;
-  modules: Array<{
-    id: number;
-    order: number;
-    title: string;
-    description: string | null;
-      lessons: Array<{
-        id: number;
-        title: string;
-        type: string;
-        content?: string | null;
-        videoUrl?: string | null;
-        durationMinutes?: number;
-        duration: string;
-        isPreview: boolean;
-      }>;
-  }>;
-  quizzes: CourseQuiz[];
-  reviews: Array<{
-    student: string;
-    rating: number;
-    comment: string | null;
-    createdAt: string;
-  }>;
-};
-
-type InstructorCoursesApiResponse = {
-  success: boolean;
-  data: {
-    teacherId: number;
-    profile: {
-      name: string;
-      role: string;
-      avatar: string | null;
-      workplace?: string | null;
-    };
-    summary: CourseManagementStat[];
-    categories: Array<{ id: number; key: string; label: string; active: boolean }>;
-    instructorCourses: InstructorCourseItem[];
-    courseBatches: CourseBatch[];
-    lessonPlanner: LessonPlannerItem[];
-    generatedAt: string;
-  };
-};
-
-type CourseDetailApiResponse = {
-  success: boolean;
-  data: CourseDetail;
-};
-
-type CourseUpdateApiResponse = {
-  success: boolean;
-  data: {
-    id: number;
-    title: string;
-    description: string | null;
-    thumbnail: string | null;
-    category: string;
-    categoryId: number;
-    level: string;
-    status: string;
-    statusTone: string;
-    workflowStatus?: string;
-  };
-};
-
-type CourseFilter = "all" | "published" | "draft" | "pending";
-type CourseDetailTab = "overview" | "schedule" | "curriculum" | "quizzes" | "preview";
-type CourseWorkflowAction = "submit" | "cancel";
-type SessionFormData = {
-  title: string;
-  description: string;
-  startTime: string;
-  endTime: string;
-  meetingUrl: string;
-  meetingPassword: string;
-  platform: string;
-  status: string;
-  recordingUrl: string;
-  note: string;
-};
-type BatchFormData = {
-  batchCode: string;
-  batchName: string;
-  startDate: string;
-  endDate: string;
-  enrollmentStartDate: string;
-  enrollmentDeadline: string;
-  minStudents: string;
-  maxStudents: string;
-  tuitionFee: string;
-  learningMode: string;
-  onlinePlatform: string;
-  defaultMeetingUrl: string;
-  timezone: string;
-  status: string;
-  note: string;
-};
-
-type CourseEditFormData = {
-  title: string;
-  description: string;
-  thumbnailUrl: string;
-  price: string;
-  categoryId: string;
-  level: string;
-};
-
-type LessonImportFormData = {
-  moduleId: string;
-  lines: string;
-  defaultType: string;
-  defaultDurationMinutes: string;
-  defaultIsPreview: boolean;
-  defaultContent: string;
-  defaultVideoUrl: string;
-};
-
-type QuizFormData = {
-  batchId: string;
-  lessonId: string;
-  title: string;
-  description: string;
-  durationMinutes: string;
-  maxScore: string;
-  passScore: string;
-  attemptLimit: string;
-};
-
-type QuizQuestionFormData = {
-  text: string;
-  type: string;
-  score: string;
-  optionA: string;
-  optionB: string;
-  optionC: string;
-  optionD: string;
-  correctIndex: string;
-  trueFalseAnswer: string;
-};
-
-type CourseSession = {
-  id: number;
-  batchId: number;
-  title: string;
-  description: string;
-  startTime: string;
-  endTime: string;
-  startLabel: string;
-  endLabel: string;
-  meetingUrl: string;
-  meetingPassword: string;
-  platform: string;
-  platformLabel: string;
-  status: string;
-  statusLabel: string;
-  recordingUrl: string;
-  note: string;
-};
-
-type ConfirmDialogState = {
-  title: string;
-  message: string;
-  confirmLabel: string;
-  onConfirm: () => Promise<void>;
-} | null;
-
-type InstructorToast = {
-  message: string;
-  type: "success" | "error";
-} | null;
-
 function getCourseFilterStatus(status: string) {
-  if (status === "Đã xuất bản" || status === "Da xuat ban" || status === "ÄÃ£ xuáº¥t báº£n") {
+  if (status === "Đã xuất bản" || status === "Da xuat ban") {
     return "published";
   }
 
-  if (status === "Chờ duyệt" || status === "Cho duyet" || status === "Chá» duyá»‡t") {
+  if (status === "Chờ duyệt" || status === "Cho duyet") {
     return "pending";
   }
 
-  if (status === "Bản nháp" || status === "Ban nhap" || status === "Báº£n nhÃ¡p") {
+  if (status === "Bản nháp" || status === "Ban nhap") {
     return "draft";
   }
 
@@ -291,7 +71,7 @@ function getCourseWorkflowStatus(course?: Pick<CourseDetail, "workflowStatus" | 
   if (filterStatus === "published") return "APPROVED";
   if (filterStatus === "pending") return "PENDING";
   if (filterStatus === "draft") return "DRAFT";
-  if (course.status.includes("tá»« chá»‘i") || course.status.includes("tu choi")) return "REJECTED";
+  if (course.status.includes("từ chối") || course.status.includes("tu choi")) return "REJECTED";
   return "";
 }
 
@@ -342,6 +122,60 @@ function getBatchLabel(batch: { id: number; code?: string | null; batchCode?: st
   return name ? `${code} - ${name}` : code;
 }
 
+function getBatchStudentCounts(batch: { students?: string; enrolledStudents?: number; maxStudents?: number }) {
+  const fromText = String(batch.students ?? "").split("/").map((value) => Number(value.trim()));
+  const enrolled = Number(batch.enrolledStudents ?? fromText[0] ?? 0);
+  const max = Number(batch.maxStudents ?? fromText[1] ?? 0);
+
+  return {
+    enrolled: Number.isFinite(enrolled) ? enrolled : 0,
+    max: Number.isFinite(max) ? max : 0,
+  };
+}
+
+function getBatchReceivingStatus(batch: { status?: string; statusValue?: string; students?: string; enrolledStudents?: number; maxStudents?: number }) {
+  const { enrolled, max } = getBatchStudentCounts(batch);
+  const status = String(batch.statusValue ?? "").toUpperCase();
+
+  if (max > 0 && enrolled >= max) return "Đã đủ học viên";
+  if (status === "OPEN") return "Đang nhận học viên";
+  if (status === "FULL") return "Đã đủ học viên";
+
+  return batch.status ?? "Bản nháp";
+}
+
+function getBatchRemainingSlots(batch: { students?: string; enrolledStudents?: number; maxStudents?: number }) {
+  const { enrolled, max } = getBatchStudentCounts(batch);
+  if (!max) return null;
+  return Math.max(max - enrolled, 0);
+}
+
+function getAutoAssignPriorityBatchId(batches: CourseDetail["batches"]) {
+  const candidates = batches.filter((batch) => {
+    const status = String(batch.statusValue ?? "").toUpperCase();
+    const remainingSlots = getBatchRemainingSlots(batch);
+    return status === "OPEN" && (remainingSlots == null || remainingSlots > 0);
+  });
+
+  if (candidates.length === 0) return null;
+
+  return [...candidates].sort((left, right) => {
+    const leftDate = left.startDate ? new Date(left.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+    const rightDate = right.startDate ? new Date(right.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+    return leftDate - rightDate;
+  })[0]?.id ?? null;
+}
+
+const WEEKDAY_OPTIONS = [
+  { value: "1", label: "Thứ 2" },
+  { value: "2", label: "Thứ 3" },
+  { value: "3", label: "Thứ 4" },
+  { value: "4", label: "Thứ 5" },
+  { value: "5", label: "Thứ 6" },
+  { value: "6", label: "Thứ 7" },
+  { value: "0", label: "Chủ nhật" },
+];
+
 function createFallbackCourseDetail(course: InstructorCourseItem): CourseDetail {
   return {
     id: course.id,
@@ -372,6 +206,8 @@ function createFallbackCourseDetail(course: InstructorCourseItem): CourseDetail 
 }
 
 function InstructorCourseManagementPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [pageData, setPageData] =
     useState<InstructorCoursesApiResponse["data"] | null>(null);
   const [courseFilter, setCourseFilter] = useState<CourseFilter>("all");
@@ -389,6 +225,7 @@ function InstructorCourseManagementPage() {
   });
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
   const [courseDetailTab, setCourseDetailTab] = useState<CourseDetailTab>("overview");
   const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
@@ -421,6 +258,37 @@ function InstructorCourseManagementPage() {
     defaultContent: "",
     defaultVideoUrl: "",
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const shouldOpenCreateCourse = params.get("createCourse") === "1";
+    const shouldOpenImportLessons = params.get("importLessons") === "1";
+
+    if (!shouldOpenCreateCourse && !shouldOpenImportLessons) {
+      return;
+    }
+
+    if (shouldOpenCreateCourse) {
+      setShowCreateForm(true);
+      params.delete("createCourse");
+    }
+
+    if (shouldOpenImportLessons) {
+      setShowImportLessonsForm(true);
+      setImportLessonError(null);
+      params.delete("importLessons");
+    }
+
+    const nextSearch = params.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch ? `?${nextSearch}` : "",
+      },
+      { replace: true },
+    );
+  }, [location.pathname, location.search, navigate]);
+
   const [showBatchForm, setShowBatchForm] = useState(false);
   const [batchFormMode, setBatchFormMode] = useState<"create" | "edit">("create");
   const [batchFormTarget, setBatchFormTarget] = useState<{ batchId?: number; courseId?: number } | null>(null);
@@ -440,7 +308,7 @@ function InstructorCourseManagementPage() {
     onlinePlatform: "ZOOM",
     defaultMeetingUrl: "",
     timezone: "Asia/Ho_Chi_Minh",
-    status: "DRAFT",
+    status: "OPEN",
     note: "",
   });
   const [showSessionForm, setShowSessionForm] = useState(false);
@@ -448,6 +316,27 @@ function InstructorCourseManagementPage() {
   const [sessionFormTarget, setSessionFormTarget] = useState<{ batchId?: number; sessionId?: number } | null>(null);
   const [sessionFormError, setSessionFormError] = useState<string | null>(null);
   const [isSavingSession, setIsSavingSession] = useState(false);
+  const [showRecurringScheduleForm, setShowRecurringScheduleForm] = useState(false);
+  const [recurringScheduleTarget, setRecurringScheduleTarget] = useState<{ batchId: number } | null>(null);
+  const [recurringScheduleError, setRecurringScheduleError] = useState<string | null>(null);
+  const [isGeneratingSchedule, setIsGeneratingSchedule] = useState(false);
+  const [recurringScheduleFormData, setRecurringScheduleFormData] = useState<RecurringScheduleFormData>({
+    weekdays: ["1", "3", "5"],
+    startTime: "19:00",
+    endTime: "20:30",
+    titlePrefix: "Buổi học",
+    description: "",
+    meetingUrl: "",
+    meetingPassword: "",
+    platform: "ZOOM",
+    status: "SCHEDULED",
+    note: "",
+  });
+  const [attendanceTarget, setAttendanceTarget] = useState<{ batchId: number; sessionId: number } | null>(null);
+  const [attendanceData, setAttendanceData] = useState<SessionAttendanceData | null>(null);
+  const [attendanceError, setAttendanceError] = useState<string | null>(null);
+  const [isAttendanceLoading, setIsAttendanceLoading] = useState(false);
+  const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const [sessionFormData, setSessionFormData] = useState<SessionFormData>({
     title: "",
     description: "",
@@ -466,6 +355,14 @@ function InstructorCourseManagementPage() {
   const [isSavingQuiz, setIsSavingQuiz] = useState(false);
   const [isDeletingQuiz, setIsDeletingQuiz] = useState<number | null>(null);
   const [selectedQuizId, setSelectedQuizId] = useState<number | null>(null);
+  const [selectedQuizAttemptId, setSelectedQuizAttemptId] = useState<number | null>(null);
+  const [quizAttemptScore, setQuizAttemptScore] = useState("");
+  const [quizAttemptError, setQuizAttemptError] = useState<string | null>(null);
+  const [isSavingQuizAttemptGrade, setIsSavingQuizAttemptGrade] = useState(false);
+  const [selectedReviewId, setSelectedReviewId] = useState<number | null>(null);
+  const [reviewReplyText, setReviewReplyText] = useState("");
+  const [reviewReplyError, setReviewReplyError] = useState<string | null>(null);
+  const [isSavingReviewReply, setIsSavingReviewReply] = useState(false);
   const [quizQuestionFormMode, setQuizQuestionFormMode] = useState<"create" | "edit">("create");
   const [quizQuestionFormTargetId, setQuizQuestionFormTargetId] = useState<number | null>(null);
   const [quizQuestionFormError, setQuizQuestionFormError] = useState<string | null>(null);
@@ -693,7 +590,7 @@ function InstructorCourseManagementPage() {
       await refreshCoursesList();
     } catch (error) {
       console.error(error);
-      setCreateError("Không thể tạo khóa học. Vui lòng thử lại.");
+      setCreateError("Không thỒ tạo khóa học. Vui lòng thử lại.");
     } finally {
       setIsCreating(false);
     }
@@ -767,7 +664,7 @@ function InstructorCourseManagementPage() {
       }
     } catch (error) {
       console.error(error);
-      setEditCourseError(error instanceof Error ? error.message : "Không thể cập nhật khóa học.");
+      setEditCourseError(error instanceof Error ? error.message : "Không thỒ cập nhật khóa học.");
     } finally {
       setIsUpdatingCourse(false);
     }
@@ -806,7 +703,7 @@ function InstructorCourseManagementPage() {
           setToast({ message: "Đã xóa khóa học khỏi danh sách.", type: "success" });
         } catch (error) {
           console.error(error);
-          const message = error instanceof Error ? error.message : "Không thể xóa khóa học.";
+          const message = error instanceof Error ? error.message : "Không thỒ xóa khóa học.";
           setEditCourseError(message);
           setToast({ message, type: "error" });
         } finally {
@@ -904,7 +801,7 @@ function InstructorCourseManagementPage() {
           setToast({ message: "Đã xóa chương khỏi khóa học.", type: "success" });
         } catch (error) {
           console.error(error);
-          const message = error instanceof Error ? error.message : "Không thể xóa chương.";
+          const message = error instanceof Error ? error.message : "Không thỒ xóa chương.";
           setModuleError(message);
           setToast({ message, type: "error" });
         } finally {
@@ -946,7 +843,7 @@ function InstructorCourseManagementPage() {
           setToast({ message: "Đã xóa bài học.", type: "success" });
         } catch (error) {
           console.error(error);
-          const message = error instanceof Error ? error.message : "Không thể xóa bài học.";
+          const message = error instanceof Error ? error.message : "Không thỒ xóa bài học.";
           setLessonError(message);
           setToast({ message, type: "error" });
         } finally {
@@ -956,12 +853,70 @@ function InstructorCourseManagementPage() {
     });
   }
 
-  const displayedStats = pageData?.summary ?? courseManagementStats;
-  const displayedCourses = pageData?.instructorCourses ?? instructorCourses;
+  const displayedStats = (pageData?.summary ?? courseManagementStats).map((stat) =>
+    stat.icon === "event_available" ? { ...stat, label: "Lớp nhận học viên" } : stat,
+  );
+  const displayedCourses: InstructorCourseItem[] = pageData?.instructorCourses ?? instructorCourses;
   const filteredCourses = displayedCourses.filter((course) => {
     if (courseFilter === "all") return true;
     return getCourseFilterStatus(course.status) === courseFilter;
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const shouldOpenCreateQuiz = params.get("createQuiz") === "1";
+
+    if (!shouldOpenCreateQuiz || displayedCourses.length === 0) {
+      return;
+    }
+
+    const targetCourse = displayedCourses.find((course) => course.id) ?? displayedCourses[0];
+
+    async function openQuizCreator() {
+      await openCourseDetail(targetCourse);
+      setCourseDetailTab("quizzes");
+      resetQuizForm("");
+      params.delete("createQuiz");
+
+      const nextSearch = params.toString();
+      navigate(
+        {
+          pathname: location.pathname,
+          search: nextSearch ? `?${nextSearch}` : "",
+        },
+        { replace: true },
+      );
+    }
+
+    openQuizCreator();
+  }, [displayedCourses, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const courseId = Number(params.get("courseId"));
+
+    if (!Number.isFinite(courseId) || courseId <= 0 || displayedCourses.length === 0) {
+      return;
+    }
+
+    const targetCourse = displayedCourses.find((course) => Number(course.id) === courseId);
+    if (!targetCourse) {
+      return;
+    }
+
+    openCourseDetail(targetCourse);
+    params.delete("courseId");
+
+    const nextSearch = params.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch ? `?${nextSearch}` : "",
+      },
+      { replace: true },
+    );
+  }, [displayedCourses, location.pathname, location.search, navigate]);
+
   const displayedBatches = pageData?.courseBatches ?? courseBatches;
   const displayedLessonPlanner = pageData?.lessonPlanner ?? lessonPlanner;
   const courseWorkflowAction = getCourseWorkflowAction(selectedCourseDetail);
@@ -1106,7 +1061,7 @@ function InstructorCourseManagementPage() {
       onlinePlatform: "ZOOM",
       defaultMeetingUrl: "",
       timezone: "Asia/Ho_Chi_Minh",
-      status: "DRAFT",
+      status: "OPEN",
       note: "",
     });
   }
@@ -1126,6 +1081,24 @@ function InstructorCourseManagementPage() {
       platform: "ZOOM",
       status: "SCHEDULED",
       recordingUrl: "",
+      note: "",
+    });
+  }
+
+  function closeRecurringScheduleForm() {
+    setShowRecurringScheduleForm(false);
+    setRecurringScheduleTarget(null);
+    setRecurringScheduleError(null);
+    setRecurringScheduleFormData({
+      weekdays: ["1", "3", "5"],
+      startTime: "19:00",
+      endTime: "20:30",
+      titlePrefix: "Buổi học",
+      description: "",
+      meetingUrl: "",
+      meetingPassword: "",
+      platform: "ZOOM",
+      status: "SCHEDULED",
       note: "",
     });
   }
@@ -1163,12 +1136,27 @@ function InstructorCourseManagementPage() {
     });
   }
 
+  function resetQuizAttemptPanel() {
+    setSelectedQuizAttemptId(null);
+    setQuizAttemptScore("");
+    setQuizAttemptError(null);
+  }
+
+  function resetReviewReplyPanel() {
+    setSelectedReviewId(null);
+    setReviewReplyText("");
+    setReviewReplyError(null);
+  }
+
   function closeCourseDetail() {
     setSelectedCourseDetail(null);
     closeBatchForm();
     closeSessionForm();
+    closeRecurringScheduleForm();
     resetQuizForm("");
     resetQuizQuestionForm();
+    resetQuizAttemptPanel();
+    resetReviewReplyPanel();
   }
 
   function openCreateBatchForm(courseId?: number) {
@@ -1189,7 +1177,7 @@ function InstructorCourseManagementPage() {
       onlinePlatform: "ZOOM",
       defaultMeetingUrl: "",
       timezone: "Asia/Ho_Chi_Minh",
-      status: "DRAFT",
+      status: "OPEN",
       note: "",
     });
     setShowBatchForm(true);
@@ -1211,9 +1199,9 @@ function InstructorCourseManagementPage() {
       tuitionFee: batch.tuitionFee ?? "",
       learningMode: batch.learningModeValue ?? "ONLINE",
       onlinePlatform: batch.onlinePlatform ?? "ZOOM",
-      defaultMeetingUrl: "",
+      defaultMeetingUrl: batch.defaultMeetingUrl ?? "",
       timezone: "Asia/Ho_Chi_Minh",
-      status: batch.statusValue ?? "DRAFT",
+      status: batch.statusValue ?? "OPEN",
       note: batch.note ?? "",
     });
     setShowBatchForm(true);
@@ -1351,6 +1339,102 @@ function InstructorCourseManagementPage() {
     setShowSessionForm(true);
   }
 
+  function openRecurringScheduleForm(batch: CourseDetail["batches"][number]) {
+    setRecurringScheduleTarget({ batchId: batch.id });
+    setRecurringScheduleError(null);
+    setRecurringScheduleFormData({
+      weekdays: ["1", "3", "5"],
+      startTime: "19:00",
+      endTime: "20:30",
+      titlePrefix: "Buổi học",
+      description: "",
+      meetingUrl: batch.defaultMeetingUrl ?? "",
+      meetingPassword: "",
+      platform: batch.onlinePlatform ?? "ZOOM",
+      status: "SCHEDULED",
+      note: "",
+    });
+    setShowRecurringScheduleForm(true);
+  }
+
+  function toggleRecurringWeekday(value: string) {
+    setRecurringScheduleFormData((current) => {
+      const weekdays = current.weekdays.includes(value)
+        ? current.weekdays.filter((weekday) => weekday !== value)
+        : [...current.weekdays, value];
+
+      return { ...current, weekdays };
+    });
+  }
+
+  async function handleGenerateRecurringSchedule() {
+    const courseId = selectedCourseDetail?.id;
+    const batchId = recurringScheduleTarget?.batchId;
+
+    if (!courseId || !batchId) {
+      setRecurringScheduleError("Hãy chọn khóa học và lớp học.");
+      return;
+    }
+
+    if (recurringScheduleFormData.weekdays.length === 0) {
+      setRecurringScheduleError("Hãy chọn ít nhất một thứ trong tuần.");
+      return;
+    }
+
+    if (!recurringScheduleFormData.startTime || !recurringScheduleFormData.endTime) {
+      setRecurringScheduleError("Hãy chọn giờ bắt đầu và giờ kết thúc.");
+      return;
+    }
+
+    if (recurringScheduleFormData.endTime <= recurringScheduleFormData.startTime) {
+      setRecurringScheduleError("Giờ kết thúc phải sau giờ bắt đầu.");
+      return;
+    }
+
+    setIsGeneratingSchedule(true);
+    setRecurringScheduleError(null);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/instructor/courses/${courseId}/batches/${batchId}/sessions/generate?teacherId=${DEFAULT_TEACHER_ID}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...recurringScheduleFormData,
+            weekdays: recurringScheduleFormData.weekdays.map(Number),
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(payload?.message ?? `Request failed with status ${response.status}`);
+      }
+
+      const payload = (await response.json()) as RecurringScheduleApiResponse;
+      if (!payload.success) throw new Error("Không thể tạo lịch định kỳ.");
+
+      await refreshCourseDetail(courseId);
+      await refreshCoursesList();
+      setCourseDetailTab("schedule");
+      setToast({
+        message: `Đã tạo ${payload.data.generatedCount} buổi học${
+          payload.data.skippedCount ? `, bỏ qua ${payload.data.skippedCount} buổi trùng lịch.` : "."
+        }`,
+        type: "success",
+      });
+      closeRecurringScheduleForm();
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : "Không thể tạo lịch định kỳ.";
+      setRecurringScheduleError(message);
+      setToast({ message, type: "error" });
+    } finally {
+      setIsGeneratingSchedule(false);
+    }
+  }
+
   function openEditSessionForm(batchId: number, session: CourseSession) {
     setSessionFormMode("edit");
     setSessionFormTarget({ batchId, sessionId: session.id });
@@ -1483,6 +1567,96 @@ function InstructorCourseManagementPage() {
     });
   }
 
+  async function openAttendanceModal(batchId: number, sessionId: number) {
+    const courseId = selectedCourseDetail?.id;
+    if (!courseId) return;
+
+    setAttendanceTarget({ batchId, sessionId });
+    setAttendanceData(null);
+    setAttendanceError(null);
+    setIsAttendanceLoading(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/instructor/courses/${courseId}/batches/${batchId}/sessions/${sessionId}/attendance?teacherId=${DEFAULT_TEACHER_ID}`,
+      );
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(payload?.message ?? `Request failed with status ${response.status}`);
+      }
+
+      const payload = (await response.json()) as SessionAttendanceApiResponse;
+      if (!payload.success) throw new Error("Không thể tải dữ liệu điểm danh.");
+      setAttendanceData(payload.data);
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : "Không thể tải dữ liệu điểm danh.";
+      setAttendanceError(message);
+      setToast({ message, type: "error" });
+    } finally {
+      setIsAttendanceLoading(false);
+    }
+  }
+
+  function updateAttendanceStudent(studentId: number, patch: Partial<AttendanceStudent>) {
+    setAttendanceData((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        students: current.students.map((student) =>
+          student.studentId === studentId ? { ...student, ...patch } : student,
+        ),
+      };
+    });
+  }
+
+  async function handleSaveAttendance() {
+    const courseId = selectedCourseDetail?.id;
+    if (!courseId || !attendanceTarget || !attendanceData) return;
+
+    setIsSavingAttendance(true);
+    setAttendanceError(null);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/instructor/courses/${courseId}/batches/${attendanceTarget.batchId}/sessions/${attendanceTarget.sessionId}/attendance?teacherId=${DEFAULT_TEACHER_ID}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            attendances: attendanceData.students.map((student) => ({
+              studentId: student.studentId,
+              status: student.status,
+              durationMinutes: student.durationMinutes,
+              note: student.note,
+            })),
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(payload?.message ?? `Request failed with status ${response.status}`);
+      }
+
+      const payload = (await response.json()) as SessionAttendanceApiResponse;
+      if (!payload.success) throw new Error("Không thể lưu điểm danh.");
+
+      setAttendanceData(payload.data);
+      await refreshCourseDetail(courseId);
+      setToast({ message: "Đã lưu điểm danh buổi học.", type: "success" });
+      setAttendanceTarget(null);
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : "Không thể lưu điểm danh.";
+      setAttendanceError(message);
+      setToast({ message, type: "error" });
+    } finally {
+      setIsSavingAttendance(false);
+    }
+  }
+
   function openEditQuizForm(quiz: CourseQuiz) {
     setSelectedQuizId(quiz.id);
     setQuizFormMode("edit");
@@ -1567,7 +1741,7 @@ function InstructorCourseManagementPage() {
       });
     } catch (error) {
       console.error(error);
-      setQuizFormError(error instanceof Error ? error.message : "Không thể lưu quiz.");
+      setQuizFormError(error instanceof Error ? error.message : "Không thỒ lưu quiz.");
     } finally {
       setIsSavingQuiz(false);
     }
@@ -1604,7 +1778,7 @@ function InstructorCourseManagementPage() {
           setToast({ message: "Đã xóa quiz.", type: "success" });
         } catch (error) {
           console.error(error);
-          const message = error instanceof Error ? error.message : "Không thể xóa quiz.";
+          const message = error instanceof Error ? error.message : "Không thỒ xóa quiz.";
           setToast({ message, type: "error" });
         } finally {
           setIsDeletingQuiz(null);
@@ -1723,7 +1897,7 @@ function InstructorCourseManagementPage() {
       });
     } catch (error) {
       console.error(error);
-      setQuizQuestionFormError(error instanceof Error ? error.message : "Không thể lưu câu hỏi.");
+      setQuizQuestionFormError(error instanceof Error ? error.message : "Không thỒ lưu câu hỏi.");
     } finally {
       setIsSavingQuizQuestion(false);
     }
@@ -1755,7 +1929,7 @@ function InstructorCourseManagementPage() {
           setToast({ message: "Đã xóa câu hỏi.", type: "success" });
         } catch (error) {
           console.error(error);
-          const message = error instanceof Error ? error.message : "Không thể xóa câu hỏi.";
+          const message = error instanceof Error ? error.message : "Không thỒ xóa câu hỏi.";
           setToast({ message, type: "error" });
         } finally {
           setIsDeletingQuizQuestion(null);
@@ -1764,14 +1938,126 @@ function InstructorCourseManagementPage() {
     });
   }
 
+  function openQuizAttempt(attempt: CourseQuizAttempt) {
+    setSelectedQuizAttemptId(attempt.id);
+    setQuizAttemptScore(attempt.score ?? "");
+    setQuizAttemptError(null);
+    setCourseDetailTab("quizzes");
+  }
+
+  function openReviewReply(review: { id: number; teacherComment: string | null }) {
+    setSelectedReviewId(review.id);
+    setReviewReplyText(review.teacherComment ?? "");
+    setReviewReplyError(null);
+    setCourseDetailTab("overview");
+  }
+
+  async function handleGradeQuizAttempt() {
+    if (!selectedCourseDetail?.id || !selectedQuiz || !selectedQuizAttempt) return;
+
+    const score = Number(quizAttemptScore);
+    const maxScore = Number(selectedQuiz.maxScore);
+    if (!Number.isFinite(score) || score < 0) {
+      setQuizAttemptError("Điểm phải là số từ 0 trở lên.");
+      return;
+    }
+
+    if (Number.isFinite(maxScore) && score > maxScore) {
+      setQuizAttemptError("Điểm không được lớn hơn điểm tối đa của quiz.");
+      return;
+    }
+
+    setIsSavingQuizAttemptGrade(true);
+    setQuizAttemptError(null);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}/quizzes/${selectedQuiz.id}/attempts/${selectedQuizAttempt.id}/grade?teacherId=${DEFAULT_TEACHER_ID}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ score }),
+        },
+      );
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message ?? `Request failed with status ${response.status}`);
+      }
+
+      await refreshCourseDetail(selectedCourseDetail.id);
+      await refreshCoursesList();
+      setSelectedQuizId(selectedQuiz.id);
+      setSelectedQuizAttemptId(selectedQuizAttempt.id);
+      setToast({ message: "Đã chấm điểm lượt làm.", type: "success" });
+    } catch (error) {
+      console.error(error);
+      setQuizAttemptError(error instanceof Error ? error.message : "Không thể chấm điểm lượt làm.");
+    } finally {
+      setIsSavingQuizAttemptGrade(false);
+    }
+  }
+
+  async function handleSaveReviewReply() {
+    if (!selectedCourseDetail?.id || !selectedReviewId) return;
+
+    const teacherComment = reviewReplyText.trim();
+    if (!teacherComment) {
+      setReviewReplyError("Phản hồi không được để trống.");
+      return;
+    }
+
+    setIsSavingReviewReply(true);
+    setReviewReplyError(null);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}/reviews/${selectedReviewId}/respond?teacherId=${DEFAULT_TEACHER_ID}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ teacherComment }),
+        },
+      );
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message ?? `Request failed with status ${response.status}`);
+      }
+
+      await refreshCourseDetail(selectedCourseDetail.id);
+      await refreshCoursesList();
+      setSelectedReviewId(selectedReviewId);
+      setToast({ message: "Đã lưu phản hồi đánh giá.", type: "success" });
+    } catch (error) {
+      console.error(error);
+      setReviewReplyError(error instanceof Error ? error.message : "Không thể lưu phản hồi.");
+    } finally {
+      setIsSavingReviewReply(false);
+    }
+  }
+
   const activeBatch =
     selectedCourseDetail?.batches.find((batch) => batch.id === selectedBatchId) ??
     selectedCourseDetail?.batches[0] ??
     null;
+  const autoAssignPriorityBatchId = selectedCourseDetail
+    ? getAutoAssignPriorityBatchId(selectedCourseDetail.batches)
+    : null;
 
   const selectedQuiz =
     selectedCourseDetail?.quizzes.find((quiz) => quiz.id === selectedQuizId) ??
     selectedCourseDetail?.quizzes[0] ??
+    null;
+
+  const selectedQuizAttempt =
+    selectedQuiz?.attemptItems.find((attempt) => attempt.id === selectedQuizAttemptId) ??
+    selectedQuiz?.attemptItems[0] ??
+    null;
+
+  const selectedReview =
+    selectedCourseDetail?.reviews.find((review) => review.id === selectedReviewId) ??
+    selectedCourseDetail?.reviews[0] ??
     null;
 
   const courseLessons =
@@ -1884,6 +2170,10 @@ function InstructorCourseManagementPage() {
       setSelectedQuizId((current) =>
         payload.data.quizzes.some((quiz) => quiz.id === current) ? current : payload.data.quizzes[0]?.id ?? null,
       );
+      setSelectedReviewId((current) =>
+        payload.data.reviews.some((review) => review.id === current) ? current : payload.data.reviews[0]?.id ?? null,
+      );
+      setReviewReplyText(payload.data.reviews[0]?.teacherComment ?? "");
     } catch (error) {
       console.error(error);
       setCourseDetailError("Chưa tải được dữ liệu chi tiết mới nhất.");
@@ -1930,7 +2220,7 @@ function InstructorCourseManagementPage() {
       }
     } catch (error) {
       console.error(error);
-      setModuleError(error instanceof Error ? error.message : "Không thể tạo chương.");
+      setModuleError(error instanceof Error ? error.message : "Không thỒ tạo chương.");
     } finally {
       setIsCreatingModule(false);
     }
@@ -2038,7 +2328,7 @@ function InstructorCourseManagementPage() {
     } catch (error) {
       console.error(error);
       setSelectedCourseDetail(previousDetail);
-      setModuleError(error instanceof Error ? error.message : "Không thể sắp xếp chương.");
+      setModuleError(error instanceof Error ? error.message : "Không thỒ sắp xếp chương.");
     } finally {
       setIsReorderingModuleId(null);
     }
@@ -2091,7 +2381,7 @@ function InstructorCourseManagementPage() {
     } catch (error) {
       console.error(error);
       setSelectedCourseDetail(previousDetail);
-      setLessonError(error instanceof Error ? error.message : "Không thể sắp xếp bài học.");
+      setLessonError(error instanceof Error ? error.message : "Không thỒ sắp xếp bài học.");
     } finally {
       setIsReorderingLessonId(null);
     }
@@ -2155,7 +2445,7 @@ function InstructorCourseManagementPage() {
       setSelectedModuleId(fallbackModuleId);
     } catch (error) {
       console.error(error);
-      setLessonError(error instanceof Error ? error.message : "Không thể lưu bài học.");
+      setLessonError(error instanceof Error ? error.message : "Không thỒ lưu bài học.");
     } finally {
       setIsCreatingLesson(false);
     }
@@ -2205,7 +2495,7 @@ function InstructorCourseManagementPage() {
       const payload = (await response.json()) as { success: boolean; data: { importedCount: number } };
 
       if (!payload.success) {
-        throw new Error("Không thể nhập bài học.");
+        throw new Error("Không thỒ nhập bài học.");
       }
 
       if (selectedCourseDetail?.id === courseId) {
@@ -2217,7 +2507,7 @@ function InstructorCourseManagementPage() {
       closeImportLessonsForm();
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : "Không thể nhập bài học.";
+      const message = error instanceof Error ? error.message : "Không thỒ nhập bài học.";
       setImportLessonError(message);
       setToast({ message, type: "error" });
     } finally {
@@ -2257,7 +2547,7 @@ function InstructorCourseManagementPage() {
             <p>{stat.label}</p>
             <div>
               <strong>{stat.value}</strong>
-              <span>{pageData ? "Dữ liệu từ backend" : "Không gian hiện tại"}</span>
+              <span>{pageData ? "Theo danh mục hiện tại" : "Không gian hiện tại"}</span>
             </div>
           </article>
         ))}
@@ -2504,7 +2794,7 @@ function InstructorCourseManagementPage() {
                         }
                       />
                       <div>
-                        <strong>Xem trước ảnh bìa</strong>
+                        <span>Ảnh này sẽ hiển thị trên card khóa học và phần đầu modal.</span>
                         <span>Ảnh này sẽ hiển thị trên card khóa học và phần đầu modal.</span>
                       </div>
                     </div>
@@ -2606,7 +2896,7 @@ function InstructorCourseManagementPage() {
 
               <section className="instructor-course-detail-section">
                 <div className="instructor-course-detail-section-title">
-                  <h4>Lớp đang mở</h4>
+                  <h4>Lớp nhận học viên</h4>
                   <div className="instructor-course-detail-section-actions">
                     <span>{selectedCourseDetail.batches.length} lớp</span>
                     <button
@@ -2614,40 +2904,67 @@ function InstructorCourseManagementPage() {
                       onClick={() => openCreateBatchForm(selectedCourseDetail.id)}
                       type="button"
                     >
-                      Thêm lớp
+                      Mở lớp học
                     </button>
                   </div>
                 </div>
                 <div className="instructor-course-detail-batches">
                   {selectedCourseDetail.batches.length === 0 ? (
-                    <p className="instructor-empty-state">Chưa có lớp cho khóa học này.</p>
+                    <p className="instructor-empty-state">Chưa có lớp nhận học viên cho khóa học này.</p>
                   ) : (
-                    selectedCourseDetail.batches.map((batch) => (
-                      <div key={batch.id}>
-                        <strong>{batch.code}</strong>
-                        <p>{batch.name}</p>
-                        <span>{batch.dates}</span>
-                        <em>{batch.students}</em>
-                        <b>{batch.mode} · {batch.status}</b>
-                        <div className="instructor-course-batch-actions">
-                          <button
-                            className="instructor-inline-action"
-                            onClick={() => openEditBatchForm(selectedCourseDetail.id!, batch)}
-                            type="button"
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            className="instructor-inline-action danger"
-                            disabled={isDeletingBatch === batch.id}
-                            onClick={() => handleDeleteBatch(selectedCourseDetail.id!, batch.id)}
-                            type="button"
-                          >
-                            {isDeletingBatch === batch.id ? "Đang xóa..." : "Xóa"}
-                          </button>
+                    selectedCourseDetail.batches.map((batch) => {
+                      const { enrolled, max } = getBatchStudentCounts(batch);
+                      const remainingSlots = getBatchRemainingSlots(batch);
+                      const isFull = max > 0 && enrolled >= max;
+                      const isPriority = batch.id === autoAssignPriorityBatchId;
+
+                      return (
+                        <div
+                          className={`${isFull ? "is-full" : ""} ${isPriority ? "is-priority" : ""}`}
+                          key={batch.id}
+                        >
+                          <div className="instructor-course-batch-main">
+                            <strong>{batch.code}</strong>
+                            <p>
+                              {batch.name}
+                              {isPriority && <i>Ưu tiên tự xếp</i>}
+                            </p>
+                          </div>
+                          <div className="instructor-course-batch-meta">
+                            <span>{batch.dates}</span>
+                            <div className="instructor-course-batch-capacity">
+                              <em>Đã xếp {enrolled} / {max || "?"}</em>
+                              <em>{remainingSlots == null ? "Chưa đặt sĩ số" : `Còn ${remainingSlots} chỗ`}</em>
+                            </div>
+                            <div className="instructor-course-batch-status">
+                              <b>{batch.mode} · {getBatchReceivingStatus(batch)}</b>
+                              <small>
+                                {isFull
+                                  ? "Lớp đã đủ chỗ, học viên mới sẽ được chuyển sang lớp còn chỗ."
+                                  : "Học viên mua khóa sẽ được hệ thống tự xếp vào lớp phù hợp."}
+                              </small>
+                            </div>
+                          </div>
+                          <div className="instructor-course-batch-actions">
+                            <button
+                              className="instructor-inline-action"
+                              onClick={() => openEditBatchForm(selectedCourseDetail.id!, batch)}
+                              type="button"
+                            >
+                              Sửa
+                            </button>
+                            <button
+                              className="instructor-inline-action danger"
+                              disabled={isDeletingBatch === batch.id}
+                              onClick={() => handleDeleteBatch(selectedCourseDetail.id!, batch.id)}
+                              type="button"
+                            >
+                              {isDeletingBatch === batch.id ? "Đang xóa..." : "Xóa"}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </section>
@@ -2704,6 +3021,14 @@ function InstructorCourseManagementPage() {
                       >
                         Thêm buổi
                       </button>
+                      <button
+                        className="instructor-inline-action"
+                        disabled={!activeBatch}
+                        onClick={() => activeBatch && openRecurringScheduleForm(activeBatch)}
+                        type="button"
+                      >
+                        Tạo lịch định kỳ
+                      </button>
                     </div>
                   </div>
 
@@ -2759,6 +3084,13 @@ function InstructorCourseManagementPage() {
                           </div>
 
                           <div className="instructor-course-session-actions">
+                            <button
+                              className="instructor-inline-action"
+                              onClick={() => openAttendanceModal(activeBatch.id, session.id)}
+                              type="button"
+                            >
+                              Điểm danh
+                            </button>
                             <button
                               className="instructor-inline-action"
                               onClick={() => openEditSessionForm(activeBatch.id, session)}
@@ -3023,44 +3355,50 @@ function InstructorCourseManagementPage() {
                           <p className="instructor-empty-state">Quiz này chưa có câu hỏi nào.</p>
                         ) : (
                           selectedQuiz.questionItems.map((question, index) => (
-                            <article className="instructor-course-quiz-question-card" key={question.id}>
-                              <div className="instructor-course-quiz-question-main">
+                            <details className="instructor-course-quiz-question-card" key={question.id}>
+                              <summary>
                                 <strong>
                                   {index + 1}. {question.text}
                                 </strong>
-                                <span>
-                                  {question.type} · {question.score} điểm
-                                </span>
+                                <span>{question.type}</span>
+                                <em>{question.score} điểm</em>
+                                <b>{question.options.length ? `${question.options.length} đáp án` : "Tự luận"}</b>
+                              </summary>
+                              <div className="instructor-course-quiz-question-detail">
+                                <div className="instructor-course-quiz-question-fulltext">
+                                  <span>Nội dung câu hỏi</span>
+                                  <p>{question.text}</p>
+                                </div>
+                                <div className="instructor-course-quiz-question-options">
+                                  {question.options.length === 0 ? (
+                                    <em>Câu tự luận</em>
+                                  ) : (
+                                    question.options.map((option) => (
+                                      <span key={option.id} className={option.isCorrect ? "correct" : ""}>
+                                        {option.text}
+                                      </span>
+                                    ))
+                                  )}
+                                </div>
+                                <div className="instructor-course-quiz-actions">
+                                  <button
+                                    className="instructor-inline-action"
+                                    onClick={() => openEditQuizQuestion(selectedQuiz, question)}
+                                    type="button"
+                                  >
+                                    Sửa
+                                  </button>
+                                  <button
+                                    className="instructor-inline-action danger"
+                                    disabled={isDeletingQuizQuestion === question.id}
+                                    onClick={() => handleDeleteQuizQuestion(selectedQuiz.id, question.id)}
+                                    type="button"
+                                  >
+                                    {isDeletingQuizQuestion === question.id ? "Đang xóa..." : "Xóa"}
+                                  </button>
+                                </div>
                               </div>
-                              <div className="instructor-course-quiz-question-options">
-                                {question.options.length === 0 ? (
-                                  <em>Câu tự luận</em>
-                                ) : (
-                                  question.options.map((option) => (
-                                    <span key={option.id} className={option.isCorrect ? "correct" : ""}>
-                                      {option.text}
-                                    </span>
-                                  ))
-                                )}
-                              </div>
-                              <div className="instructor-course-quiz-actions">
-                                <button
-                                  className="instructor-inline-action"
-                                  onClick={() => openEditQuizQuestion(selectedQuiz, question)}
-                                  type="button"
-                                >
-                                  Sửa
-                                </button>
-                                <button
-                                  className="instructor-inline-action danger"
-                                  disabled={isDeletingQuizQuestion === question.id}
-                                  onClick={() => handleDeleteQuizQuestion(selectedQuiz.id, question.id)}
-                                  type="button"
-                                >
-                                  {isDeletingQuizQuestion === question.id ? "Đang xóa..." : "Xóa"}
-                                </button>
-                              </div>
-                            </article>
+                            </details>
                           ))
                         )}
                       </div>
@@ -3103,7 +3441,7 @@ function InstructorCourseManagementPage() {
                             </select>
                           </label>
                           <label className="instructor-create-course-field">
-                            <span>Điểm</span>
+                            <span>ĐiỒm</span>
                             <input
                               min="1"
                               step="0.5"
@@ -3200,6 +3538,103 @@ function InstructorCourseManagementPage() {
                       </form>
                     </div>
                   </div>
+
+                  <div className="instructor-course-quiz-grading">
+                    <div className="instructor-course-detail-section-title">
+                      <h4>Lượt làm & chấm điểm</h4>
+                      <span>{selectedQuiz?.attemptItems.length ?? 0} lượt làm</span>
+                    </div>
+
+                    <div className="instructor-course-quiz-grading-grid">
+                      <div className="instructor-course-quiz-attempt-list">
+                        {!selectedQuiz ? (
+                          <p className="instructor-empty-state">Chọn một quiz để xem lượt làm.</p>
+                        ) : selectedQuiz.attemptItems.length === 0 ? (
+                          <p className="instructor-empty-state">Quiz này chưa có học viên làm bài.</p>
+                        ) : (
+                          selectedQuiz.attemptItems.map((attempt) => (
+                            <button
+                              className={`instructor-course-quiz-attempt-card ${
+                                selectedQuizAttempt?.id === attempt.id ? "active" : ""
+                              }`}
+                              key={attempt.id}
+                              onClick={() => openQuizAttempt(attempt)}
+                              type="button"
+                            >
+                              <strong>{attempt.studentName}</strong>
+                              <span>{attempt.submittedLabel}</span>
+                              <em>{attempt.status}</em>
+                              <b>{attempt.score ? `${attempt.score}/${selectedQuiz.maxScore}` : "Chờ chấm"}</b>
+                            </button>
+                          ))
+                        )}
+                      </div>
+
+                      <div className="instructor-course-quiz-grade-panel">
+                        {!selectedQuizAttempt ? (
+                          <p className="instructor-empty-state">Chọn một lượt làm để xem câu trả lời.</p>
+                        ) : (
+                          <>
+                            <div className="instructor-course-quiz-grade-header">
+                              <div>
+                                <strong>{selectedQuizAttempt.studentName}</strong>
+                                <span>{selectedQuizAttempt.submittedLabel}</span>
+                              </div>
+                              <em>{selectedQuizAttempt.status}</em>
+                            </div>
+
+                            <div className="instructor-course-quiz-answer-list">
+                              {selectedQuizAttempt.answers.length === 0 ? (
+                                <p className="instructor-empty-state">Lượt làm này chưa có câu trả lời chi tiết.</p>
+                              ) : (
+                                selectedQuizAttempt.answers.map((answer, answerIndex) => (
+                                  <article className="instructor-course-quiz-answer-card" key={answer.id}>
+                                    <strong>
+                                      {answerIndex + 1}. {answer.questionText}
+                                    </strong>
+                                    <span>
+                                      {answer.questionType === "ESSAY"
+                                        ? answer.essayAnswer || "Chưa nhập câu trả lời tự luận"
+                                        : answer.optionText || "Chưa chọn đáp án"}
+                                    </span>
+                                    {answer.isCorrect != null && (
+                                      <em className={answer.isCorrect ? "correct" : "wrong"}>
+                                        {answer.isCorrect ? "Đúng" : "Sai"}
+                                      </em>
+                                    )}
+                                  </article>
+                                ))
+                              )}
+                            </div>
+
+                            <form
+                              className="instructor-course-quiz-grade-form"
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                handleGradeQuizAttempt();
+                              }}
+                            >
+                              {quizAttemptError && <p className="instructor-course-detail-error">{quizAttemptError}</p>}
+                              <label className="instructor-create-course-field">
+                                <span>Điểm tổng</span>
+                                <input
+                                  min="0"
+                                  max={selectedQuiz?.maxScore ?? undefined}
+                                  step="0.5"
+                                  type="number"
+                                  value={quizAttemptScore || selectedQuizAttempt.score}
+                                  onChange={(event) => setQuizAttemptScore(event.target.value)}
+                                />
+                              </label>
+                              <button disabled={isSavingQuizAttemptGrade} type="submit">
+                                {isSavingQuizAttemptGrade ? "Đang lưu..." : "Lưu điểm"}
+                              </button>
+                            </form>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </section>
               )}
 
@@ -3223,7 +3658,7 @@ function InstructorCourseManagementPage() {
                         <span>{selectedCourseDetail.status}</span>
                       </div>
                       <div className="instructor-course-preview-actions">
-                        <button type="button">Đăng ký học</button>
+                        <button type="button">ĐĒng ký học</button>
                         <span>{selectedCourseDetail.price}</span>
                       </div>
                     </div>
@@ -3272,7 +3707,7 @@ function InstructorCourseManagementPage() {
 
                   <article className="instructor-course-preview-panel">
                     <div className="instructor-course-detail-section-subtitle">
-                      <span>Nội dung khóa học</span>
+                      <strong>Outline theo đúng thứ tự chương và bài</strong>
                       <strong>Outline theo đúng thứ tự chương và bài</strong>
                     </div>
                     <div className="instructor-course-preview-outline">
@@ -3477,7 +3912,7 @@ function InstructorCourseManagementPage() {
                               }
                             >
                               <option value="VIDEO">Video</option>
-                              <option value="TEXT">Văn bản</option>
+                              <option value="TEXT">VĒn bản</option>
                               <option value="PDF">Tài liệu PDF</option>
                               <option value="LIVE">Buổi live</option>
                             </select>
@@ -3617,18 +4052,71 @@ function InstructorCourseManagementPage() {
                   <h4>Đánh giá gần đây</h4>
                   <span>{selectedCourseDetail.reviews.length} nhận xét</span>
                 </div>
-                <div className="instructor-course-detail-reviews">
-                  {selectedCourseDetail.reviews.length === 0 ? (
-                    <p className="instructor-empty-state">Chưa có đánh giá nào.</p>
-                  ) : (
-                    selectedCourseDetail.reviews.map((review) => (
-                      <div key={`${review.student}-${review.createdAt}`}>
-                        <strong>{review.student}</strong>
-                        <span>{review.rating}/5 sao</span>
-                        <p>{review.comment}</p>
-                      </div>
-                    ))
-                  )}
+                <div className="instructor-course-review-grid">
+                  <div className="instructor-course-review-list">
+                    {selectedCourseDetail.reviews.length === 0 ? (
+                      <p className="instructor-empty-state">Chưa có đánh giá nào.</p>
+                    ) : (
+                      selectedCourseDetail.reviews.map((review) => (
+                        <button
+                          className={`instructor-course-review-card ${selectedReview?.id === review.id ? "active" : ""}`}
+                          key={review.id}
+                          onClick={() => openReviewReply(review)}
+                          type="button"
+                        >
+                          <strong>{review.student}</strong>
+                          <span>{review.rating}/5 sao</span>
+                          <p>{review.comment || "Không có nội dung nhận xét"}</p>
+                          <em>{review.teacherComment ? "Đã phản hồi" : "Chưa phản hồi"}</em>
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="instructor-course-review-panel">
+                    {!selectedReview ? (
+                      <p className="instructor-empty-state">Chọn một đánh giá để phản hồi.</p>
+                    ) : (
+                      <>
+                        <div className="instructor-course-review-header">
+                          <div>
+                            <strong>{selectedReview.student}</strong>
+                            <span>{selectedReview.rating}/5 sao</span>
+                          </div>
+                          <em>{selectedReview.createdAt}</em>
+                        </div>
+
+                        <div className="instructor-course-review-origin">
+                          <span>Nhận xét của học viên</span>
+                          <p>{selectedReview.comment || "Không có nội dung nhận xét"}</p>
+                        </div>
+
+                        <form
+                          className="instructor-inline-form"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            handleSaveReviewReply();
+                          }}
+                        >
+                          {reviewReplyError && <p className="instructor-course-detail-error">{reviewReplyError}</p>}
+                          <label className="instructor-create-course-field">
+                            <span>Phản hồi của giảng viên</span>
+                            <textarea
+                              rows={4}
+                              value={reviewReplyText}
+                              onChange={(event) => setReviewReplyText(event.target.value)}
+                              placeholder="Viết phản hồi cho học viên..."
+                            />
+                          </label>
+                          <div className="instructor-create-course-actions">
+                            <button disabled={isSavingReviewReply} type="submit">
+                              {isSavingReviewReply ? "Đang lưu..." : "Lưu phản hồi"}
+                            </button>
+                          </div>
+                        </form>
+                      </>
+                    )}
+                  </div>
                 </div>
               </section>
             </div>
@@ -3652,8 +4140,8 @@ function InstructorCourseManagementPage() {
               <div className="instructor-create-course-header">
                 <div>
                   <p className="instructor-eyebrow">Tạo khóa học</p>
-                  <h3>Khóa học mới</h3>
                   <p>Điền thông tin cơ bản để tạo bản nháp nhanh.</p>
+                
                 </div>
                 <button
                   aria-label="Đóng form tạo khóa học"
@@ -3712,7 +4200,7 @@ function InstructorCourseManagementPage() {
                       src={createFormData.thumbnailUrl.trim()}
                     />
                     <div>
-                      <strong>Xem trước ảnh bìa</strong>
+                      <span>Ảnh sẽ được lưu vào khóa học mới sau khi tạo.</span>
                       <span>Ảnh sẽ được lưu vào khóa học mới sau khi tạo.</span>
                     </div>
                   </div>
@@ -3879,7 +4367,7 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
                     }
                   >
                     <option value="VIDEO">Video</option>
-                    <option value="TEXT">Văn bản</option>
+                    <option value="TEXT">VĒn bản</option>
                     <option value="PDF">Tài liệu PDF</option>
                     <option value="LIVE">Buổi live</option>
                   </select>
@@ -3960,7 +4448,7 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
       {showBatchForm && (
         <div className="instructor-course-create-backdrop" onClick={closeBatchForm} role="presentation">
           <aside
-            aria-label={batchFormMode === "edit" ? "Chỉnh sửa lớp học" : "Tạo lớp học"}
+            aria-label={batchFormMode === "edit" ? "Chỉnh sửa lớp học" : "Mở lớp học"}
             aria-modal="true"
             className="instructor-course-detail-modal instructor-create-course-modal no-hero"
             onClick={(event) => event.stopPropagation()}
@@ -3975,9 +4463,9 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
             >
               <div className="instructor-create-course-header">
                 <div>
-                  <p className="instructor-eyebrow">Quản lý lớp học</p>
-                  <h3>{batchFormMode === "edit" ? "Chỉnh sửa lớp" : "Tạo lớp mới"}</h3>
-                  <p>Điều chỉnh lịch học, sĩ số và hình thức học của đợt mở lớp.</p>
+                  <p>Chuẩn bị lớp để hệ thống tự xếp học viên sau khi mua khóa.</p>
+                  <h3>{batchFormMode === "edit" ? "Chỉnh sửa lớp" : "Mở lớp học"}</h3>
+                  <p>Thiết lập lịch học, sĩ số, link/phòng học và trạng thái nhận học viên.</p>
                 </div>
                 <button
                   aria-label="Đóng form lớp học"
@@ -4011,8 +4499,8 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
                     }
                   >
                     <option value="DRAFT">Bản nháp</option>
-                    <option value="OPEN">Đang mở</option>
-                    <option value="FULL">Đã đầy</option>
+                    <option value="OPEN">Đang nhận học viên</option>
+                    <option value="FULL">Đã đủ học viên</option>
                     <option value="STARTED">Đang học</option>
                     <option value="FINISHED">Đã kết thúc</option>
                     <option value="CANCELLED">Đã hủy</option>
@@ -4164,7 +4652,161 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
                   Hủy
                 </button>
                 <button disabled={isSavingBatch} type="submit">
-                  {isSavingBatch ? "Đang lưu..." : batchFormMode === "edit" ? "Lưu lớp học" : "Tạo lớp học"}
+                  {isSavingBatch ? "Đang lưu..." : batchFormMode === "edit" ? "Lưu lớp học" : "Mở lớp học"}
+                </button>
+              </div>
+            </form>
+          </aside>
+        </div>
+      )}
+
+      {showRecurringScheduleForm && (
+        <div className="instructor-course-create-backdrop" onClick={closeRecurringScheduleForm} role="presentation">
+          <aside
+            aria-label="Tạo lịch học định kỳ"
+            aria-modal="true"
+            className="instructor-course-detail-modal instructor-create-course-modal no-hero"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <form
+              className="instructor-create-course-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleGenerateRecurringSchedule();
+              }}
+            >
+              <div className="instructor-create-course-header">
+                <div>
+                  <p className="instructor-eyebrow">Lịch định kỳ</p>
+                  <h3>Tạo lịch học cho lớp</h3>
+                  <p>Chọn các ngày học trong tuần, hệ thống sẽ tự sinh buổi học từ ngày bắt đầu đến ngày kết thúc lớp.</p>
+                </div>
+                <button
+                  aria-label="Đóng form lịch định kỳ"
+                  className="instructor-course-detail-close"
+                  onClick={closeRecurringScheduleForm}
+                  type="button"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              {recurringScheduleError && <p className="instructor-course-detail-error">{recurringScheduleError}</p>}
+
+              <div className="instructor-recurring-weekdays" aria-label="Chọn ngày học trong tuần">
+                {WEEKDAY_OPTIONS.map((weekday) => (
+                  <label key={weekday.value}>
+                    <input
+                      checked={recurringScheduleFormData.weekdays.includes(weekday.value)}
+                      onChange={() => toggleRecurringWeekday(weekday.value)}
+                      type="checkbox"
+                    />
+                    <span>{weekday.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="instructor-create-course-grid">
+                <label className="instructor-create-course-field">
+                  <span>Giờ bắt đầu *</span>
+                  <input
+                    type="time"
+                    value={recurringScheduleFormData.startTime}
+                    onChange={(event) =>
+                      setRecurringScheduleFormData({ ...recurringScheduleFormData, startTime: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="instructor-create-course-field">
+                  <span>Giờ kết thúc *</span>
+                  <input
+                    type="time"
+                    value={recurringScheduleFormData.endTime}
+                    onChange={(event) =>
+                      setRecurringScheduleFormData({ ...recurringScheduleFormData, endTime: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="instructor-create-course-field instructor-create-course-field-wide">
+                  <span>Tiêu đề mẫu</span>
+                  <input
+                    value={recurringScheduleFormData.titlePrefix}
+                    onChange={(event) =>
+                      setRecurringScheduleFormData({ ...recurringScheduleFormData, titlePrefix: event.target.value })
+                    }
+                    placeholder="VD: Buổi học"
+                  />
+                </label>
+                <label className="instructor-create-course-field instructor-create-course-field-wide">
+                  <span>Mô tả chung</span>
+                  <textarea
+                    rows={3}
+                    value={recurringScheduleFormData.description}
+                    onChange={(event) =>
+                      setRecurringScheduleFormData({ ...recurringScheduleFormData, description: event.target.value })
+                    }
+                    placeholder="Nội dung chung cho các buổi học"
+                  />
+                </label>
+                <label className="instructor-create-course-field instructor-create-course-field-wide">
+                  <span>Meeting URL</span>
+                  <input
+                    value={recurringScheduleFormData.meetingUrl}
+                    onChange={(event) =>
+                      setRecurringScheduleFormData({ ...recurringScheduleFormData, meetingUrl: event.target.value })
+                    }
+                    placeholder="https://..."
+                  />
+                </label>
+                <label className="instructor-create-course-field">
+                  <span>Mật khẩu</span>
+                  <input
+                    value={recurringScheduleFormData.meetingPassword}
+                    onChange={(event) =>
+                      setRecurringScheduleFormData({
+                        ...recurringScheduleFormData,
+                        meetingPassword: event.target.value,
+                      })
+                    }
+                    placeholder="Nếu có"
+                  />
+                </label>
+                <label className="instructor-create-course-field">
+                  <span>Nền tảng</span>
+                  <select
+                    value={recurringScheduleFormData.platform}
+                    onChange={(event) =>
+                      setRecurringScheduleFormData({ ...recurringScheduleFormData, platform: event.target.value })
+                    }
+                  >
+                    <option value="ZOOM">Zoom</option>
+                    <option value="GOOGLE_MEET">Google Meet</option>
+                    <option value="MICROSOFT_TEAMS">Microsoft Teams</option>
+                    <option value="JITSI">Jitsi</option>
+                    <option value="INTERNAL_ROOM">Phòng nội bộ</option>
+                    <option value="OTHER">Khác</option>
+                  </select>
+                </label>
+                <label className="instructor-create-course-field instructor-create-course-field-wide">
+                  <span>Ghi chú</span>
+                  <textarea
+                    rows={3}
+                    value={recurringScheduleFormData.note}
+                    onChange={(event) =>
+                      setRecurringScheduleFormData({ ...recurringScheduleFormData, note: event.target.value })
+                    }
+                    placeholder="Ghi chú chung cho lịch định kỳ"
+                  />
+                </label>
+              </div>
+
+              <div className="instructor-create-course-actions">
+                <button type="button" onClick={closeRecurringScheduleForm}>
+                  Hủy
+                </button>
+                <button disabled={isGeneratingSchedule} type="submit">
+                  {isGeneratingSchedule ? "Đang tạo..." : "Tạo lịch định kỳ"}
                 </button>
               </div>
             </form>
@@ -4190,7 +4832,7 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
             >
               <div className="instructor-create-course-header">
                 <div>
-                  <p className="instructor-eyebrow">Quản lý lịch học</p>
+                  <p>Thêm lịch dạy, link họp và trạng thái của từng buổi trong lớp.</p>
                   <h3>{sessionFormMode === "edit" ? "Chỉnh sửa buổi học" : "Tạo buổi học mới"}</h3>
                   <p>Thêm lịch dạy, link họp và trạng thái của từng buổi trong lớp.</p>
                 </div>
@@ -4334,6 +4976,135 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
                 </button>
               </div>
             </form>
+          </aside>
+        </div>
+      )}
+
+      {attendanceTarget && (
+        <div
+          className="instructor-course-create-backdrop"
+          onClick={() => {
+            if (!isSavingAttendance) setAttendanceTarget(null);
+          }}
+          role="presentation"
+        >
+          <aside
+            aria-label="Điểm danh buổi học"
+            aria-modal="true"
+            className="instructor-course-detail-modal instructor-attendance-modal no-hero"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="instructor-create-course-header">
+              <div>
+                <p className="instructor-eyebrow">Điểm danh</p>
+                <h3>{attendanceData?.session.title ?? "Buổi học"}</h3>
+                <p>
+                  {attendanceData
+                    ? `${attendanceData.session.courseTitle} - ${attendanceData.session.batchCode}`
+                    : "Đang tải danh sách học viên..."}
+                </p>
+              </div>
+              <button
+                aria-label="Đóng điểm danh"
+                className="instructor-course-detail-close"
+                disabled={isSavingAttendance}
+                onClick={() => setAttendanceTarget(null)}
+                type="button"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {attendanceError && <p className="instructor-course-detail-error">{attendanceError}</p>}
+
+            {isAttendanceLoading ? (
+              <p className="instructor-empty-state">Đang tải danh sách điểm danh...</p>
+            ) : !attendanceData ? (
+              <p className="instructor-empty-state">Chưa có dữ liệu điểm danh.</p>
+            ) : (
+              <>
+                <div className="instructor-attendance-summary">
+                  <article>
+                    <span>Tổng</span>
+                    <strong>{attendanceData.summary.total}</strong>
+                  </article>
+                  <article>
+                    <span>Có mặt</span>
+                    <strong>{attendanceData.students.filter((student) => student.status === "PRESENT").length}</strong>
+                  </article>
+                  <article>
+                    <span>Đi trễ</span>
+                    <strong>{attendanceData.students.filter((student) => student.status === "LATE").length}</strong>
+                  </article>
+                  <article>
+                    <span>Vắng phép</span>
+                    <strong>{attendanceData.students.filter((student) => student.status === "EXCUSED").length}</strong>
+                  </article>
+                  <article>
+                    <span>Vắng</span>
+                    <strong>{attendanceData.students.filter((student) => student.status === "ABSENT").length}</strong>
+                  </article>
+                </div>
+
+                <div className="instructor-attendance-list">
+                  {attendanceData.students.length === 0 ? (
+                    <p className="instructor-empty-state">Lớp này chưa có học viên ghi danh.</p>
+                  ) : (
+                    attendanceData.students.map((student) => (
+                      <article className="instructor-attendance-row" key={student.studentId}>
+                        <div>
+                          <strong>{student.studentName}</strong>
+                          <span>{student.email}</span>
+                        </div>
+                        <select
+                          value={student.status}
+                          onChange={(event) =>
+                            updateAttendanceStudent(student.studentId, { status: event.target.value })
+                          }
+                        >
+                          <option value="PRESENT">Có mặt</option>
+                          <option value="LATE">Đi trễ</option>
+                          <option value="EXCUSED">Vắng phép</option>
+                          <option value="ABSENT">Vắng</option>
+                        </select>
+                        <input
+                          min="0"
+                          placeholder="Số phút"
+                          type="number"
+                          value={student.durationMinutes}
+                          onChange={(event) =>
+                            updateAttendanceStudent(student.studentId, {
+                              durationMinutes: Number(event.target.value) || 0,
+                            })
+                          }
+                        />
+                        <input
+                          placeholder="Ghi chú"
+                          value={student.note}
+                          onChange={(event) =>
+                            updateAttendanceStudent(student.studentId, { note: event.target.value })
+                          }
+                        />
+                      </article>
+                    ))
+                  )}
+                </div>
+
+                <div className="instructor-create-course-actions">
+                  <button disabled={isSavingAttendance} onClick={() => setAttendanceTarget(null)} type="button">
+                    Hủy
+                  </button>
+                  <button
+                    disabled={isSavingAttendance || attendanceData.students.length === 0}
+                    onClick={handleSaveAttendance}
+                    type="button"
+                  >
+                    {isSavingAttendance ? "Đang lưu..." : "Lưu điểm danh"}
+                  </button>
+                </div>
+              </>
+            )}
           </aside>
         </div>
       )}

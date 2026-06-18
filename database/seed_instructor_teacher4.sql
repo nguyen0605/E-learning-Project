@@ -105,6 +105,28 @@ VALUES
 (1205, 1103, 'Quy du phong nen phu hop voi muc nao?', 'SINGLE_CHOICE', 2),
 (1206, 1103, 'Ngan sach ca nhan giup ich gi?', 'ESSAY', 4);
 
+INSERT IGNORE INTO answer_options
+(option_id, question_id, option_text, is_correct)
+VALUES
+(1251, 1201, 'The h1', TRUE),
+(1252, 1201, 'The p', FALSE),
+(1253, 1201, 'The div', FALSE),
+(1254, 1201, 'The img', FALSE),
+(1255, 1202, 'Can chinh va sap xep layout', TRUE),
+(1256, 1202, 'Tao database', FALSE),
+(1257, 1202, 'Gui email', FALSE),
+(1258, 1202, 'Ma hoa mat khau', FALSE),
+(1259, 1203, 'Truyen du lieu tu component cha sang con', TRUE),
+(1260, 1203, 'Luu trang thai thay doi noi bo', FALSE),
+(1261, 1203, 'Tao route backend', FALSE),
+(1262, 1203, 'Ket noi database', FALSE),
+(1263, 1204, 'True', TRUE),
+(1264, 1204, 'False', FALSE),
+(1265, 1205, '3 den 6 thang chi phi sinh hoat', TRUE),
+(1266, 1205, 'Toan bo thu nhap hang thang', FALSE),
+(1267, 1205, 'Chi tien giai tri', FALSE),
+(1268, 1205, 'Khong can quy du phong', FALSE);
+
 INSERT IGNORE INTO quiz_attempts
 (attempt_id, quiz_id, student_id, started_at, submitted_at, score, status)
 VALUES
@@ -113,6 +135,20 @@ VALUES
 (1303, 1102, 11, '2026-06-09 19:00:00', '2026-06-09 19:44:00', NULL, 'SUBMITTED'),
 (1304, 1102, 12, '2026-06-09 19:00:00', '2026-06-09 19:39:00', 8, 'GRADED'),
 (1305, 1103, 14, '2026-06-10 19:00:00', '2026-06-10 19:31:00', NULL, 'SUBMITTED');
+
+INSERT IGNORE INTO quiz_answers
+(answer_id, attempt_id, question_id, option_id, essay_answer)
+VALUES
+(1351, 1301, 1201, 1251, NULL),
+(1352, 1301, 1202, 1255, NULL),
+(1353, 1302, 1201, 1251, NULL),
+(1354, 1302, 1202, 1256, NULL),
+(1355, 1303, 1203, 1259, NULL),
+(1356, 1303, 1204, 1263, NULL),
+(1357, 1304, 1203, 1259, NULL),
+(1358, 1304, 1204, 1264, NULL),
+(1359, 1305, 1205, 1265, NULL),
+(1360, 1305, 1206, NULL, 'Ngan sach ca nhan giup theo doi dong tien, uu tien tiet kiem va han che chi tieu cam tinh.');
 
 INSERT IGNORE INTO discussions
 (discussion_id, batch_id, user_id, title, content, created_at)

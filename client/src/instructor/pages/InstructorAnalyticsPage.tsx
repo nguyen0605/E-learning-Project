@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { instructorApiRequest } from "../api/instructorApi";
+import { getInstructorAuthTeacherId } from "../auth/instructorAuth";
 import InstructorLayout from "../components/InstructorLayout";
 import {
   analyticsRecommendations,
@@ -8,8 +10,7 @@ import {
   learnerSegments,
 } from "../data/instructorMockData";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-const DEFAULT_TEACHER_ID = 4;
+const DEFAULT_TEACHER_ID = getInstructorAuthTeacherId();
 
 type AnalyticsStat = (typeof analyticsStats)[number];
 type EngagementItem = (typeof engagementTrend)[number];
@@ -31,19 +32,21 @@ type InstructorAnalyticsApiResponse = {
 function InstructorAnalyticsPage() {
   const [pageData, setPageData] =
     useState<InstructorAnalyticsApiResponse["data"] | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState("Học kỳ này");
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
 
     async function loadAnalytics() {
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/instructor/analytics?teacherId=${DEFAULT_TEACHER_ID}`,
-          { signal: controller.signal },
+        const payload = await instructorApiRequest<InstructorAnalyticsApiResponse>(
+          "/api/instructor/analytics",
+          {
+            query: { teacherId: DEFAULT_TEACHER_ID },
+            signal: controller.signal,
+          },
         );
-        if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
-
-        const payload = (await response.json()) as InstructorAnalyticsApiResponse;
         if (!payload.success) throw new Error("Analytics API returned unsuccessful response.");
 
         setPageData(payload.data);
@@ -57,11 +60,52 @@ function InstructorAnalyticsPage() {
     return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    if (!toast) return;
+    const timeoutId = window.setTimeout(() => setToast(null), 3200);
+    return () => window.clearTimeout(timeoutId);
+  }, [toast]);
+
   const displayedStats = pageData?.analyticsStats ?? analyticsStats;
   const displayedEngagementTrend = pageData?.engagementTrend ?? engagementTrend;
   const displayedLearnerSegments = pageData?.learnerSegments ?? learnerSegments;
   const displayedCourseInsights = pageData?.courseInsights ?? courseInsights;
   const displayedRecommendations = pageData?.analyticsRecommendations ?? analyticsRecommendations;
+
+  function csvCell(value: string | number) {
+    return `"${String(value).replaceAll('"', '""')}"`;
+  }
+
+  function handleTogglePeriod() {
+    const nextPeriod = selectedPeriod === "Học kỳ này" ? "30 ngày gần nhất" : "Học kỳ này";
+    setSelectedPeriod(nextPeriod);
+    setToast({ type: "success", message: `Đã chuyển bộ lọc sang ${nextPeriod}.` });
+  }
+
+  function handleExportAnalyticsReport() {
+    const header = ["Khóa học", "Hoàn thành", "Điểm kiểm tra TB", "Chuyên cần", "Xu hướng"];
+    const csv = [
+      header.map(csvCell).join(","),
+      ...displayedCourseInsights.map((course) =>
+        [
+          course.title,
+          `${course.completion}%`,
+          course.quizAverage,
+          `${course.attendance}%`,
+          course.trend,
+        ].map(csvCell).join(","),
+      ),
+    ].join("\n");
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `bao-cao-phan-tich-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setToast({ type: "success", message: "Đã xuất báo cáo phân tích CSV." });
+  }
 
   return (
     <InstructorLayout activePage="analytics">
@@ -75,11 +119,11 @@ function InstructorAnalyticsPage() {
           </p>
         </div>
         <div className="instructor-hero-actions">
-          <button className="instructor-secondary-button" type="button">
+          <button className="instructor-secondary-button" onClick={handleTogglePeriod} type="button">
             <span className="material-symbols-outlined">date_range</span>
-            Học kỳ này
+            {selectedPeriod}
           </button>
-          <button className="instructor-primary-button" type="button">
+          <button className="instructor-primary-button" onClick={handleExportAnalyticsReport} type="button">
             <span className="material-symbols-outlined">download</span>
             Xuất báo cáo
           </button>
@@ -95,7 +139,7 @@ function InstructorAnalyticsPage() {
             <p>{stat.label}</p>
             <div>
               <strong>{stat.value}</strong>
-              <span>{pageData ? "Dữ liệu từ backend" : "Trong 30 ngày gần nhất"}</span>
+              <span>{pageData ? "Theo dữ liệu học tập" : "Trong 30 ngày gần nhất"}</span>
             </div>
           </article>
         ))}
@@ -188,6 +232,18 @@ function InstructorAnalyticsPage() {
           </div>
         </aside>
       </section>
+
+      {toast && (
+        <div className={`instructor-toast ${toast.type}`} role="status">
+          <span className="material-symbols-outlined">
+            {toast.type === "success" ? "check_circle" : "error"}
+          </span>
+          <p>{toast.message}</p>
+          <button onClick={() => setToast(null)} type="button">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+      )}
     </InstructorLayout>
   );
 }

@@ -4,7 +4,8 @@ export type InstructorNavKey =
   | "quizzes"
   | "students"
   | "interaction"
-  | "analytics";
+  | "analytics"
+  | "profile";
 
 export const instructorProfile = {
   name: "Thầy Minh Anh",
@@ -44,6 +45,12 @@ export const instructorNavItems: {
     label: "Phân tích",
     icon: "analytics",
     path: "/instructor/analytics",
+  },
+  {
+    key: "profile",
+    label: "Hồ sơ",
+    icon: "account_circle",
+    path: "/instructor/profile",
   },
 ];
 

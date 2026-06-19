@@ -1,42 +1,14 @@
-import { useEffect, useState } from "react";
-import { getAuthHeaders } from "../../auth/authHeaders";
+import AdminDataState from "../components/AdminDataState";
+import AdminSidebar from "../components/AdminSidebar";
+import AdminTopbar from "../components/AdminTopbar";
+import { useAdminData } from "../hooks/useAdminData";
+import type { AdminPage } from "../adminNavigation";
 import "../../index.css";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-
-type AdminPage =
-  | "dashboard"
-  | "students"
-  | "courses"
-  | "system"
-  | "content";
 
 type SystemConfigurationPageProps = {
   activePage: AdminPage;
   onNavigate: (page: AdminPage) => void;
 };
-
-const navItems = [
-  { key: "dashboard" as const, label: "Tổng quan", icon: "dashboard" },
-  { key: "students" as const, label: "Quản lý học viên", icon: "group" },
-  { key: "courses" as const, label: "Quản lý khóa học", icon: "library_books" },
-  { key: "system" as const, label: "Cấu hình hệ thống", icon: "settings" },
-  { key: "content" as const, label: "Nội dung chung", icon: "description" },
-];
-
-const configTabs = [
-  { label: "Cài đặt chung", icon: "language", active: true },
-  { label: "Cấu hình email", icon: "mail" },
-  { label: "Cổng thanh toán", icon: "payments" },
-  { label: "Bảo mật", icon: "verified_user" },
-];
-
-const securityRules = [
-  "Chữ in hoa",
-  "Ký hiệu đặc biệt",
-  "Số",
-  "Tối thiểu 12 ký tự",
-];
 
 type SystemConfigApiResponse = {
   success: boolean;
@@ -65,91 +37,26 @@ function SystemConfigurationPage({
   activePage,
   onNavigate,
 }: SystemConfigurationPageProps) {
-  const [pageData, setPageData] = useState<SystemConfigApiResponse["data"] | null>(null);
+  const {
+    data: pageData,
+    error,
+    isLoading,
+  } = useAdminData<SystemConfigApiResponse["data"]>("/system-config");
 
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadConfig() {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/admin/system-config`, {
-          headers: getAuthHeaders(),
-        });
-        if (!response.ok) throw new Error(`Failed with ${response.status}`);
-
-        const result = (await response.json()) as SystemConfigApiResponse;
-        if (!ignore) setPageData(result.data);
-      } catch (error) {
-        console.error(error);
-      }
-    }
-
-    loadConfig();
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
-  const displayedTabs = pageData?.tabs ?? configTabs;
-  const displayedRules = pageData?.security.passwordRules ?? securityRules.map((label) => ({
-    key: label,
-    label,
-    enabled: true,
-  }));
+  if (!pageData) {
+    return <AdminDataState error={error} isLoading={isLoading} />;
+  }
 
   return (
     <div className="admin-shell">
-      <aside className="sidebar">
-        <div className="brand-block">
-          <p className="brand-title">LTHDV E-Learning</p>
-          <p className="brand-subtitle">Trang quản trị</p>
-        </div>
-
-        <nav className="sidebar-nav">
-          {navItems.map((item) => (
-            <button
-              key={item.label}
-              className={`nav-item${item.key === activePage ? " active" : ""}`}
-              type="button"
-              onClick={() => onNavigate(item.key)}
-            >
-              <span className="material-symbols-outlined">{item.icon}</span>
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-
-        <div className="pro-card">
-          <p className="pro-label">Quản trị thông minh</p>
-          <p className="pro-copy">Bảng điều khiển tổng cho nhận diện nền tảng và giao thức bảo mật.</p>
-        </div>
-      </aside>
+      <AdminSidebar
+        activePage={activePage}
+        description="Bảng điều khiển tổng cho nhận diện nền tảng và giao thức bảo mật."
+        onNavigate={onNavigate}
+      />
 
       <main className="main-panel">
-        <header className="topbar">
-          <label className="searchbar" aria-label="Tìm kiếm">
-            <span className="material-symbols-outlined">search</span>
-            <input type="text" placeholder="Tìm cấu hình hệ thống..." />
-          </label>
-
-          <div className="topbar-actions">
-            <button className="icon-button" type="button" aria-label="Thông báo">
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="notification-dot" />
-            </button>
-            <div className="profile-chip">
-              <div>
-                <p className="profile-name">Scholar Admin</p>
-                <p className="profile-role">Quản trị viên</p>
-              </div>
-              <img
-                src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=240&q=80"
-                alt="Quản trị viên"
-              />
-            </div>
-          </div>
-        </header>
+        <AdminTopbar searchPlaceholder="Tìm cấu hình hệ thống..." />
 
         <section className="content system-page">
           <div className="hero">
@@ -163,7 +70,7 @@ function SystemConfigurationPage({
 
           <div className="system-layout">
             <nav className="system-tabs">
-              {displayedTabs.map((tab) => (
+              {pageData.tabs.map((tab) => (
                 <button
                   key={tab.label}
                   className={tab.active ? "active" : ""}
@@ -185,13 +92,13 @@ function SystemConfigurationPage({
                 <div className="system-field-grid">
                   <div className="panel system-field-card">
                     <label>Tên nền tảng</label>
-                    <input type="text" value={pageData?.general.platformName ?? "Editorial Scholar Pro"} readOnly />
+                    <input type="text" value={pageData.general.platformName} readOnly />
                     <p>Tên này xuất hiện ở tab trình duyệt và email hệ thống.</p>
                   </div>
 
                   <div className="panel system-field-card">
                     <label>Ngôn ngữ mặc định</label>
-                    <select value={pageData?.general.defaultLanguage ?? "Tiếng Anh (Hoa Kỳ)"} disabled>
+                    <select value={pageData.general.defaultLanguage} disabled>
                       <option>Tiếng Anh (Hoa Kỳ)</option>
                       <option>Tiếng Tây Ban Nha</option>
                       <option>Tiếng Pháp</option>
@@ -213,8 +120,8 @@ function SystemConfigurationPage({
                             upload_file
                           </span>
                           <div>
-                            <strong>{pageData?.general.logo.label ?? "Logo nền tảng"}</strong>
-                            <small>{pageData?.general.logo.acceptedFormats ?? "SVG hoặc PNG, tối đa 2MB"}</small>
+                            <strong>{pageData.general.logo.label}</strong>
+                            <small>{pageData.general.logo.acceptedFormats}</small>
                           </div>
                         </button>
 
@@ -223,8 +130,8 @@ function SystemConfigurationPage({
                             filter_vintage
                           </span>
                           <div>
-                            <strong>{pageData?.general.favicon.label ?? "Favicon hệ thống"}</strong>
-                            <small>{pageData?.general.favicon.acceptedFormats ?? "ICO hoặc PNG, 32x32px"}</small>
+                            <strong>{pageData.general.favicon.label}</strong>
+                            <small>{pageData.general.favicon.acceptedFormats}</small>
                           </div>
                         </button>
                       </div>
@@ -250,18 +157,18 @@ function SystemConfigurationPage({
                   <div className="system-form-grid">
                     <div className="system-form-group wide">
                       <label>Máy chủ SMTP</label>
-                      <input type="text" placeholder="smtp.provider.com" value={pageData?.email.smtpHost ?? ""} readOnly />
+                      <input type="text" placeholder="smtp.provider.com" value={pageData.email.smtpHost} readOnly />
                     </div>
                     <div className="system-form-group">
                       <label>Cổng kết nối</label>
-                      <input type="text" placeholder="587" value={pageData?.email.port ?? ""} readOnly />
+                      <input type="text" placeholder="587" value={pageData.email.port} readOnly />
                     </div>
                     <div className="system-form-group full">
                       <label>Email gửi mặc định</label>
                       <input
                         type="email"
                         placeholder="notifications@editorialscholar.edu"
-                        value={pageData?.email.senderEmail ?? ""}
+                        value={pageData.email.senderEmail}
                         readOnly
                       />
                     </div>
@@ -282,7 +189,7 @@ function SystemConfigurationPage({
                       <p>Yêu cầu xác minh bổ sung cho toàn bộ tài khoản admin.</p>
                     </div>
                     <label className="system-switch">
-                      <input type="checkbox" checked={pageData?.security.twoFactorAuthentication ?? true} readOnly />
+                      <input type="checkbox" checked={pageData.security.twoFactorAuthentication} readOnly />
                       <span />
                     </label>
                   </div>
@@ -293,7 +200,7 @@ function SystemConfigurationPage({
                       <p>Đăng xuất sau 30 phút không hoạt động.</p>
                     </div>
                     <label className="system-switch">
-                      <input type="checkbox" checked={pageData?.security.sessionTimeoutEnabled ?? true} readOnly />
+                      <input type="checkbox" checked={pageData.security.sessionTimeoutEnabled} readOnly />
                       <span />
                     </label>
                   </div>
@@ -301,7 +208,7 @@ function SystemConfigurationPage({
                   <div className="panel system-rules-card">
                     <label>Quy tắc mật khẩu</label>
                     <div className="system-rules-grid">
-                      {displayedRules.map((rule) => (
+                      {pageData.security.passwordRules.map((rule) => (
                         <label key={rule.key}>
                           <input type="checkbox" checked={rule.enabled} readOnly />
                           <span>{rule.label}</span>

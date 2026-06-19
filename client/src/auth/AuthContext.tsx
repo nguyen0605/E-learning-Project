@@ -20,8 +20,10 @@ type AuthStatus = "checking" | "authenticated" | "guest";
 
 type AuthContextValue = {
   login: (payload: LoginPayload) => Promise<AuthSession>;
+  loginAdmin: (payload: LoginPayload) => Promise<AuthSession>;
   logout: () => Promise<void>;
   registerStudent: (payload: RegisterPayload) => Promise<AuthUser>;
+  updateUser: (user: AuthUser) => void;
   session: AuthSession | null;
   status: AuthStatus;
   user: AuthUser | null;
@@ -118,6 +120,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return nextSession;
   }, []);
 
+  const loginAdmin = useCallback(async (payload: LoginPayload) => {
+    const nextSession = await authApi.login(payload);
+
+    if (nextSession.user.role !== "ADMIN") {
+      await authApi.logout(nextSession.token).catch(() => undefined);
+      throw new authApi.AuthApiError(
+        "Tài khoản này không có quyền truy cập cổng quản trị.",
+        403,
+      );
+    }
+
+    setStoredAuthSession(nextSession, payload.remember);
+    setSession(nextSession);
+    setStatus("authenticated");
+
+    return nextSession;
+  }, []);
+
   const registerStudent = useCallback(async (payload: RegisterPayload) => {
     const { user } = await authApi.registerStudent(payload);
     return user;
@@ -135,16 +155,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [session?.token]);
 
+  const updateUser = useCallback((user: AuthUser) => {
+    setSession((currentSession) => {
+      if (!currentSession) {
+        return currentSession;
+      }
+
+      const nextSession = {
+        ...currentSession,
+        user,
+      };
+
+      setStoredAuthSession(nextSession, isAuthSessionRemembered());
+      return nextSession;
+    });
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       login,
+      loginAdmin,
       logout,
       registerStudent,
+      updateUser,
       session,
       status,
       user: session?.user ?? null,
     }),
-    [login, logout, registerStudent, session, status],
+    [login, loginAdmin, logout, registerStudent, session, status, updateUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

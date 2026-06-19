@@ -1,18 +1,19 @@
+import { useTranslation } from "react-i18next";
+
 function Footer() {
+  const { t } = useTranslation("student");
+
   return (
     <footer className="sp-footer">
       <div>
         <strong>Academic Atelier</strong>
-        <p>
-          © 2024 Academic Atelier. Nền tảng học tập trực tuyến dành cho người học hiện đại.
-        </p>
+        <p>{t("footer.description")}</p>
       </div>
-
       <nav>
-        <a href="#">Chính sách bảo mật</a>
-        <a href="#">Điều khoản sử dụng</a>
-        <a href="#">Chính sách Cookie</a>
-        <a href="#">Sơ đồ trang web</a>
+        <a href="#">{t("footer.privacy")}</a>
+        <a href="#">{t("footer.terms")}</a>
+        <a href="#">{t("footer.cookies")}</a>
+        <a href="#">{t("footer.sitemap")}</a>
       </nav>
     </footer>
   );

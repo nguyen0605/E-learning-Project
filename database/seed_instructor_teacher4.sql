@@ -20,7 +20,7 @@ VALUES
 
 INSERT IGNORE INTO course_modules (module_id, course_id, module_title, description, order_no) VALUES
 (301, 1, 'Nen tang HTML va cau truc website', 'Lam quen voi HTML va semantic tags.', 1),
-(302, 1, 'CSS va bo cuc giao dien', 'Flexbox, grid va responsive.', 2),
+(302, 1, 'CSS va bo cuc giao dien', 'Flexbox, grid va responsive.',     2),
 (303, 2, 'Tong quan ReactJS', 'Component, props va state.', 1),
 (304, 2, 'Xay dung du an React thuc te', 'Mini project quan ly khoa hoc.', 2),
 (305, 9, 'Quan ly thu chi ca nhan', 'Lap ke hoach chi tieu va ngan sach.', 1),

@@ -1,35 +1,41 @@
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../auth/AuthContext";
+import { useTranslation } from "react-i18next";
+import logo from "../../assets/logo-learnX.png";
+import type { AuthUser } from "../../auth/auth.types";
+import { normalizeLanguage } from "../../i18n/locale";
 import type { StudentView } from "../types/student.types";
+import { resolveMediaUrl } from "../utils/mediaUrl";
 import Icon from "./Icon";
+import NotificationBell from "../../shared/components/notifications/NotificationBell";
 
 type StudentHeaderProps = {
   activeView: StudentView;
   onNavigate: (view: StudentView) => void;
+  onOpenAccountDrawer: () => void;
+  user: AuthUser | null;
 };
 
-const navItems: Array<{ label: string; view: StudentView }> = [
-  { label: "Khoá học", view: "courses" },
-  { label: "Khóa học của bạn", view: "myCourses" },
-  { label: "Sản phẩm", view: "categories" },
-  { label: "Giỏ hàng", view: "cart" },
-  { label: "Tương tác", view: "interaction" },
+const navItems: Array<{ labelKey: string; view: StudentView }> = [
+  { labelKey: "header.nav.courses", view: "courses" },
+  { labelKey: "header.nav.myCourses", view: "myCourses" },
+  { labelKey: "header.nav.cart", view: "cart" },
+  { labelKey: "header.nav.interaction", view: "interaction" },
 ];
 
-function StudentHeader({ activeView, onNavigate }: StudentHeaderProps) {
-  const navigate = useNavigate();
-  const { logout, user } = useAuth();
-
-  async function handleLogout() {
-    await logout();
-    navigate("/student/login", { replace: true });
-  }
+function StudentHeader({
+  activeView,
+  onNavigate,
+  onOpenAccountDrawer,
+  user,
+}: StudentHeaderProps) {
+  const { t, i18n } = useTranslation(["student", "common"]);
+  const currentLanguage = normalizeLanguage(i18n.resolvedLanguage);
 
   return (
     <header className="sp-header">
       <button className="sp-brand" type="button" onClick={() => onNavigate("home")}>
-        Scholar
+        <img alt="LearnX" src={logo} />
       </button>
+
       <nav className="sp-nav">
         {navItems.map((item) => (
           <button
@@ -44,40 +50,77 @@ function StudentHeader({ activeView, onNavigate }: StudentHeaderProps) {
             type="button"
             onClick={() => onNavigate(item.view)}
           >
-            {item.label}
+            {t(item.labelKey)}
           </button>
         ))}
         <button
-          className={activeView === "exam" ? "active" : ""}
+          className={
+            activeView === "exam" ||
+            activeView === "examTake" ||
+            activeView === "examReview"
+              ? "active"
+              : ""
+          }
           type="button"
           onClick={() => onNavigate("exam")}
         >
-          Bài kiểm tra
+          {t("header.nav.exams")}
         </button>
       </nav>
+
       <div className="sp-header-actions">
         <label className="sp-search">
           <Icon name="search" />
-          <input placeholder="Search lessons..." />
+          <input placeholder={t("header.searchPlaceholder")} />
         </label>
-        <button type="button" aria-label="Notifications">
-          <Icon name="notifications" />
-        </button>
-        <button type="button" aria-label="Cart" onClick={() => onNavigate("cart")}>
+
+        <label className="sp-language-select">
+          <Icon name="language" />
+          <select
+            aria-label={t("language.label", { ns: "common" })}
+            value={currentLanguage}
+            onChange={(event) => void i18n.changeLanguage(event.target.value)}
+          >
+            <option value="vi">{t("language.vi", { ns: "common" })}</option>
+            <option value="en">{t("language.en", { ns: "common" })}</option>
+          </select>
+        </label>
+
+        <NotificationBell
+          className="student-notification-bell"
+          icon={<Icon name="notifications" />}
+          onOpenNotification={(notification) => {
+            if (notification.type.includes("EXAM")) {
+              onNavigate("exam");
+            } else if (notification.type.includes("ASSIGNMENT")) {
+              onNavigate("myCourses");
+            } else if (notification.type.includes("PAYMENT")) {
+              onNavigate("accountPaymentHistory");
+            } else if (notification.type.includes("COURSE")) {
+              onNavigate("myCourses");
+            }
+          }}
+        />
+        <button
+          type="button"
+          aria-label={t("header.cart")}
+          onClick={() => onNavigate("cart")}
+        >
           <Icon name="shopping_cart" />
         </button>
-        <button className="sp-avatar" type="button" aria-label="Profile">
+        <button
+          className="sp-avatar"
+          type="button"
+          aria-label={t("header.account")}
+          onClick={onOpenAccountDrawer}
+        >
           <img
             src={
-              user?.avatarUrl ??
+              resolveMediaUrl(user?.avatarUrl) ??
               `https://api.dicebear.com/9.x/personas/svg?seed=${user?.email ?? "Scholar"}`
             }
             alt=""
           />
-        </button>
-        <button className="sp-logout-button" onClick={handleLogout} type="button">
-          <Icon name="logout" />
-          <span>Đăng xuất</span>
         </button>
       </div>
     </header>

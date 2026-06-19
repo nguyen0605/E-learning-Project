@@ -1,34 +1,15 @@
-import { useEffect, useState } from "react";
-import { getAuthHeaders } from "../../auth/authHeaders";
+import logo from "../../assets/logo-learnX.png";
+import AdminDataState from "../components/AdminDataState";
+import AdminSidebar from "../components/AdminSidebar";
+import AdminTopbar from "../components/AdminTopbar";
+import { useAdminData } from "../hooks/useAdminData";
+import type { AdminPage } from "../adminNavigation";
 import "../../index.css";
-
-type AdminPage =
-  | "dashboard"
-  | "students"
-  | "courses"
-  | "system"
-  | "content";
 
 type AdminDashboardPageProps = {
   activePage: AdminPage;
   onNavigate: (page: AdminPage) => void;
 };
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-
-const defaultAvatar =
-  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80";
-
-const defaultCourseImage =
-  "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=300&q=80";
-
-const navItems = [
-  { key: "dashboard" as const, label: "Tổng quan", icon: "dashboard" },
-  { key: "students" as const, label: "Quản lý học viên", icon: "group" },
-  { key: "courses" as const, label: "Quản lý khóa học", icon: "library_books" },
-  { key: "system" as const, label: "Cấu hình hệ thống", icon: "settings" },
-  { key: "content" as const, label: "Nội dung chung", icon: "description" },
-];
 
 const growthToneMap = {
   admin: "primary",
@@ -51,17 +32,17 @@ const activityIconMap = {
 };
 
 function formatCompactNumber(value: number) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("vi-VN", {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value);
 }
 
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("vi-VN", {
     style: "currency",
-    currency: "USD",
-    maximumFractionDigits: value >= 1000000 ? 1 : 0,
+    currency: "VND",
+    maximumFractionDigits: 0,
   }).format(value);
 }
 
@@ -95,7 +76,11 @@ function normalizeBars(items: { label: string; revenue: number }[]) {
 
   return items.map((item, index) => ({
     ...item,
-    height: Math.max(20, Math.round((item.revenue / maxRevenue) * 100)),
+    height:
+      item.revenue === 0
+        ? 0
+        : Math.max(8, Math.round((item.revenue / maxRevenue) * 100)),
+    isZero: item.revenue === 0,
     active: index === items.length - 1,
     tooltip: formatCurrency(item.revenue),
   }));
@@ -111,9 +96,11 @@ type DashboardApiResponse = {
   data: {
     summary: {
       totalUsers: { value: number; trend: Trend };
+      totalStudents?: { value: number; trend: Trend };
       totalRevenue: { value: number; trend: Trend };
       activeCourses: { value: number; trend: Trend };
       completionRate: { value: number; trend: Trend };
+      unresolvedAlerts?: { value: number; trend: Trend };
     };
     revenueTrajectory: { label: string; revenue: number }[];
     userGrowth: { label: string; total: number; percentage: number }[];
@@ -142,54 +129,17 @@ function AdminDashboardPage({
   activePage,
   onNavigate,
 }: AdminDashboardPageProps) {
-  const [dashboard, setDashboard] = useState<DashboardApiResponse["data"] | null>(
-    null,
-  );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const {
+    data: dashboard,
+    error,
+    isLoading,
+  } = useAdminData<DashboardApiResponse["data"]>("/dashboard");
 
-  useEffect(() => {
-    const controller = new AbortController();
+  if (!dashboard) {
+    return <AdminDataState error={error} isLoading={isLoading} />;
+  }
 
-    async function loadDashboard() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const response = await fetch(`${API_BASE_URL}/api/admin/dashboard`, {
-          headers: getAuthHeaders(),
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-
-        const payload: DashboardApiResponse = await response.json();
-
-        if (!payload.success) {
-          throw new Error("Dashboard API returned unsuccessful response.");
-        }
-
-        setDashboard(payload.data);
-      } catch (fetchError) {
-        if (fetchError instanceof Error && fetchError.name === "AbortError") {
-          return;
-        }
-
-        setError("Không thể tải dữ liệu dashboard. Kiểm tra server và MySQL.");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadDashboard();
-
-    return () => controller.abort();
-  }, []);
-
-  const stats = dashboard
-    ? [
+  const stats = [
         {
           title: "Tổng người dùng",
           value: formatCompactNumber(dashboard.summary.totalUsers.value),
@@ -207,7 +157,20 @@ function AdminDashboardPage({
           icon: "payments",
         },
         {
-          title: "Khóa học đang mở",
+          title: "Tổng học viên",
+          value: formatCompactNumber(
+            dashboard.summary.totalStudents?.value ??
+              dashboard.userGrowth.find((item) => item.label === "STUDENT")?.total ??
+              0,
+          ),
+          trend: dashboard.summary.totalStudents?.trend.value ?? "",
+          trendType:
+            dashboard.summary.totalStudents?.trend.direction ?? "neutral",
+          accent: "blue",
+          icon: "school",
+        },
+        {
+          title: "Tổng khóa học",
           value: String(dashboard.summary.activeCourses.value),
           trend: dashboard.summary.activeCourses.trend.value,
           trendType: dashboard.summary.activeCourses.trend.direction,
@@ -222,23 +185,28 @@ function AdminDashboardPage({
           accent: "gold",
           icon: "star",
         },
-      ]
-    : [];
+        {
+          title: "Cảnh báo chưa xử lý",
+          value: String(dashboard.summary.unresolvedAlerts?.value ?? 0),
+          trend: dashboard.summary.unresolvedAlerts?.trend.value ?? "",
+          trendType:
+            dashboard.summary.unresolvedAlerts?.trend.direction ?? "neutral",
+          accent: "amber",
+          icon: "warning",
+        },
+      ];
 
-  const revenueBars = dashboard ? normalizeBars(dashboard.revenueTrajectory) : [];
+  const revenueBars = normalizeBars(dashboard.revenueTrajectory);
 
-  const growthChannels = dashboard
-    ? dashboard.userGrowth.map((item) => ({
+  const growthChannels = dashboard.userGrowth.map((item) => ({
         name: formatRoleLabel(item.label),
         value: `${item.percentage}%`,
         width: `${Math.max(item.percentage, 6)}%`,
         tone:
           growthToneMap[item.label as keyof typeof growthToneMap] ?? "soft",
-      }))
-    : [];
+      }));
 
-  const courses = dashboard
-    ? dashboard.topCourses.map((course) => ({
+  const courses = dashboard.topCourses.map((course) => ({
         title: course.title,
         meta: `bởi ${course.instructorName} - ${formatCompactNumber(course.students)} học viên`,
         revenue: formatCurrency(course.revenue),
@@ -254,12 +222,10 @@ function AdminDashboardPage({
             : course.badge === "Highly Rated"
               ? "primary"
               : "muted",
-        image: course.thumbnail || defaultCourseImage,
-      }))
-    : [];
+        image: course.thumbnail || logo,
+      }));
 
-  const activities = dashboard
-    ? dashboard.recentActivity.map((activity) => ({
+  const activities = dashboard.recentActivity.map((activity) => ({
         title: activity.title,
         body: activity.description,
         time: formatRelativeTime(activity.createdAt),
@@ -269,76 +235,18 @@ function AdminDashboardPage({
         tone:
           activityToneMap[activity.type as keyof typeof activityToneMap] ??
           "primary",
-      }))
-    : [];
+      }));
 
   return (
     <div className="admin-shell">
-      <aside className="sidebar">
-        <div className="brand-block">
-          <p className="brand-title">LTHDV E-Learning</p>
-          <p className="brand-subtitle">Trang quản trị</p>
-        </div>
-
-        <nav className="sidebar-nav">
-          {navItems.map((item) => {
-            const isCurrent = item.key === activePage;
-
-            return (
-              <button
-                key={item.label}
-                className={`nav-item${isCurrent ? " active" : ""}`}
-                type="button"
-                onClick={() => {
-                  if (
-                    item.key === "dashboard" ||
-                    item.key === "students" ||
-                    item.key === "courses" ||
-                    item.key === "system" ||
-                    item.key === "content"
-                  ) {
-                    onNavigate(item.key);
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined">{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="pro-card">
-          <p className="pro-label">Quản trị thông minh</p>
-          <p className="pro-copy">Dashboard đang kết nối với dữ liệu quản trị thực tế.</p>
-        </div>
-      </aside>
+      <AdminSidebar
+        activePage={activePage}
+        description="Dashboard đang kết nối với dữ liệu quản trị thực tế."
+        onNavigate={onNavigate}
+      />
 
       <main className="main-panel">
-        <header className="topbar">
-          <label className="searchbar" aria-label="Tìm kiếm">
-            <span className="material-symbols-outlined">search</span>
-            <input
-              type="text"
-              placeholder="Tìm thống kê, khóa học hoặc người dùng..."
-            />
-          </label>
-
-          <div className="topbar-actions">
-            <button className="icon-button" type="button" aria-label="Thông báo">
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="notification-dot" />
-            </button>
-
-            <div className="profile-chip">
-              <div>
-                <p className="profile-name">Scholar Admin</p>
-                <p className="profile-role">Quản trị hệ thống</p>
-              </div>
-              <img src={defaultAvatar} alt="Quản trị viên" />
-            </div>
-          </div>
-        </header>
+        <AdminTopbar searchPlaceholder="Tìm thống kê, khóa học hoặc người dùng..." />
 
         <section className="content">
           <div className="hero">
@@ -349,12 +257,6 @@ function AdminDashboardPage({
               tháng này.
             </p>
           </div>
-
-          {loading ? (
-            <div className="status-banner">Đang tải dữ liệu dashboard...</div>
-          ) : null}
-
-          {error ? <div className="status-banner error">{error}</div> : null}
 
           <section className="stats-grid">
             {stats.map((stat) => (
@@ -406,8 +308,10 @@ function AdminDashboardPage({
                 {revenueBars.map((bar) => (
                   <div key={bar.label} className="bar-column">
                     <div
-                      className={`bar ${bar.active ? "active" : ""}`}
+                      className={`bar${bar.active ? " active" : ""}${bar.isZero ? " zero" : ""}`}
                       style={{ height: `${bar.height}%` }}
+                      tabIndex={0}
+                      aria-label={`${bar.label}: ${bar.tooltip}`}
                     >
                       <span className="tooltip">{bar.tooltip}</span>
                     </div>

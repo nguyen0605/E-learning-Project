@@ -9,9 +9,8 @@ function formatPercentage(value) {
 }
 
 function toMonthLabel(value) {
-  const date = new Date(`${value}-01T00:00:00`);
-
-  return date.toLocaleString("en-US", { month: "short" }).toUpperCase();
+  const month = Number(String(value).slice(5, 7));
+  return `T${month}`;
 }
 
 function buildTrend(currentValue, previousValue, suffix = "") {
@@ -43,7 +42,13 @@ function buildTrend(currentValue, previousValue, suffix = "") {
 async function getSummaryStats() {
   const [rows] = await db.query(`
     SELECT
-      (SELECT COUNT(*) FROM users WHERE role = 'STUDENT') AS total_users,
+      (SELECT COUNT(*) FROM users) AS total_users,
+      (SELECT COUNT(*) FROM users WHERE role = 'STUDENT') AS total_students,
+      (
+        (SELECT COUNT(*) FROM courses WHERE status = 'PENDING') +
+        (SELECT COUNT(*) FROM payments WHERE payment_status = 'PENDING') +
+        (SELECT COUNT(*) FROM users WHERE status = 'LOCKED')
+      ) AS unresolved_alerts,
       (
         SELECT COALESCE(SUM(amount), 0)
         FROM payments
@@ -52,7 +57,6 @@ async function getSummaryStats() {
       (
         SELECT COUNT(*)
         FROM courses
-        WHERE status IN ('APPROVED', 'PENDING', 'DRAFT')
       ) AS active_courses,
       (
         SELECT COALESCE(
@@ -72,9 +76,14 @@ async function getPreviousSummaryStats() {
       (
         SELECT COUNT(*)
         FROM users
+        WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
+      ) AS total_users,
+      (
+        SELECT COUNT(*)
+        FROM users
         WHERE role = 'STUDENT'
           AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
-      ) AS total_users,
+      ) AS total_students,
       (
         SELECT COALESCE(SUM(amount), 0)
         FROM payments
@@ -116,7 +125,7 @@ async function getRevenueTrajectory() {
       COALESCE(SUM(o.amount), 0) AS revenue
     FROM months m
     LEFT JOIN payments o
-      ON DATE_FORMAT(o.created_at, '%Y-%m') = m.month_key
+      ON DATE_FORMAT(o.paid_at, '%Y-%m') = m.month_key
       AND o.payment_status = 'SUCCESS'
     GROUP BY m.month_key
     ORDER BY m.month_key
@@ -154,16 +163,30 @@ async function getTopCourses() {
       c.course_name AS title,
       c.thumbnail_url AS thumbnail,
       u.full_name AS instructor_name,
-      COUNT(DISTINCT e.enrollment_id) AS students,
-      COALESCE(SUM(o.amount), 0) AS revenue,
-      COALESCE(AVG(r.rating), 0) AS rating
+      COALESCE(enrollment_stats.students, 0) AS students,
+      COALESCE(payment_stats.revenue, 0) AS revenue,
+      COALESCE(review_stats.rating, 0) AS rating
     FROM courses c
     LEFT JOIN users u ON u.user_id = c.teacher_id
-    LEFT JOIN course_batches b ON b.course_id = c.course_id
-    LEFT JOIN enrollments e ON e.batch_id = b.batch_id
-    LEFT JOIN payments o ON o.batch_id = b.batch_id AND o.payment_status = 'SUCCESS'
-    LEFT JOIN course_reviews r ON r.course_id = c.course_id
-    GROUP BY c.course_id, c.course_name, c.thumbnail_url, u.full_name
+    LEFT JOIN (
+      SELECT b.course_id, COUNT(DISTINCT e.enrollment_id) AS students
+      FROM course_batches b
+      LEFT JOIN enrollments e ON e.batch_id = b.batch_id
+      GROUP BY b.course_id
+    ) enrollment_stats ON enrollment_stats.course_id = c.course_id
+    LEFT JOIN (
+      SELECT b.course_id, SUM(p.amount) AS revenue
+      FROM course_batches b
+      INNER JOIN payments p
+        ON p.batch_id = b.batch_id
+        AND p.payment_status = 'SUCCESS'
+      GROUP BY b.course_id
+    ) payment_stats ON payment_stats.course_id = c.course_id
+    LEFT JOIN (
+      SELECT course_id, AVG(rating) AS rating
+      FROM course_reviews
+      GROUP BY course_id
+    ) review_stats ON review_stats.course_id = c.course_id
     ORDER BY revenue DESC, students DESC
     LIMIT 5
   `);
@@ -189,8 +212,14 @@ async function getRecentActivity() {
         CONCAT('payment-', o.payment_id) AS id,
         'order_paid' AS type,
         CONCAT('Payment #', o.payment_id, ' was marked as ', o.payment_status) AS title,
-        CONCAT('Student ID ', o.student_id, ' paid $', FORMAT(o.amount, 2)) AS description,
-        o.created_at AS created_at
+        CONCAT(
+          'Student ID ',
+          o.student_id,
+          ' paid ',
+          FORMAT(o.amount, 0, 'vi_VN'),
+          ' VND'
+        ) AS description,
+        COALESCE(o.paid_at, o.created_at) AS created_at
       FROM payments o
 
       UNION ALL
@@ -259,6 +288,10 @@ export async function getAdminDashboardData() {
         value: Number(summary.total_users),
         trend: buildTrend(summary.total_users, previousSummary.total_users, "%"),
       },
+      totalStudents: {
+        value: Number(summary.total_students),
+        trend: buildTrend(summary.total_students, previousSummary.total_students, "%"),
+      },
       totalRevenue: {
         value: formatCurrency(summary.total_revenue),
         trend: buildTrend(summary.total_revenue, previousSummary.total_revenue, "%"),
@@ -270,6 +303,13 @@ export async function getAdminDashboardData() {
       completionRate: {
         value: formatPercentage(summary.completion_rate),
         trend: buildTrend(summary.completion_rate, previousSummary.completion_rate, "%"),
+      },
+      unresolvedAlerts: {
+        value: Number(summary.unresolved_alerts),
+        trend: {
+          value: Number(summary.unresolved_alerts) === 0 ? "Da xu ly" : "Can xu ly",
+          direction: Number(summary.unresolved_alerts) === 0 ? "neutral" : "down",
+        },
       },
     },
     revenueTrajectory,

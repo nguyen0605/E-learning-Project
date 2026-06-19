@@ -1,9 +1,15 @@
 import express from "express";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import adminRoutes from "./routes/admin.routes.js";
+import authRoutes from "./routes/auth.routes.js";
 import instructorRoutes from "./routes/instructor.routes.js";
+import studentRoutes from "./routes/student.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
+const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 app.use(express.json());
 
@@ -26,6 +32,10 @@ app.get("/", (req, res) => {
   });
 });
 
+app.use("/uploads", express.static(path.resolve(currentDirectory, "..", "uploads")));
+app.use("/api/auth", authRoutes);
+app.use("/api/student", studentRoutes);
+app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/instructor", instructorRoutes);
 

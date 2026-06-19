@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "../../i18n/locale";
 import Icon from "../components/Icon";
 import { getCart, removeCartItem } from "../services/studentCartApi";
 import type { StudentCart } from "../types/cart.types";
@@ -6,16 +8,16 @@ import type { StudentCart } from "../types/cart.types";
 const fallbackImage =
   "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80";
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("vi-VN", {
+function formatCurrency(value: number, language: string | undefined) {
+  return new Intl.NumberFormat(getIntlLocale(language), {
     currency: "VND",
     maximumFractionDigits: 0,
     style: "currency",
   }).format(value);
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("vi-VN").format(new Date(value));
+function formatDate(value: string, language: string | undefined) {
+  return new Intl.DateTimeFormat(getIntlLocale(language)).format(new Date(value));
 }
 
 function getCourseImage(thumbnailUrl: string | null) {
@@ -23,32 +25,30 @@ function getCourseImage(thumbnailUrl: string | null) {
 }
 
 function CartPage() {
+  const { t, i18n } = useTranslation("student");
+  const language = i18n.resolvedLanguage;
   const [cart, setCart] = useState<StudentCart | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [removingId, setRemovingId] = useState<number | null>(null);
 
-  async function loadCart() {
+  const loadCart = useCallback(async () => {
     setIsLoading(true);
     setError("");
 
     try {
       const nextCart = await getCart();
       setCart(nextCart);
-    } catch (cartError) {
-      setError(
-        cartError instanceof Error
-          ? cartError.message
-          : "Không thể tải giỏ hàng.",
-      );
+    } catch {
+      setError(t("cart.loadError"));
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [t]);
 
   useEffect(() => {
     void loadCart();
-  }, []);
+  }, [loadCart]);
 
   async function handleRemoveItem(cartItemId: number) {
     setRemovingId(cartItemId);
@@ -57,12 +57,8 @@ function CartPage() {
     try {
       await removeCartItem(cartItemId);
       await loadCart();
-    } catch (removeError) {
-      setError(
-        removeError instanceof Error
-          ? removeError.message
-          : "Không thể xóa khóa học khỏi giỏ hàng.",
-      );
+    } catch {
+      setError(t("cart.removeError"));
     } finally {
       setRemovingId(null);
     }
@@ -80,37 +76,31 @@ function CartPage() {
   return (
     <main className="sp-cart-page">
       <section>
-        <h1>Giỏ hàng</h1>
-        <p>
-          Bạn đã chọn {summary.itemCount} khóa học để nâng cao kiến thức và kỹ
-          năng.
-        </p>
+        <h1>{t("cart.title")}</h1>
+        <p>{t("cart.description", { count: summary.itemCount })}</p>
 
-        {isLoading ? <p className="sp-state-line">Đang tải giỏ hàng...</p> : null}
+        {isLoading ? <p className="sp-state-line">{t("cart.loading")}</p> : null}
         {error ? <p className="sp-state-line error">{error}</p> : null}
 
         {!isLoading && !error && items.length === 0 ? (
           <div className="sp-empty-cart">
             <Icon name="shopping_cart" />
-            <h2>Giỏ hàng đang trống</h2>
-            <p>Hãy mở một khóa học và bấm “Thêm vào giỏ hàng”.</p>
+            <h2>{t("cart.emptyTitle")}</h2>
+            <p>{t("cart.emptyDescription")}</p>
           </div>
         ) : null}
 
         {items.map((item) => (
           <article className="sp-cart-item" key={item.id}>
             <img src={getCourseImage(item.course.thumbnailUrl)} alt={item.course.name} />
-
             <div>
               <span>{item.category.name}</span>
-
               <h2>{item.course.name}</h2>
-
               <p>
-                Giảng viên: {item.teacher.fullName} • Lớp: {item.batch.name} •{" "}
-                {formatDate(item.batch.startDate)} - {formatDate(item.batch.endDate)}
+                {t("cart.teacher")}: {item.teacher.fullName} • {t("cart.class")}:{" "}
+                {item.batch.name} • {formatDate(item.batch.startDate, language)} -{" "}
+                {formatDate(item.batch.endDate, language)}
               </p>
-
               <div>
                 <button
                   disabled={removingId === item.id}
@@ -118,46 +108,38 @@ function CartPage() {
                   type="button"
                 >
                   <Icon name="delete" />{" "}
-                  {removingId === item.id ? "Đang xóa..." : "Xóa khỏi giỏ hàng"}
+                  {removingId === item.id ? t("cart.removing") : t("cart.remove")}
                 </button>
               </div>
             </div>
-
-            <strong>{formatCurrency(item.priceSnapshot)}</strong>
+            <strong>{formatCurrency(item.priceSnapshot, language)}</strong>
           </article>
         ))}
       </section>
 
       <aside className="sp-order-card">
-        <h2>Tóm tắt đơn hàng</h2>
-
+        <h2>{t("cart.summaryTitle")}</h2>
         <p>
-          <span>Tạm tính</span>
-          <strong>{formatCurrency(summary.subtotal)}</strong>
+          <span>{t("cart.subtotal")}</span>
+          <strong>{formatCurrency(summary.subtotal, language)}</strong>
         </p>
-
         <p className="discount">
-          <span>Giảm giá</span>
-          <strong>-{formatCurrency(summary.discount)}</strong>
+          <span>{t("cart.discount")}</span>
+          <strong>-{formatCurrency(summary.discount, language)}</strong>
         </p>
-
         <p>
-          <span>Thuế</span>
-          <strong>{formatCurrency(summary.tax)}</strong>
+          <span>{t("cart.tax")}</span>
+          <strong>{formatCurrency(summary.tax, language)}</strong>
         </p>
-
         <hr />
-
         <p className="total">
-          <span>Tổng thanh toán</span>
-          <strong>{formatCurrency(summary.total)}</strong>
+          <span>{t("cart.total")}</span>
+          <strong>{formatCurrency(summary.total, language)}</strong>
         </p>
-
         <button className="sp-checkout" disabled={items.length === 0} type="button">
-          Tiến hành thanh toán
+          {t("cart.checkout")}
         </button>
-
-        <small>Giỏ hàng được lưu theo tài khoản học viên của bạn.</small>
+        <small>{t("cart.accountNote")}</small>
       </aside>
     </main>
   );

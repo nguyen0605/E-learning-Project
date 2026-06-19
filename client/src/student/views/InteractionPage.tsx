@@ -1,42 +1,42 @@
+import { useTranslation } from "react-i18next";
 import DiscussionCard from "../components/DiscussionCard";
 import Icon from "../components/Icon";
 
 function InteractionPage() {
+  const { t } = useTranslation("student");
+
   return (
     <main className="sp-community-page">
       <section className="sp-community-head">
         <div>
-          <p className="sp-eyebrow">Cộng đồng học tập</p>
-          <h1>Thiết kế Biên tập & Nghệ thuật Sắp chữ Nâng cao</h1>
-          <p>
-            Tham gia thảo luận cùng cộng đồng học viên. Đặt câu hỏi, chia sẻ kinh
-            nghiệm và kết nối với những người cùng học trong khóa học này.
-          </p>
+          <p className="sp-eyebrow">{t("interaction.eyebrow")}</p>
+          <h1>{t("interaction.title")}</h1>
+          <p>{t("interaction.description")}</p>
         </div>
 
         <aside>
           <strong>4.8</strong>
           <span>★★★★★</span>
-          <p>1.240 lượt đánh giá từ học viên</p>
-          <button type="button">Đánh giá khóa học</button>
+          <p>{t("interaction.reviews")}</p>
+          <button type="button">{t("interaction.reviewCourse")}</button>
         </aside>
       </section>
 
       <div className="sp-community-layout">
         <aside className="sp-discussion-nav">
           <button className="active" type="button">
-            <Icon name="forum" /> Tất cả thảo luận
+            <Icon name="forum" /> {t("interaction.allDiscussions")}
           </button>
 
           <button type="button">
-            <Icon name="help" /> Hỏi & Đáp
+            <Icon name="help" /> {t("interaction.qa")}
           </button>
 
           <button type="button">
-            <Icon name="history" /> Câu hỏi của tôi
+            <Icon name="history" /> {t("interaction.myQuestions")}
           </button>
 
-          <h3>Nội dung bài học</h3>
+          <h3>{t("interaction.lessonContent")}</h3>
 
           <p className="active">Chương 04: Phân cấp thị giác</p>
           <p>Chương 03: Lý thuyết màu sắc</p>
@@ -47,11 +47,11 @@ function InteractionPage() {
           <div className="sp-discussion-tools">
             <label>
               <Icon name="search" />
-              <input placeholder="Tìm kiếm câu hỏi hoặc chủ đề..." />
+              <input placeholder={t("interaction.searchPlaceholder")} />
             </label>
 
             <button type="button">
-              <Icon name="add_comment" /> Đặt câu hỏi
+              <Icon name="add_comment" /> {t("interaction.askQuestion")}
             </button>
           </div>
 
@@ -76,7 +76,7 @@ function InteractionPage() {
           />
 
           <button className="sp-load-more" type="button">
-            Xem thêm thảo luận cũ
+            {t("interaction.loadMore")}
           </button>
         </section>
       </div>

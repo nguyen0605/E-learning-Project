@@ -87,3 +87,24 @@ export async function getMyCourses() {
 
   return readApiData<StudentEnrolledCourse[]>(response);
 }
+
+export async function completeLesson(lessonId: number) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/student/lessons/${lessonId}/progress`,
+    {
+      method: "PUT",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  return readApiData<{
+    lessonId: number;
+    courseId: number;
+    completedLessons: number;
+    totalLessons: number;
+    progressPercent: number;
+  }>(response);
+}

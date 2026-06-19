@@ -1,162 +1,191 @@
-import Icon from "../components/Icon";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import StudentExamCard from "../components/StudentExamCard";
+import StudentExamResultRow from "../components/StudentExamResultRow";
+import StudentExamSidebar from "../components/StudentExamSidebar";
+import { getStudentExamDashboard } from "../services/studentExamsApi";
+import type {
+  StudentExam,
+  StudentExamDashboard,
+  StudentExamResult,
+} from "../types/exam.types";
+import {
+  getExamTabItems,
+  type StudentExamTab,
+} from "../utils/examFormatters";
+import "./ExamPage.css";
 
-const answers = [
-  "Increasing personal income tax rates to reduce aggregate demand.",
-  "Lowering the discount rate set by the central bank.",
-  "Expanding government expenditure on infrastructure projects.",
-  "Implementing an open market purchase of treasury securities.",
-];
+type ExamPageProps = {
+  onOpenExam: (exam: StudentExam) => void;
+  onOpenResult: (result: StudentExamResult) => void;
+};
 
-function ExamPage() {
+function ExamPage({ onOpenExam, onOpenResult }: ExamPageProps) {
+  const { t } = useTranslation("student");
+  const tabs: Array<{ key: StudentExamTab; label: string }> = [
+    { key: "upcoming", label: t("exam.dashboard.upcoming") },
+    { key: "completed", label: t("exam.dashboard.completed") },
+    { key: "incomplete", label: t("exam.dashboard.incomplete") },
+  ];
+  const [dashboard, setDashboard] = useState<StudentExamDashboard | null>(null);
+  const [activeTab, setActiveTab] = useState<StudentExamTab>("upcoming");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setIsLoading(true);
+    setError("");
+
+    getStudentExamDashboard()
+      .then((data) => {
+        if (isMounted) {
+          setDashboard(data);
+        }
+      })
+      .catch((fetchError) => {
+        if (isMounted) {
+          setError(
+            fetchError instanceof Error
+              ? fetchError.message
+              : t("exam.dashboard.loadError"),
+          );
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [t]);
+
+  const filteredExams = useMemo(
+    () => getExamTabItems(dashboard?.exams ?? [], activeTab),
+    [activeTab, dashboard?.exams],
+  );
+
   return (
-    <main className="sp-exam-page">
-      <section className="sp-exam-head">
+    <main className="sp-exam-dashboard-page">
+      <section className="sp-exam-dashboard-head">
         <div>
-          <p className="sp-eyebrow">Chương 04: Kinh tế học Nâng cao</p>
-          <h1>Bài Kiểm Tra Cuối Kỳ Kinh Tế Vĩ Mô</h1>
+          <p className="sp-eyebrow">{t("exam.dashboard.eyebrow")}</p>
+          <h1>{t("exam.dashboard.title")}</h1>
         </div>
 
-        <div className="sp-timer">
-          <small>Thời gian còn lại</small>
-          <strong>24:18</strong>
-          <Icon name="timer" />
+        <div className="sp-exam-summary-grid">
+          <article>
+            <span>{t("exam.dashboard.total")}</span>
+            <strong>{dashboard?.summary.total ?? 0}</strong>
+          </article>
+          <article>
+            <span>{t("exam.dashboard.upcoming")}</span>
+            <strong>{dashboard?.summary.upcoming ?? 0}</strong>
+          </article>
+          <article>
+            <span>{t("exam.dashboard.completed")}</span>
+            <strong>{dashboard?.summary.completed ?? 0}</strong>
+          </article>
+          <article>
+            <span>{t("exam.dashboard.averageScore")}</span>
+            <strong>{dashboard?.summary.averageScore ?? 0}</strong>
+          </article>
         </div>
       </section>
 
-      <div className="sp-progress">
-        <span>Câu hỏi 08 / 15</span>
-
-        <div>
-          <i />
-        </div>
-
-        <span>Hoàn thành 53%</span>
-      </div>
-
-      <section className="sp-exam-grid">
-        <article className="sp-question-card">
-          <h2>
-            Chính sách tài khóa nào dưới đây có khả năng được sử dụng để kiểm soát
-            tình trạng lạm phát cao trong mô hình nền kinh tế đóng?
-          </h2>
-
-          {answers.map((answer, index) => (
-            <label key={answer} className={index === 0 ? "selected" : ""}>
-              <input
-                type="radio"
-                name="exam-answer"
-                defaultChecked={index === 0}
-              />
-
-              <span>{String.fromCharCode(65 + index)}</span>
-
-              {answer}
-
-              {index === 0 ? <Icon name="check_circle" /> : null}
-            </label>
-          ))}
-
-          <div className="sp-question-actions">
-            <button type="button">
-              <Icon name="chevron_left" /> Câu trước
-            </button>
-
-            <button type="button">
-              Lưu & Tiếp theo <Icon name="chevron_right" />
-            </button>
-          </div>
-        </article>
-
-        <aside>
-          <div className="sp-map">
-            <h3>Danh sách câu hỏi</h3>
-
-            {Array.from({ length: 15 }, (_, index) => (
+      <section className="sp-exam-dashboard-layout">
+        <div className="sp-exam-dashboard-main">
+          <div className="sp-exam-filter-tabs" role="tablist" aria-label={t("exam.dashboard.filterLabel")}>
+            {tabs.map((tab) => (
               <button
-                className={
-                  index < 7 ? "done" : index === 7 ? "current" : ""
-                }
-                key={index}
+                key={tab.key}
+                className={activeTab === tab.key ? "active" : ""}
+                onClick={() => setActiveTab(tab.key)}
                 type="button"
               >
-                {index + 1}
+                {tab.label}
               </button>
             ))}
           </div>
 
-          <div className="sp-pro-tip">
-            <h3>
-              <Icon name="emoji_objects" /> Mẹo học tập
-            </h3>
+          {isLoading ? (
+            <p className="sp-state-line">{t("exam.dashboard.loading")}</p>
+          ) : null}
 
-            <p>
-              Hãy nhớ rằng chính sách tài khóa chỉ liên quan đến chi tiêu công và
-              các chính sách thuế của chính phủ.
-            </p>
-          </div>
-        </aside>
-      </section>
+          {error ? <p className="sp-state-line error">{error}</p> : null}
 
-      <section className="sp-results">
-        <p className="sp-eyebrow">Hoàn thành bài kiểm tra</p>
+          {!isLoading && !error ? (
+            <section className="sp-exam-list-section">
+              <div className="sp-exam-section-head">
+                <div>
+                  <h2>
+                    {activeTab === "upcoming"
+                      ? t("exam.dashboard.sectionUpcoming")
+                      : activeTab === "completed"
+                        ? t("exam.dashboard.sectionCompleted")
+                        : t("exam.dashboard.sectionIncomplete")}
+                  </h2>
+                  <p>{t("exam.dashboard.filteredCount", { count: filteredExams.length })}</p>
+                </div>
 
-        <h2>Xuất sắc lắm, bé Đạt!</h2>
+                <span>
+                  {activeTab === "upcoming"
+                    ? t("exam.dashboard.openCount", { count: dashboard?.summary.upcoming ?? 0 })
+                    : activeTab === "completed"
+                      ? t("exam.dashboard.submittedCount", { count: dashboard?.summary.completed ?? 0 })
+                      : t("exam.dashboard.inProgressCount", { count: dashboard?.summary.incomplete ?? 0 })}
+                </span>
+              </div>
 
-        <p>
-          Bạn đã hoàn thành thành công bài kiểm tra cuối kỳ môn Kinh tế Vĩ mô.
-        </p>
+              {filteredExams.length ? (
+                <div className="sp-exam-card-grid">
+                  {filteredExams.map((exam) => (
+                    <StudentExamCard exam={exam} key={exam.id} onAction={onOpenExam} />
+                  ))}
+                </div>
+              ) : (
+                <div className="sp-empty-cart">
+                  <h2>{t("exam.dashboard.emptyTitle")}</h2>
+                  <p>{t("exam.dashboard.emptyDescription")}</p>
+                </div>
+              )}
+            </section>
+          ) : null}
 
-        <div className="sp-score-row">
-          <article>
-            <small>Điểm tổng kết</small>
+          {!isLoading && !error ? (
+            <section className="sp-exam-result-section">
+              <div className="sp-exam-section-head">
+                <div>
+                  <h2>{t("exam.dashboard.recentResults")}</h2>
+                  <p>{t("exam.dashboard.recentDescription")}</p>
+                </div>
+              </div>
 
-            <strong>
-              92<span>/100</span>
-            </strong>
-
-            <p>Thuộc top 5% học viên có kết quả cao nhất.</p>
-          </article>
-
-          <article className="blue">
-            <small>Thời gian làm bài</small>
-
-            <strong>18:42</strong>
-
-            <p>
-              Bạn hoàn thành bài thi nhanh hơn trung bình 6 phút so với các học
-              viên khác.
-            </p>
-          </article>
+              {dashboard?.recentResults.length ? (
+                <div className="sp-exam-result-list">
+                  {dashboard.recentResults.map((result) => (
+                    <StudentExamResultRow
+                      key={`${result.examId}-${result.attemptId ?? result.submittedAt}`}
+                      onOpen={onOpenResult}
+                      result={result}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="sp-empty-cart">
+                  <h2>{t("exam.dashboard.noResults")}</h2>
+                  <p>{t("exam.dashboard.noResultsDescription")}</p>
+                </div>
+              )}
+            </section>
+          ) : null}
         </div>
 
-        <div className="sp-breakdown">
-          <h3>Chi tiết kết quả</h3>
-
-          <p>
-            <Icon name="check_circle" /> Câu 08: Chính sách tài khóa{" "}
-            <strong>+6.6 điểm</strong>
-          </p>
-
-          <div>
-            Giải thích: Tăng thuế là một chính sách tài khóa thắt chặt, giúp giảm
-            tốc độ tăng trưởng của nền kinh tế và kiềm chế lạm phát.
-          </div>
-
-          <p className="wrong">
-            <Icon name="cancel" /> Câu 12: Bẫy thanh khoản{" "}
-            <strong>0 điểm</strong>
-          </p>
-
-          <div className="wrong">
-            Đáp án đúng: D. Chính sách này trở nên kém hiệu quả.
-          </div>
-
-          <button type="button">Tải báo cáo kết quả</button>
-
-          <button className="primary" type="button">
-            Tiếp tục học tập
-          </button>
-        </div>
+        <StudentExamSidebar />
       </section>
     </main>
   );

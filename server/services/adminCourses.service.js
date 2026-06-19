@@ -1,7 +1,5 @@
 import db from "../db.js";
 
-const courseStatusOverrides = new Map();
-
 function formatCurrency(value) {
   return Number(value ?? 0);
 }
@@ -15,19 +13,18 @@ function formatCompactNumber(value) {
 
 function toClientStatus(status) {
   if (status === "APPROVED") return "approved";
-  if (status === "REJECTED" || status === "HIDDEN") return "rejected";
+  if (status === "HIDDEN") return "hidden";
+  if (status === "REJECTED") return "rejected";
   return "pending";
 }
 
 function deriveCourseStatus(course) {
-  const override = courseStatusOverrides.get(course.id);
-
-  if (override) return override;
   return toClientStatus(course.db_status);
 }
 
 function getStatusLabel(status) {
   if (status === "approved") return "Da duyet";
+  if (status === "hidden") return "Da an";
   if (status === "rejected") return "Tu choi";
   return "Cho duyet";
 }
@@ -48,14 +45,19 @@ async function getBaseCourses() {
       COUNT(DISTINCT e.enrollment_id) AS enrolled_students,
       COUNT(DISTINCT r.review_id) AS review_count,
       COALESCE(AVG(r.rating), 0) AS avg_rating,
-      COALESCE(SUM(p.amount), 0) AS total_revenue
+      COALESCE((
+        SELECT SUM(p.amount)
+        FROM course_batches revenue_batch
+        INNER JOIN payments p ON p.batch_id = revenue_batch.batch_id
+        WHERE revenue_batch.course_id = c.course_id
+          AND p.payment_status = 'SUCCESS'
+      ), 0) AS total_revenue
     FROM courses c
     LEFT JOIN course_categories cat ON cat.category_id = c.category_id
     LEFT JOIN users u ON u.user_id = c.teacher_id
     LEFT JOIN course_batches b ON b.course_id = c.course_id
     LEFT JOIN enrollments e ON e.batch_id = b.batch_id
     LEFT JOIN course_reviews r ON r.course_id = c.course_id
-    LEFT JOIN payments p ON p.batch_id = b.batch_id AND p.payment_status = 'SUCCESS'
     GROUP BY
       c.course_id,
       c.course_name,
@@ -107,7 +109,7 @@ export async function getAdminCoursesPageData() {
     SELECT COALESCE(SUM(amount), 0) AS monthly_revenue
     FROM payments
     WHERE payment_status = 'SUCCESS'
-      AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      AND paid_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
   `);
 
   const pendingCount = courses.filter((course) => course.status === "pending").length;
@@ -158,7 +160,19 @@ export async function reviewAdminCourse(courseId, status) {
 
   if (!detail) return null;
 
-  courseStatusOverrides.set(Number(courseId), status);
+  const dbStatus =
+    status === "approved"
+      ? "APPROVED"
+      : status === "rejected"
+        ? "REJECTED"
+        : status === "hidden"
+          ? "HIDDEN"
+          : "PENDING";
+
+  await db.query("UPDATE courses SET status = ? WHERE course_id = ?", [
+    dbStatus,
+    courseId,
+  ]);
 
   return {
     id: Number(courseId),

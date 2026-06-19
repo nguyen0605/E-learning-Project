@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "../../i18n/locale";
 import type { StudentCourse } from "../types/course.types";
 import Icon from "./Icon";
 
@@ -13,8 +15,8 @@ const fallbackImages = [
   "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=900&q=80",
 ];
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("vi-VN", {
+function formatCurrency(value: number, language: string | undefined) {
+  return new Intl.NumberFormat(getIntlLocale(language), {
     currency: "VND",
     maximumFractionDigits: 0,
     style: "currency",
@@ -30,6 +32,7 @@ function getCourseImage(course: StudentCourse) {
 }
 
 function StudentCourseCard({ course, onOpen }: StudentCourseCardProps) {
+  const { t, i18n } = useTranslation("student");
   return (
     <article className="sp-course-card sp-db-course-card">
       <button
@@ -57,19 +60,22 @@ function StudentCourseCard({ course, onOpen }: StudentCourseCardProps) {
           <div className="sp-course-meta-row">
             <span>{course.level}</span>
             <span>
-              <Icon name="menu_book" /> {course.stats.lessonCount} bài học
+              <Icon name="menu_book" />{" "}
+              {t("courseCard.lessons", { count: course.stats.lessonCount })}
             </span>
           </div>
           <div className="sp-course-footer">
             <div>
               <p>
                 {course.stats.averageRating.toFixed(1)}{" "}
-                <small>({course.stats.reviewCount} đánh giá)</small>
+                <small>
+                  ({t("courseCard.reviews", { count: course.stats.reviewCount })})
+                </small>
               </p>
-              <strong>{formatCurrency(course.price)}</strong>
+              <strong>{formatCurrency(course.price, i18n.resolvedLanguage)}</strong>
             </div>
             <span className="sp-card-open">
-              Chi tiết <Icon name="chevron_right" />
+              {t("courseCard.details")} <Icon name="chevron_right" />
             </span>
           </div>
         </div>

@@ -1,6 +1,5 @@
 import db from "../db.js";
-
-const studentStatusOverrides = new Map();
+import { createNotification } from "./notification.service.js";
 
 function formatPercentage(value) {
   return Number(Number(value ?? 0).toFixed(1));
@@ -23,14 +22,8 @@ function toInitials(title) {
 }
 
 function resolveStudentStatus(student) {
-  const override = studentStatusOverrides.get(student.id);
-
-  if (override) return override;
   if (student.account_status === "LOCKED") return "suspended";
   if (student.account_status === "INACTIVE") return "inactive";
-  if (Number(student.progress_percentage) === 0) return "inactive";
-  if (Number(student.progress_percentage) < 20) return "suspended";
-
   return "active";
 }
 
@@ -266,7 +259,33 @@ export async function updateAdminStudentStatus(studentId, status) {
 
   if (!detail) return null;
 
-  studentStatusOverrides.set(Number(studentId), status);
+  const dbStatus =
+    status === "suspended"
+      ? "LOCKED"
+      : status === "inactive"
+        ? "INACTIVE"
+        : "ACTIVE";
+
+  await db.query(
+    "UPDATE users SET status = ? WHERE user_id = ? AND role = 'STUDENT'",
+    [dbStatus, studentId],
+  );
+
+  await createNotification({
+    userId: Number(studentId),
+    type: dbStatus === "LOCKED" ? "ACCOUNT_LOCKED" : "ACCOUNT_STATUS_CHANGED",
+    title: dbStatus === "LOCKED" ? "Tài khoản đã bị khóa" : "Trạng thái tài khoản đã thay đổi",
+    content:
+      dbStatus === "LOCKED"
+        ? "Tài khoản học viên của bạn đã bị quản trị viên khóa."
+        : "Tài khoản học viên của bạn đã được cập nhật trạng thái.",
+    referenceType: "USER",
+    referenceId: Number(studentId),
+    targetUrl: "/student",
+    priority: dbStatus === "LOCKED" ? "HIGH" : "NORMAL",
+  }).catch((error) => {
+    console.error("Failed to notify student about account status.", error);
+  });
 
   return {
     id: Number(studentId),

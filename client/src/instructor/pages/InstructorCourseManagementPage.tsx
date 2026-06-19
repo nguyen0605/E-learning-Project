@@ -1,7 +1,8 @@
 ﻿/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import InstructorLayout from "../components/InstructorLayout";
-import { getInstructorAuthTeacherId } from "../auth/instructorAuth";
+import { getInstructorAuthTeacherId, getInstructorAuthToken } from "../auth/instructorAuth";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   courseBatches,
@@ -43,6 +44,20 @@ const COURSE_FALLBACK_IMAGES = [
   "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=600&q=80",
   "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=600&q=80",
 ];
+
+function instructorFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  const token = getInstructorAuthToken();
+
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  return fetch(input, {
+    ...init,
+    headers,
+  });
+}
 
 function getCourseFilterStatus(status: string) {
   if (status === "Đã xuất bản" || status === "Da xuat ban") {
@@ -207,6 +222,7 @@ function createFallbackCourseDetail(course: InstructorCourseItem): CourseDetail 
 }
 
 function InstructorCourseManagementPage() {
+  const { t } = useTranslation("instructor");
   const location = useLocation();
   const navigate = useNavigate();
   const [pageData, setPageData] =
@@ -420,7 +436,7 @@ function InstructorCourseManagementPage() {
 
     async function loadCourses() {
       try {
-        const response = await fetch(
+        const response = await instructorFetch(
           `${API_BASE_URL}/api/instructor/courses?teacherId=${DEFAULT_TEACHER_ID}`,
           { signal: controller.signal },
         );
@@ -551,7 +567,7 @@ function InstructorCourseManagementPage() {
     setCreateError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: "POST",
@@ -611,7 +627,7 @@ function InstructorCourseManagementPage() {
     setEditCourseError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: "PUT",
@@ -685,7 +701,7 @@ function InstructorCourseManagementPage() {
         setEditCourseError(null);
 
         try {
-          const response = await fetch(
+          const response = await instructorFetch(
             `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}?teacherId=${DEFAULT_TEACHER_ID}`,
             {
               method: "DELETE",
@@ -725,7 +741,7 @@ function InstructorCourseManagementPage() {
     setEditCourseError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${courseId}/workflow?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: "PATCH",
@@ -786,7 +802,7 @@ function InstructorCourseManagementPage() {
         setModuleError(null);
 
         try {
-          const response = await fetch(
+          const response = await instructorFetch(
             `${API_BASE_URL}/api/instructor/courses/${courseId}/modules/${moduleId}?teacherId=${DEFAULT_TEACHER_ID}`,
             {
               method: "DELETE",
@@ -828,7 +844,7 @@ function InstructorCourseManagementPage() {
         setLessonError(null);
 
         try {
-          const response = await fetch(
+          const response = await instructorFetch(
             `${API_BASE_URL}/api/instructor/courses/${courseId}/lessons/${lessonId}?teacherId=${DEFAULT_TEACHER_ID}`,
             {
               method: "DELETE",
@@ -965,7 +981,7 @@ function InstructorCourseManagementPage() {
   }
 
   async function refreshCoursesList() {
-    const response = await fetch(
+    const response = await instructorFetch(
       `${API_BASE_URL}/api/instructor/courses?teacherId=${DEFAULT_TEACHER_ID}`,
     );
 
@@ -1004,7 +1020,7 @@ function InstructorCourseManagementPage() {
   }
 
   async function refreshCourseDetail(courseId: number) {
-    const response = await fetch(
+    const response = await instructorFetch(
       `${API_BASE_URL}/api/instructor/courses/${courseId}?teacherId=${DEFAULT_TEACHER_ID}`,
     );
 
@@ -1250,7 +1266,7 @@ function InstructorCourseManagementPage() {
     setBatchFormError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${targetCourseId}/batches${batchFormMode === "edit" && batchFormTarget?.batchId ? `/${batchFormTarget.batchId}` : ""}?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: batchFormMode === "edit" ? "PUT" : "POST",
@@ -1289,7 +1305,7 @@ function InstructorCourseManagementPage() {
       onConfirm: async () => {
         setIsDeletingBatch(batchId);
         try {
-          const response = await fetch(
+          const response = await instructorFetch(
             `${API_BASE_URL}/api/instructor/courses/${courseId}/batches/${batchId}?teacherId=${DEFAULT_TEACHER_ID}`,
             { method: "DELETE" },
           );
@@ -1397,7 +1413,7 @@ function InstructorCourseManagementPage() {
     setRecurringScheduleError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${courseId}/batches/${batchId}/sessions/generate?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: "POST",
@@ -1504,7 +1520,7 @@ function InstructorCourseManagementPage() {
     setSessionFormError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${targetCourseId}/batches/${targetBatchId}/sessions${
           sessionFormMode === "edit" && sessionFormTarget?.sessionId ? `/${sessionFormTarget.sessionId}` : ""
         }?teacherId=${DEFAULT_TEACHER_ID}`,
@@ -1547,7 +1563,7 @@ function InstructorCourseManagementPage() {
       confirmLabel: "Xóa buổi học",
       onConfirm: async () => {
         try {
-          const response = await fetch(
+          const response = await instructorFetch(
             `${API_BASE_URL}/api/instructor/courses/${courseId}/batches/${batchId}/sessions/${sessionId}?teacherId=${DEFAULT_TEACHER_ID}`,
             { method: "DELETE" },
           );
@@ -1579,7 +1595,7 @@ function InstructorCourseManagementPage() {
     setIsAttendanceLoading(true);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${courseId}/batches/${batchId}/sessions/${sessionId}/attendance?teacherId=${DEFAULT_TEACHER_ID}`,
       );
 
@@ -1621,7 +1637,7 @@ function InstructorCourseManagementPage() {
     setAttendanceError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${courseId}/batches/${attendanceTarget.batchId}/sessions/${attendanceTarget.sessionId}/attendance?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: "PUT",
@@ -1709,7 +1725,7 @@ function InstructorCourseManagementPage() {
     setQuizFormError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}/quizzes${
           quizFormMode === "edit" && quizFormTargetId ? `/${quizFormTargetId}` : ""
         }?teacherId=${DEFAULT_TEACHER_ID}`,
@@ -1760,7 +1776,7 @@ function InstructorCourseManagementPage() {
       onConfirm: async () => {
         try {
           setIsDeletingQuiz(quizId);
-          const response = await fetch(
+          const response = await instructorFetch(
             `${API_BASE_URL}/api/instructor/courses/${courseId}/quizzes/${quizId}?teacherId=${DEFAULT_TEACHER_ID}`,
             { method: "DELETE" },
           );
@@ -1867,7 +1883,7 @@ function InstructorCourseManagementPage() {
     setQuizQuestionFormError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}/quizzes/${selectedQuiz.id}/questions${
           quizQuestionFormMode === "edit" && quizQuestionFormTargetId ? `/${quizQuestionFormTargetId}` : ""
         }?teacherId=${DEFAULT_TEACHER_ID}`,
@@ -1915,7 +1931,7 @@ function InstructorCourseManagementPage() {
       onConfirm: async () => {
         try {
           setIsDeletingQuizQuestion(questionId);
-          const response = await fetch(
+          const response = await instructorFetch(
             `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}/quizzes/${quizId}/questions/${questionId}?teacherId=${DEFAULT_TEACHER_ID}`,
             { method: "DELETE" },
           );
@@ -1973,7 +1989,7 @@ function InstructorCourseManagementPage() {
     setQuizAttemptError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}/quizzes/${selectedQuiz.id}/attempts/${selectedQuizAttempt.id}/grade?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: "PATCH",
@@ -2013,7 +2029,7 @@ function InstructorCourseManagementPage() {
     setReviewReplyError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}/reviews/${selectedReviewId}/respond?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: "PATCH",
@@ -2098,7 +2114,7 @@ function InstructorCourseManagementPage() {
     setIsImportCourseLoading(true);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${courseId}?teacherId=${DEFAULT_TEACHER_ID}`,
       );
 
@@ -2148,7 +2164,7 @@ function InstructorCourseManagementPage() {
     setIsCourseDetailLoading(true);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${course.id}?teacherId=${DEFAULT_TEACHER_ID}`,
       );
 
@@ -2198,7 +2214,7 @@ function InstructorCourseManagementPage() {
     setModuleError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}/modules${moduleFormMode === "edit" && moduleFormTargetId ? `/${moduleFormTargetId}` : ""}?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: moduleFormMode === "edit" ? "PUT" : "POST",
@@ -2311,7 +2327,7 @@ function InstructorCourseManagementPage() {
     setModuleError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}/modules/order?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: "PATCH",
@@ -2364,7 +2380,7 @@ function InstructorCourseManagementPage() {
     setLessonError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}/modules/${moduleId}/lessons/order?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: "PATCH",
@@ -2410,7 +2426,7 @@ function InstructorCourseManagementPage() {
     setLessonError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${selectedCourseDetail.id}/lessons${lessonFormMode === "edit" && lessonFormTargetId ? `/${lessonFormTargetId}` : ""}?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: lessonFormMode === "edit" ? "PUT" : "POST",
@@ -2477,7 +2493,7 @@ function InstructorCourseManagementPage() {
     setImportLessonError(null);
 
     try {
-      const response = await fetch(
+      const response = await instructorFetch(
         `${API_BASE_URL}/api/instructor/courses/${courseId}/lessons/import?teacherId=${DEFAULT_TEACHER_ID}`,
         {
           method: "POST",
@@ -2521,26 +2537,23 @@ function InstructorCourseManagementPage() {
     <InstructorLayout activePage="courses">
       <section className="instructor-hero instructor-course-hero">
         <div>
-          <p className="instructor-eyebrow">Quản lý khóa học</p>
-          <h2>Tổ chức danh mục giảng dạy</h2>
-          <p>
-            Quản lý khóa học, lớp mở, chương học và bài học nháp trong một
-            không gian thống nhất trước khi xuất bản cho học viên.
-          </p>
+          <p className="instructor-eyebrow">{t("coursesPage.eyebrow")}</p>
+          <h2>{t("coursesPage.title")}</h2>
+          <p>{t("coursesPage.description")}</p>
         </div>
         <div className="instructor-hero-actions">
           <button className="instructor-secondary-button" onClick={openImportLessonsForm} type="button">
             <span className="material-symbols-outlined">upload_file</span>
-            Nhập bài học
+            {t("coursesPage.importLessons")}
           </button>
           <button className="instructor-primary-button" type="button" onClick={() => setShowCreateForm(true)}>
             <span className="material-symbols-outlined">add</span>
-            Khóa học mới
+            {t("coursesPage.newCourse")}
           </button>
         </div>
       </section>
 
-      <section className="instructor-stat-grid" aria-label="Tổng quan khóa học">
+      <section className="instructor-stat-grid" aria-label={t("coursesPage.overviewLabel")}>
         {displayedStats.map((stat) => (
           <article className="instructor-stat-card" key={stat.label}>
             <div className={`instructor-stat-icon ${stat.tone}`}>
@@ -2558,8 +2571,8 @@ function InstructorCourseManagementPage() {
       <section className="instructor-panel instructor-course-workbench">
         <div className="instructor-panel-header">
           <div>
-            <p className="instructor-eyebrow">Danh mục</p>
-            <h3>Khóa học giảng dạy</h3>
+            <p className="instructor-eyebrow">{t("coursesPage.catalogEyebrow")}</p>
+            <h3>{t("coursesPage.teachingCourses")}</h3>
           </div>
           <div className="instructor-filter-tabs" aria-label="Bộ lọc khóa học">
             <button
@@ -2567,7 +2580,7 @@ function InstructorCourseManagementPage() {
               onClick={() => setCourseFilter("all")}
               type="button"
             >
-              Tất cả
+              {t("coursesPage.all")}
             </button>
             <button
               className={courseFilter === "published" ? "active" : ""}
@@ -2612,7 +2625,7 @@ function InstructorCourseManagementPage() {
                   <em>{course.status}</em>
                 </div>
                 <h4>{course.title}</h4>
-                <p>Khóa học cấp độ {course.level.toLowerCase()} với lộ trình rõ ràng.</p>
+                <p>{t("coursesPage.levelDescription", { level: course.level.toLowerCase() })}</p>
 
                 <div className="instructor-course-metrics">
                   <span>{course.students} học viên</span>
@@ -2627,7 +2640,7 @@ function InstructorCourseManagementPage() {
                 <div className="instructor-card-footer">
                   <strong>{course.completion}% hoàn thành</strong>
                   <button onClick={() => openCourseDetail(course)} type="button">
-                    Quản lý
+                    {t("coursesPage.manage")}
                   </button>
                 </div>
               </div>
@@ -2640,8 +2653,8 @@ function InstructorCourseManagementPage() {
         <article className="instructor-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Lớp học</p>
-              <h3>Các lớp đang mở</h3>
+              <p className="instructor-eyebrow">{t("coursesPage.classesEyebrow")}</p>
+              <h3>{t("coursesPage.openClasses")}</h3>
             </div>
             <span className="material-symbols-outlined">event</span>
           </div>
@@ -2665,8 +2678,8 @@ function InstructorCourseManagementPage() {
         <article className="instructor-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Xây dựng bài học</p>
-              <h3>Kế hoạch chương học</h3>
+              <p className="instructor-eyebrow">{t("coursesPage.lessonBuilderEyebrow")}</p>
+              <h3>{t("coursesPage.modulePlan")}</h3>
             </div>
             <span className="material-symbols-outlined">view_list</span>
           </div>
@@ -2851,7 +2864,7 @@ function InstructorCourseManagementPage() {
                       onClick={handleDeleteCourse}
                       type="button"
                     >
-                      {isDeletingCourse ? "Đang xóa..." : "Xóa khóa học"}
+                      {isDeletingCourse ? t("coursesPage.deleting") : t("coursesPage.deleteCourse")}
                     </button>
                     {courseWorkflowAction ? (
                       <button
@@ -2860,7 +2873,7 @@ function InstructorCourseManagementPage() {
                         onClick={requestCourseWorkflowAction}
                         type="button"
                       >
-                        {isUpdatingWorkflow ? "Đang xử lý..." : courseWorkflowAction.label}
+                        {isUpdatingWorkflow ? t("coursesPage.processing") : courseWorkflowAction.label}
                       </button>
                     ) : (
                       selectedCourseWorkflowStatus === "APPROVED" && (
@@ -2872,14 +2885,14 @@ function InstructorCourseManagementPage() {
                       onClick={handleUpdateCourse}
                       type="button"
                     >
-                      {isUpdatingCourse ? "Đang lưu..." : "Lưu thay đổi"}
+                      {isUpdatingCourse ? t("coursesPage.saving") : t("commonActions.saveChanges")}
                     </button>
                   </div>
                 </section>
               )}
 
               {isCourseDetailLoading && (
-                <p className="instructor-course-detail-loading">Đang tải dữ liệu chi tiết mới nhất...</p>
+                <p className="instructor-course-detail-loading">{t("coursesPage.loadingDetail")}</p>
               )}
 
               {courseDetailError && (
@@ -2977,7 +2990,7 @@ function InstructorCourseManagementPage() {
                   onClick={() => setCourseDetailTab("overview")}
                   type="button"
                 >
-                  Tổng quan
+                  {t("coursesPage.overviewTab")}
                 </button>
                 <button
                   className={courseDetailTab === "schedule" ? "active" : ""}
@@ -3029,7 +3042,7 @@ function InstructorCourseManagementPage() {
                         onClick={() => activeBatch && openRecurringScheduleForm(activeBatch)}
                         type="button"
                       >
-                        Tạo lịch định kỳ
+                        {t("coursesPage.createRecurringSchedule")}
                       </button>
                     </div>
                   </div>
@@ -3091,7 +3104,7 @@ function InstructorCourseManagementPage() {
                               onClick={() => openAttendanceModal(activeBatch.id, session.id)}
                               type="button"
                             >
-                              Điểm danh
+                              {t("coursesPage.attendanceEyebrow")}
                             </button>
                             <button
                               className="instructor-inline-action"
@@ -3120,7 +3133,7 @@ function InstructorCourseManagementPage() {
               {courseDetailTab === "quizzes" && (
                 <section className="instructor-course-detail-section">
                   <div className="instructor-course-detail-section-title">
-                    <h4>Quản lý quiz</h4>
+                    <h4>{t("coursesPage.quizManagement")}</h4>
                     <span>{selectedCourseDetail.quizzes.length} quiz</span>
                   </div>
 
@@ -3128,7 +3141,7 @@ function InstructorCourseManagementPage() {
                     <div className="instructor-course-curriculum-column">
                       <div className="instructor-course-detail-section-subtitle">
                         <span>Thiết lập quiz</span>
-                        <strong>{quizFormMode === "edit" ? "Chỉnh sửa quiz" : "Tạo quiz cho lớp"}</strong>
+                        <strong>{quizFormMode === "edit" ? t("coursesPage.editQuiz") : t("coursesPage.createClassQuiz")}</strong>
                       </div>
 
                       <form className="instructor-inline-form" onSubmit={(event) => {
@@ -3249,15 +3262,15 @@ function InstructorCourseManagementPage() {
                         <div className="instructor-create-course-actions">
                           {quizFormMode === "edit" && (
                             <button type="button" onClick={() => resetQuizForm()}>
-                              Hủy sửa
+                              {t("coursesPage.cancelEdit")}
                             </button>
                           )}
                           <button disabled={isSavingQuiz || selectedCourseDetail.batches.length === 0} type="submit">
                             {isSavingQuiz
-                              ? "Đang lưu..."
+                              ? t("coursesPage.saving")
                               : quizFormMode === "edit"
-                                ? "Lưu quiz"
-                                : "Tạo quiz"}
+                                ? t("coursesPage.saveQuiz")
+                                : t("coursesPage.createQuiz")}
                           </button>
                         </div>
                       </form>
@@ -3265,7 +3278,7 @@ function InstructorCourseManagementPage() {
 
                     <div className="instructor-course-curriculum-column">
                       <div className="instructor-course-detail-section-subtitle">
-                        <span>Danh sách quiz</span>
+                        <span>{t("coursesPage.quizList")}</span>
                         <strong>Quiz đã tạo trong khóa học</strong>
                       </div>
 
@@ -3526,14 +3539,14 @@ function InstructorCourseManagementPage() {
                         <div className="instructor-create-course-actions">
                           {quizQuestionFormMode === "edit" && (
                             <button type="button" onClick={resetQuizQuestionForm}>
-                              Hủy sửa
+                              {t("coursesPage.cancelEdit")}
                             </button>
                           )}
                           <button disabled={isSavingQuizQuestion || !selectedQuiz} type="submit">
                             {isSavingQuizQuestion
-                              ? "Đang lưu..."
+                              ? t("coursesPage.saving")
                               : quizQuestionFormMode === "edit"
-                                ? "Lưu câu hỏi"
+                                ? t("coursesPage.saveQuestion")
                                 : "Thêm câu hỏi"}
                           </button>
                         </div>
@@ -3629,7 +3642,7 @@ function InstructorCourseManagementPage() {
                                 />
                               </label>
                               <button disabled={isSavingQuizAttemptGrade} type="submit">
-                                {isSavingQuizAttemptGrade ? "Đang lưu..." : "Lưu điểm"}
+                                {isSavingQuizAttemptGrade ? t("coursesPage.saving") : t("commonActions.saveGrade")}
                               </button>
                             </form>
                           </>
@@ -3651,7 +3664,7 @@ function InstructorCourseManagementPage() {
                       src={getCourseThumbnail(selectedCourseDetail, 0)}
                     />
                     <div className="instructor-course-preview-summary">
-                      <p className="instructor-eyebrow">Xem trước khóa học</p>
+                      <p className="instructor-eyebrow">{t("coursesPage.previewEyebrow")}</p>
                       <h4>{selectedCourseDetail.title}</h4>
                       <p>{selectedCourseDetail.description}</p>
                       <div className="instructor-course-preview-pills">
@@ -3669,21 +3682,21 @@ function InstructorCourseManagementPage() {
                   <div className="instructor-course-preview-grid">
                     <article className="instructor-course-preview-panel">
                       <div className="instructor-course-detail-section-subtitle">
-                        <span>Thông tin chính</span>
+                        <span>{t("coursesPage.mainInfo")}</span>
                         <strong>Tóm tắt hiển thị cho học viên</strong>
                       </div>
                       <div className="instructor-course-preview-stats">
                         <div>
                           <strong>{selectedCourseDetail.price}</strong>
-                          <span>Học phí</span>
+                          <span>{t("coursesPage.tuition")}</span>
                         </div>
                         <div>
                           <strong>{selectedCourseDetail.duration}</strong>
-                          <span>Tổng thời lượng</span>
+                          <span>{t("coursesPage.totalDuration")}</span>
                         </div>
                         <div>
                           <strong>{selectedCourseDetail.rating > 0 ? `${selectedCourseDetail.rating}/5` : "Chưa có"}</strong>
-                          <span>Đánh giá</span>
+                          <span>{t("coursesPage.rating")}</span>
                         </div>
                       </div>
                     </article>
@@ -3729,7 +3742,7 @@ function InstructorCourseManagementPage() {
                                   <span>{String(lessonIndex + 1).padStart(2, "0")}</span>
                                   <strong>{lesson.title}</strong>
                                   <em>{lesson.duration}</em>
-                                  {lesson.isPreview && <b>Xem thử</b>}
+                                  {lesson.isPreview && <b>{t("coursesPage.preview")}</b>}
                                 </p>
                               ))
                             )}
@@ -3754,7 +3767,7 @@ function InstructorCourseManagementPage() {
                   <div className="instructor-course-curriculum-grid">
                     <div className="instructor-course-curriculum-column">
                       <div className="instructor-course-detail-section-subtitle">
-                        <span>Danh sách chương</span>
+                        <span>{t("coursesPage.moduleList")}</span>
                         <strong>{moduleFormMode === "edit" ? "Chỉnh sửa chương" : "Thêm chương mới"}</strong>
                       </div>
 
@@ -3790,14 +3803,14 @@ function InstructorCourseManagementPage() {
                         <div className="instructor-create-course-actions">
                           {moduleFormMode === "edit" && (
                             <button type="button" onClick={cancelModuleEdit}>
-                              Hủy sửa
+                              {t("coursesPage.cancelEdit")}
                             </button>
                           )}
                           <button disabled={isCreatingModule} type="submit">
                             {isCreatingModule
-                              ? "Đang lưu..."
+                              ? t("coursesPage.saving")
                               : moduleFormMode === "edit"
-                                ? "Lưu chương"
+                                ? t("coursesPage.saveModule")
                                 : "Thêm chương"}
                           </button>
                         </div>
@@ -3972,14 +3985,14 @@ function InstructorCourseManagementPage() {
                         <div className="instructor-create-course-actions">
                           {lessonFormMode === "edit" && (
                             <button type="button" onClick={cancelLessonEdit}>
-                              Hủy sửa
+                              {t("coursesPage.cancelEdit")}
                             </button>
                           )}
                           <button disabled={isCreatingLesson} type="submit">
                             {isCreatingLesson
-                              ? "Đang lưu..."
+                              ? t("coursesPage.saving")
                               : lessonFormMode === "edit"
-                                ? "Lưu bài học"
+                                ? t("coursesPage.saveLesson")
                                 : "Thêm bài học"}
                           </button>
                         </div>
@@ -4051,7 +4064,7 @@ function InstructorCourseManagementPage() {
 
               <section className="instructor-course-detail-section">
                 <div className="instructor-course-detail-section-title">
-                  <h4>Đánh giá gần đây</h4>
+                  <h4>{t("coursesPage.recentReviews")}</h4>
                   <span>{selectedCourseDetail.reviews.length} nhận xét</span>
                 </div>
                 <div className="instructor-course-review-grid">
@@ -4102,7 +4115,7 @@ function InstructorCourseManagementPage() {
                         >
                           {reviewReplyError && <p className="instructor-course-detail-error">{reviewReplyError}</p>}
                           <label className="instructor-create-course-field">
-                            <span>Phản hồi của giảng viên</span>
+                            <span>{t("coursesPage.teacherResponse")}</span>
                             <textarea
                               rows={4}
                               value={reviewReplyText}
@@ -4112,7 +4125,7 @@ function InstructorCourseManagementPage() {
                           </label>
                           <div className="instructor-create-course-actions">
                             <button disabled={isSavingReviewReply} type="submit">
-                              {isSavingReviewReply ? "Đang lưu..." : "Lưu phản hồi"}
+                              {isSavingReviewReply ? t("coursesPage.saving") : t("coursesPage.saveReply")}
                             </button>
                           </div>
                         </form>
@@ -4141,7 +4154,7 @@ function InstructorCourseManagementPage() {
             }}>
               <div className="instructor-create-course-header">
                 <div>
-                  <p className="instructor-eyebrow">Tạo khóa học</p>
+                  <p className="instructor-eyebrow">{t("coursesPage.createCourseEyebrow")}</p>
                   <p>Điền thông tin cơ bản để tạo bản nháp nhanh.</p>
                 
                 </div>
@@ -4251,10 +4264,10 @@ function InstructorCourseManagementPage() {
 
               <div className="instructor-create-course-actions">
                 <button type="button" onClick={closeCreateForm}>
-                  Hủy
+                  {t("commonActions.cancel")}
                 </button>
                 <button disabled={isCreating} type="submit">
-                  {isCreating ? "Đang tạo..." : "Tạo khóa học"}
+                  {isCreating ? t("coursesPage.creating") : t("coursesPage.createCourse")}
                 </button>
               </div>
             </form>
@@ -4280,8 +4293,8 @@ function InstructorCourseManagementPage() {
             >
               <div className="instructor-create-course-header">
                 <div>
-                  <p className="instructor-eyebrow">Nhập bài học</p>
-                  <h3>Nhập nhanh nhiều bài học</h3>
+                  <p className="instructor-eyebrow">{t("coursesPage.importLessonsEyebrow")}</p>
+                  <h3>{t("coursesPage.quickImportLessons")}</h3>
           
                 </div>
                 <button
@@ -4298,7 +4311,7 @@ function InstructorCourseManagementPage() {
 
               <div className="instructor-create-course-grid">
                 <label className="instructor-create-course-field">
-                  <span>Khóa học</span>
+                  <span>{t("coursesPage.course")}</span>
                   <select
                     value={importLessonCourseId}
                     onChange={(event) => {
@@ -4325,7 +4338,7 @@ function InstructorCourseManagementPage() {
                     }
                   >
                     <option value="">
-                      {isImportCourseLoading ? "Đang tải..." : "Chọn chương"}
+                      {isImportCourseLoading ? t("commonActions.loading") : t("coursesPage.selectModule")}
                     </option>
                     {importTargetModules.map((module) => (
                       <option key={module.id} value={module.id}>
@@ -4436,10 +4449,10 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
 
               <div className="instructor-create-course-actions">
                 <button type="button" onClick={closeImportLessonsForm}>
-                  Hủy
+                  {t("commonActions.cancel")}
                 </button>
                 <button disabled={isImportingLessons || isImportCourseLoading} type="submit">
-                  {isImportingLessons ? "Đang nhập..." : "Nhập bài học"}
+                  {isImportingLessons ? t("coursesPage.importing") : t("coursesPage.importLessons")}
                 </button>
               </div>
             </form>
@@ -4466,7 +4479,7 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
               <div className="instructor-create-course-header">
                 <div>
                   <p>Chuẩn bị lớp để hệ thống tự xếp học viên sau khi mua khóa.</p>
-                  <h3>{batchFormMode === "edit" ? "Chỉnh sửa lớp" : "Mở lớp học"}</h3>
+                  <h3>{batchFormMode === "edit" ? t("coursesPage.editClass") : t("coursesPage.openClass")}</h3>
                   <p>Thiết lập lịch học, sĩ số, link/phòng học và trạng thái nhận học viên.</p>
                 </div>
                 <button
@@ -4651,10 +4664,10 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
 
               <div className="instructor-create-course-actions">
                 <button type="button" onClick={closeBatchForm}>
-                  Hủy
+                  {t("commonActions.cancel")}
                 </button>
                 <button disabled={isSavingBatch} type="submit">
-                  {isSavingBatch ? "Đang lưu..." : batchFormMode === "edit" ? "Lưu lớp học" : "Mở lớp học"}
+                  {isSavingBatch ? t("coursesPage.saving") : batchFormMode === "edit" ? t("coursesPage.saveClass") : t("coursesPage.openClass")}
                 </button>
               </div>
             </form>
@@ -4680,8 +4693,8 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
             >
               <div className="instructor-create-course-header">
                 <div>
-                  <p className="instructor-eyebrow">Lịch định kỳ</p>
-                  <h3>Tạo lịch học cho lớp</h3>
+                  <p className="instructor-eyebrow">{t("coursesPage.scheduleEyebrow")}</p>
+                  <h3>{t("coursesPage.createSchedule")}</h3>
                   <p>Chọn các ngày học trong tuần, hệ thống sẽ tự sinh buổi học từ ngày bắt đầu đến ngày kết thúc lớp.</p>
                 </div>
                 <button
@@ -4805,10 +4818,10 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
 
               <div className="instructor-create-course-actions">
                 <button type="button" onClick={closeRecurringScheduleForm}>
-                  Hủy
+                  {t("commonActions.cancel")}
                 </button>
                 <button disabled={isGeneratingSchedule} type="submit">
-                  {isGeneratingSchedule ? "Đang tạo..." : "Tạo lịch định kỳ"}
+                  {isGeneratingSchedule ? t("coursesPage.creatingSchedule") : t("coursesPage.createRecurringSchedule")}
                 </button>
               </div>
             </form>
@@ -4835,7 +4848,7 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
               <div className="instructor-create-course-header">
                 <div>
                   <p>Thêm lịch dạy, link họp và trạng thái của từng buổi trong lớp.</p>
-                  <h3>{sessionFormMode === "edit" ? "Chỉnh sửa buổi học" : "Tạo buổi học mới"}</h3>
+                  <h3>{sessionFormMode === "edit" ? t("coursesPage.editSession") : t("coursesPage.newSession")}</h3>
                   <p>Thêm lịch dạy, link họp và trạng thái của từng buổi trong lớp.</p>
                 </div>
                 <button
@@ -4967,14 +4980,14 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
 
               <div className="instructor-create-course-actions">
                 <button type="button" onClick={closeSessionForm}>
-                  Hủy
+                  {t("commonActions.cancel")}
                 </button>
                 <button disabled={isSavingSession} type="submit">
                   {isSavingSession
-                    ? "Đang lưu..."
+                    ? t("coursesPage.saving")
                     : sessionFormMode === "edit"
-                      ? "Lưu buổi học"
-                      : "Tạo buổi học"}
+                      ? t("coursesPage.saveSession")
+                      : t("coursesPage.newSession")}
                 </button>
               </div>
             </form>
@@ -4999,12 +5012,12 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
           >
             <div className="instructor-create-course-header">
               <div>
-                <p className="instructor-eyebrow">Điểm danh</p>
-                <h3>{attendanceData?.session.title ?? "Buổi học"}</h3>
+                <p className="instructor-eyebrow">{t("coursesPage.attendanceEyebrow")}</p>
+                <h3>{attendanceData?.session.title ?? t("coursesPage.sessionFallback")}</h3>
                 <p>
                   {attendanceData
                     ? `${attendanceData.session.courseTitle} - ${attendanceData.session.batchCode}`
-                    : "Đang tải danh sách học viên..."}
+                    : t("coursesPage.loadingStudents")}
                 </p>
               </div>
               <button
@@ -5021,14 +5034,14 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
             {attendanceError && <p className="instructor-course-detail-error">{attendanceError}</p>}
 
             {isAttendanceLoading ? (
-              <p className="instructor-empty-state">Đang tải danh sách điểm danh...</p>
+              <p className="instructor-empty-state">{t("coursesPage.loadingAttendance")}</p>
             ) : !attendanceData ? (
               <p className="instructor-empty-state">Chưa có dữ liệu điểm danh.</p>
             ) : (
               <>
                 <div className="instructor-attendance-summary">
                   <article>
-                    <span>Tổng</span>
+                    <span>{t("coursesPage.total")}</span>
                     <strong>{attendanceData.summary.total}</strong>
                   </article>
                   <article>
@@ -5095,14 +5108,14 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
 
                 <div className="instructor-create-course-actions">
                   <button disabled={isSavingAttendance} onClick={() => setAttendanceTarget(null)} type="button">
-                    Hủy
+                    {t("commonActions.cancel")}
                   </button>
                   <button
                     disabled={isSavingAttendance || attendanceData.students.length === 0}
                     onClick={handleSaveAttendance}
                     type="button"
                   >
-                    {isSavingAttendance ? "Đang lưu..." : "Lưu điểm danh"}
+                    {isSavingAttendance ? t("coursesPage.saving") : t("coursesPage.saveAttendance")}
                   </button>
                 </div>
               </>
@@ -5139,7 +5152,7 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
                 onClick={() => setConfirmDialog(null)}
                 type="button"
               >
-                Hủy
+                {t("commonActions.cancel")}
               </button>
               <button
                 disabled={isConfirming}
@@ -5154,7 +5167,7 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
                 }}
                 type="button"
               >
-                {isConfirming ? "Đang xử lý..." : confirmDialog.confirmLabel}
+                {isConfirming ? t("coursesPage.processing") : confirmDialog.confirmLabel}
               </button>
             </div>
           </aside>

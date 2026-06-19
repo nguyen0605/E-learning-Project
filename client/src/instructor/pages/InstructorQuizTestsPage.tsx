@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { instructorApiRequest } from "../api/instructorApi";
 import { getInstructorAuthTeacherId } from "../auth/instructorAuth";
@@ -98,6 +99,7 @@ function getQuizFilterStatus(status: string) {
 }
 
 function InstructorQuizTestsPage() {
+  const { t } = useTranslation("instructor");
   const navigate = useNavigate();
   const [pageData, setPageData] =
     useState<InstructorQuizzesApiResponse["data"] | null>(null);
@@ -256,7 +258,7 @@ function InstructorQuizTestsPage() {
 
   async function handleDeleteAssignment(assignmentId = editingAssignmentId) {
     if (assignmentId == null) return;
-    const confirmed = window.confirm("Xóa bài tập này? Bài nộp liên quan sẽ bị xóa theo.");
+    const confirmed = window.confirm(t("quizzesPage.deleteAssignmentConfirm"));
     if (!confirmed) return;
 
     setIsDeletingAssignment(true);
@@ -459,8 +461,8 @@ function InstructorQuizTestsPage() {
     <InstructorLayout activePage="quizzes">
       <section className="instructor-hero instructor-quiz-hero">
         <div>
-          <p className="instructor-eyebrow">Bài kiểm tra</p>
-          <h2>Thiết kế đánh giá rõ ràng</h2>
+          <p className="instructor-eyebrow">{t("quizzesPage.eyebrow")}</p>
+          <h2>{t("quizzesPage.title")}</h2>
           <p>
             Tạo bài kiểm tra, quản lý ngân hàng câu hỏi, theo dõi tỷ lệ đạt và
             kiểm soát bài cần chấm trước khi ảnh hưởng đến tiến độ học viên.
@@ -481,12 +483,12 @@ function InstructorQuizTestsPage() {
             type="button"
           >
             <span className="material-symbols-outlined">add</span>
-            Bài kiểm tra mới
+            {t("quizzesPage.newTest")}
           </button>
         </div>
       </section>
 
-      <section className="instructor-stat-grid" aria-label="Tổng quan bài kiểm tra">
+      <section className="instructor-stat-grid" aria-label={t("quizzesPage.statsLabel")}>
         {displayedStats.map((stat) => (
           <article className="instructor-stat-card" key={stat.label}>
             <div className={`instructor-stat-icon ${stat.tone}`}>
@@ -505,8 +507,8 @@ function InstructorQuizTestsPage() {
         <article className="instructor-panel instructor-quiz-list-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Đánh giá</p>
-              <h3>Bài kiểm tra đang dùng</h3>
+              <p className="instructor-eyebrow">{t("quizzesPage.assessmentEyebrow")}</p>
+              <h3>{t("quizzesPage.activeTests")}</h3>
             </div>
             <div className="instructor-filter-tabs" aria-label="Bộ lọc bài kiểm tra">
               <button
@@ -514,7 +516,7 @@ function InstructorQuizTestsPage() {
                 onClick={() => setQuizFilter("all")}
                 type="button"
               >
-                Tất cả
+                {t("quizzesPage.all")}
               </button>
               <button
                 className={quizFilter === "published" ? "active" : ""}
@@ -567,8 +569,8 @@ function InstructorQuizTestsPage() {
         <aside className="instructor-panel instructor-grading-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Chấm thủ công</p>
-              <h3>Hàng đợi chấm bài</h3>
+              <p className="instructor-eyebrow">{t("quizzesPage.manualGradingEyebrow")}</p>
+              <h3>{t("quizzesPage.gradingQueue")}</h3>
             </div>
             <span className="material-symbols-outlined">rate_review</span>
           </div>
@@ -591,11 +593,11 @@ function InstructorQuizTestsPage() {
       <section className="instructor-panel instructor-assignment-panel">
         <div className="instructor-panel-header">
           <div>
-            <p className="instructor-eyebrow">Bài tập</p>
-            <h3>Bài nộp cần xử lý</h3>
+            <p className="instructor-eyebrow">{t("quizzesPage.assignmentEyebrow")}</p>
+            <h3>{t("quizzesPage.pendingSubmissions")}</h3>
           </div>
           <button className="instructor-ghost-button" onClick={() => openAssignmentForm()} type="button">
-            Bài tập mới
+            {t("quizzesPage.newAssignment")}
           </button>
         </div>
 
@@ -614,7 +616,7 @@ function InstructorQuizTestsPage() {
             value={assignmentBatchFilter}
             onChange={(event) => setAssignmentBatchFilter(event.target.value)}
           >
-            <option value="all">Tất cả lớp</option>
+            <option value="all">{t("quizzesPage.allClasses")}</option>
             {displayedBatchOptions.map((batch) => (
               <option key={batch.id} value={batch.batchCode}>
                 {batch.batchCode}
@@ -628,7 +630,7 @@ function InstructorQuizTestsPage() {
               onClick={() => setAssignmentSubmissionFilter("all")}
               type="button"
             >
-              Tất cả
+              {t("quizzesPage.all")}
             </button>
             <button
               className={assignmentSubmissionFilter === "pending" ? "active" : ""}
@@ -649,11 +651,11 @@ function InstructorQuizTestsPage() {
 
         <div className="instructor-assignment-summary">
           <article>
-            <span>Bài tập</span>
+            <span>{t("quizzesPage.assignment")}</span>
             <strong>{assignmentStats.totalAssignments}</strong>
           </article>
           <article>
-            <span>Bài nộp</span>
+            <span>{t("quizzesPage.submissions")}</span>
             <strong>{assignmentStats.totalSubmissions}</strong>
           </article>
           <article>
@@ -754,7 +756,7 @@ function InstructorQuizTestsPage() {
 
                 <div className="instructor-submission-content">
                   <span>Nội dung nộp</span>
-                  <p>{selectedSubmission.content || "Học viên chưa nhập nội dung."}</p>
+                  <p>{selectedSubmission.content || t("quizzesPage.emptySubmission")}</p>
                   {selectedSubmission.fileUrl && (
                     <a href={selectedSubmission.fileUrl} rel="noreferrer" target="_blank">
                       Mở tệp đính kèm
@@ -791,7 +793,7 @@ function InstructorQuizTestsPage() {
                     />
                   </label>
                   <button disabled={isSavingAssignmentGrade} type="submit">
-                    {isSavingAssignmentGrade ? "Đang lưu..." : "Lưu điểm"}
+                    {isSavingAssignmentGrade ? t("quizzesPage.saving") : t("quizzesPage.saveGrade")}
                   </button>
                 </form>
               </>
@@ -803,10 +805,10 @@ function InstructorQuizTestsPage() {
       <section className="instructor-panel instructor-question-bank-panel">
         <div className="instructor-panel-header">
           <div>
-            <p className="instructor-eyebrow">Ngân hàng câu hỏi</p>
-            <h3>Bộ câu hỏi tái sử dụng</h3>
+            <p className="instructor-eyebrow">{t("quizzesPage.questionBankEyebrow")}</p>
+            <h3>{t("quizzesPage.reusableQuestions")}</h3>
           </div>
-          <button className="instructor-ghost-button" type="button">Quản lý ngân hàng</button>
+          <button className="instructor-ghost-button" type="button">{t("quizzesPage.manageBank")}</button>
         </div>
         <div className="instructor-question-grid">
           {displayedQuestionBank.map((bank) => (
@@ -841,8 +843,8 @@ function InstructorQuizTestsPage() {
             >
               <div className="instructor-create-course-header">
                 <div>
-                  <p className="instructor-eyebrow">Bài tập</p>
-                  <h3>{editingAssignmentId ? "Sửa bài tập" : "Tạo bài tập mới"}</h3>
+                  <p className="instructor-eyebrow">{t("quizzesPage.assignmentEyebrow")}</p>
+                  <h3>{editingAssignmentId ? t("quizzesPage.editAssignment") : t("quizzesPage.createAssignment")}</h3>
                   <p>Giao bài cho một lớp, đặt hạn nộp và điểm tối đa để chấm bài nộp của học viên.</p>
                 </div>
                 <button
@@ -928,7 +930,7 @@ function InstructorQuizTestsPage() {
 
               <div className="instructor-create-course-actions">
                 <button type="button" onClick={closeAssignmentForm}>
-                  Hủy
+                  {t("quizzesPage.cancel")}
                 </button>
                 {editingAssignmentId && (
                   <button disabled={isDeletingAssignment} type="button" onClick={() => handleDeleteAssignment(editingAssignmentId)}>
@@ -938,11 +940,11 @@ function InstructorQuizTestsPage() {
                 <button disabled={isCreatingAssignment || displayedBatchOptions.length === 0} type="submit">
                   {isCreatingAssignment
                     ? editingAssignmentId
-                      ? "Đang lưu..."
-                      : "Đang tạo..."
+                      ? t("quizzesPage.saving")
+                      : t("quizzesPage.creating")
                     : editingAssignmentId
-                      ? "Lưu thay đổi"
-                      : "Tạo bài tập"}
+                      ? t("quizzesPage.saveChanges")
+                      : t("quizzesPage.createAssignment")}
                 </button>
               </div>
             </form>

@@ -1,15 +1,18 @@
 import { useTranslation } from "react-i18next";
 import logo from "../../assets/logo-learnX.png";
 import type { AuthUser } from "../../auth/auth.types";
-import { normalizeLanguage } from "../../i18n/locale";
+import LanguageSwitcher from "../../shared/components/language/LanguageSwitcher";
 import type { StudentView } from "../types/student.types";
 import { resolveMediaUrl } from "../utils/mediaUrl";
 import Icon from "./Icon";
 import NotificationBell from "../../shared/components/notifications/NotificationBell";
+import type { AppNotification } from "../../shared/services/notificationApi";
 
 type StudentHeaderProps = {
   activeView: StudentView;
+  isGuest?: boolean;
   onNavigate: (view: StudentView) => void;
+  onOpenNotification?: (notification: AppNotification) => void;
   onOpenAccountDrawer: () => void;
   user: AuthUser | null;
 };
@@ -23,12 +26,13 @@ const navItems: Array<{ labelKey: string; view: StudentView }> = [
 
 function StudentHeader({
   activeView,
+  isGuest = false,
   onNavigate,
+  onOpenNotification,
   onOpenAccountDrawer,
   user,
 }: StudentHeaderProps) {
-  const { t, i18n } = useTranslation(["student", "common"]);
-  const currentLanguage = normalizeLanguage(i18n.resolvedLanguage);
+  const { t } = useTranslation("student");
 
   return (
     <header className="sp-header">
@@ -74,33 +78,38 @@ function StudentHeader({
           <input placeholder={t("header.searchPlaceholder")} />
         </label>
 
-        <label className="sp-language-select">
-          <Icon name="language" />
-          <select
-            aria-label={t("language.label", { ns: "common" })}
-            value={currentLanguage}
-            onChange={(event) => void i18n.changeLanguage(event.target.value)}
-          >
-            <option value="vi">{t("language.vi", { ns: "common" })}</option>
-            <option value="en">{t("language.en", { ns: "common" })}</option>
-          </select>
-        </label>
+        <LanguageSwitcher className="sp-language-select" />
 
-        <NotificationBell
-          className="student-notification-bell"
-          icon={<Icon name="notifications" />}
-          onOpenNotification={(notification) => {
-            if (notification.type.includes("EXAM")) {
-              onNavigate("exam");
-            } else if (notification.type.includes("ASSIGNMENT")) {
-              onNavigate("myCourses");
-            } else if (notification.type.includes("PAYMENT")) {
-              onNavigate("accountPaymentHistory");
-            } else if (notification.type.includes("COURSE")) {
-              onNavigate("myCourses");
-            }
-          }}
-        />
+        {isGuest ? (
+          <button
+            aria-label="Đăng nhập để xem thông báo"
+            onClick={() => onNavigate("interaction")}
+            type="button"
+          >
+            <Icon name="notifications" />
+          </button>
+        ) : (
+          <NotificationBell
+            className="student-notification-bell"
+            icon={<Icon name="notifications" />}
+            onOpenNotification={(notification) => {
+              if (notification.targetUrl) {
+                onOpenNotification?.(notification);
+                return;
+              }
+
+              if (notification.type.includes("EXAM")) {
+                onNavigate("exam");
+              } else if (notification.type.includes("ASSIGNMENT")) {
+                onNavigate("myCourses");
+              } else if (notification.type.includes("PAYMENT")) {
+                onNavigate("accountPaymentHistory");
+              } else if (notification.type.includes("COURSE")) {
+                onNavigate("myCourses");
+              }
+            }}
+          />
+        )}
         <button
           type="button"
           aria-label={t("header.cart")}
@@ -114,13 +123,17 @@ function StudentHeader({
           aria-label={t("header.account")}
           onClick={onOpenAccountDrawer}
         >
-          <img
-            src={
-              resolveMediaUrl(user?.avatarUrl) ??
-              `https://api.dicebear.com/9.x/personas/svg?seed=${user?.email ?? "Scholar"}`
-            }
-            alt=""
-          />
+          {isGuest ? (
+            <Icon name="account_circle" />
+          ) : (
+            <img
+              src={
+                resolveMediaUrl(user?.avatarUrl) ??
+                `https://api.dicebear.com/9.x/personas/svg?seed=${user?.email ?? "Scholar"}`
+              }
+              alt=""
+            />
+          )}
         </button>
       </div>
     </header>

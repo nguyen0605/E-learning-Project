@@ -28,6 +28,10 @@ import {
   type AdminPage,
 } from "../admin/adminNavigation";
 import AdminLoginPage from "../admin/pages/AdminLoginPage";
+import GuestCatalogPage from "../guest/pages/GuestCatalogPage";
+import GuestCategoriesPage from "../guest/pages/GuestCategoriesPage";
+import GuestHomePage from "../guest/pages/GuestHomePage";
+import GuestInstructorPage from "../guest/pages/GuestInstructorPage";
 import StudentLoginPage from "../student/pages/StudentLoginPage";
 import StudentPortalPage from "../student/pages/StudentPortalPage";
 import StudentRegisterPage from "../student/pages/StudentRegisterPage";
@@ -132,11 +136,18 @@ function AdminRoutes() {
 function AppRouter() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/student" replace />} />
+      <Route path="/" element={<GuestHomePage />} />
+      <Route path="/courses" element={<GuestCatalogPage />} />
+      <Route path="/courses/:courseId" element={<GuestCatalogPage />} />
+      <Route path="/categories" element={<GuestCategoriesPage />} />
+      <Route
+        path="/instructors/:teacherId"
+        element={<GuestInstructorPage />}
+      />
       {StudentRoutes()}
       {InstructorRoutes()}
       {AdminRoutes()}
-      <Route path="*" element={<Navigate to="/student" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

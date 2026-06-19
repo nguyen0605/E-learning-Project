@@ -1,3 +1,5 @@
+import { getInstructorAuthToken } from "../auth/instructorAuth";
+
 export const INSTRUCTOR_API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 type QueryValue = string | number | boolean | null | undefined;
@@ -53,4 +55,3 @@ export async function instructorApiRequest<T>(
 
   return payload as T;
 }
-import { getInstructorAuthToken } from "../auth/instructorAuth";

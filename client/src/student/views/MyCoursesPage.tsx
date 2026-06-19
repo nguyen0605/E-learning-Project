@@ -6,6 +6,7 @@ import { getMyCourses } from "../services/studentCoursesApi";
 import type { StudentEnrolledCourse } from "../types/course.types";
 
 type MyCoursesPageProps = {
+  onReviewCourse: (courseId: number) => void;
   onStartLearning: (courseId: number) => void;
 };
 
@@ -20,7 +21,10 @@ function formatDate(value: string, language: string | undefined) {
   return new Intl.DateTimeFormat(getIntlLocale(language)).format(new Date(value));
 }
 
-function MyCoursesPage({ onStartLearning }: MyCoursesPageProps) {
+function MyCoursesPage({
+  onReviewCourse,
+  onStartLearning,
+}: MyCoursesPageProps) {
   const { t, i18n } = useTranslation("student");
   const language = i18n.resolvedLanguage;
   const [courses, setCourses] = useState<StudentEnrolledCourse[]>([]);
@@ -119,14 +123,32 @@ function MyCoursesPage({ onStartLearning }: MyCoursesPageProps) {
                   {item.enrollment.status}
                 </small>
               </div>
-              <button
-                disabled={!canStudy}
-                onClick={() => onStartLearning(item.course.id)}
-                type="button"
-              >
-                <Icon name={canStudy ? "play_circle" : "hourglass_top"} />
-                {canStudy ? t("myCourses.start") : t("myCourses.waiting")}
-              </button>
+              <div className="sp-my-course-actions">
+                <button
+                  disabled={!canStudy}
+                  onClick={() => onStartLearning(item.course.id)}
+                  type="button"
+                >
+                  <Icon name={canStudy ? "play_circle" : "hourglass_top"} />
+                  {canStudy ? t("myCourses.start") : t("myCourses.waiting")}
+                </button>
+                <button
+                  className="secondary"
+                  disabled={!canStudy || progressPercent < 30}
+                  onClick={() => onReviewCourse(item.course.id)}
+                  title={
+                    progressPercent < 30
+                      ? t("myCourses.reviewLockedTitle")
+                      : t("myCourses.reviewTitle")
+                  }
+                  type="button"
+                >
+                  <Icon name="rate_review" />
+                  {progressPercent < 30
+                    ? t("myCourses.reviewAtProgress")
+                    : t("myCourses.review")}
+                </button>
+              </div>
             </article>
           );
         })}

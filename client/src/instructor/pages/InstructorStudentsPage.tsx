@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { instructorApiRequest } from "../api/instructorApi";
 import { getInstructorAuthTeacherId } from "../auth/instructorAuth";
@@ -51,11 +52,12 @@ function csvCell(value: string | number) {
 }
 
 function InstructorStudentsPage() {
+  const { t } = useTranslation("instructor");
   const location = useLocation();
   const navigate = useNavigate();
   const [pageData, setPageData] =
     useState<InstructorStudentsApiResponse["data"] | null>(null);
-  const [selectedCohort, setSelectedCohort] = useState("Tất cả lớp");
+  const [selectedCohort, setSelectedCohort] = useState("ALL");
   const [selectedStudent, setSelectedStudent] = useState<InstructorStudent | null>(null);
   const [interventionNote, setInterventionNote] = useState("");
   const [interventionNextAction, setInterventionNextAction] = useState("");
@@ -140,7 +142,7 @@ function InstructorStudentsPage() {
   }, [displayedStudents, location.pathname, location.search, navigate]);
 
   const filteredStudents = displayedStudents.filter((student) => {
-    if (selectedCohort === "Tất cả lớp" || selectedCohort === "Táº¥t cáº£ lá»›p") {
+    if (selectedCohort === "ALL") {
       return true;
     }
 
@@ -191,7 +193,7 @@ function InstructorStudentsPage() {
     const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    const cohortSlug = selectedCohort === "Tất cả lớp" ? "tat-ca-lop" : selectedCohort.replaceAll(/\s+/g, "-");
+    const cohortSlug = selectedCohort === "ALL" ? "tat-ca-lop" : selectedCohort.replaceAll(/\s+/g, "-");
 
     link.href = url;
     link.download = `danh-sach-hoc-vien-${cohortSlug}-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -203,7 +205,7 @@ function InstructorStudentsPage() {
   function handleOpenClassMessage() {
     const params = new URLSearchParams();
     params.set("compose", "message");
-    if (selectedCohort && selectedCohort !== "Tất cả lớp") {
+    if (selectedCohort && selectedCohort !== "ALL") {
       params.set("cohort", selectedCohort);
     }
 
@@ -268,8 +270,8 @@ function InstructorStudentsPage() {
     <InstructorLayout activePage="students">
       <section className="instructor-hero instructor-students-hero">
         <div>
-          <p className="instructor-eyebrow">Quản lý học viên</p>
-          <h2>Theo sát từng học viên</h2>
+          <p className="instructor-eyebrow">{t("studentsPage.eyebrow")}</p>
+          <h2>{t("studentsPage.title")}</h2>
           <p>
             Theo dõi tiến độ, chuyên cần, lớp học và các tín hiệu cần hỗ trợ
             trước khi vấn đề nhỏ ảnh hưởng đến kết quả học tập.
@@ -287,7 +289,7 @@ function InstructorStudentsPage() {
         </div>
       </section>
 
-      <section className="instructor-stat-grid" aria-label="Tổng quan học viên">
+      <section className="instructor-stat-grid" aria-label={t("studentsPage.statsLabel")}>
         {displayedStats.map((stat) => (
           <article className="instructor-stat-card" key={stat.label}>
             <div className={`instructor-stat-icon ${stat.tone}`}>
@@ -306,8 +308,8 @@ function InstructorStudentsPage() {
         <article className="instructor-panel instructor-students-table-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Danh sách</p>
-              <h3>Học viên đang học</h3>
+              <p className="instructor-eyebrow">{t("studentsPage.listEyebrow")}</p>
+              <h3>{t("studentsPage.activeStudents")}</h3>
             </div>
             <div
               className="instructor-filter-tabs instructor-cohort-tabs"
@@ -317,15 +319,15 @@ function InstructorStudentsPage() {
                 <button
                   className={
                     selectedCohort === filter ||
-                    (index === 0 && selectedCohort === "Tất cả lớp")
+                    (index === 0 && selectedCohort === "ALL")
                       ? "active"
                       : ""
                   }
                   key={filter}
-                  onClick={() => setSelectedCohort(index === 0 ? "Tất cả lớp" : filter)}
+                  onClick={() => setSelectedCohort(index === 0 ? "ALL" : filter)}
                   type="button"
                 >
-                  {filter}
+                  {index === 0 ? t("studentsPage.allClasses") : filter}
                 </button>
               ))}
             </div>
@@ -333,8 +335,8 @@ function InstructorStudentsPage() {
 
           <div className="instructor-student-table">
             <div className="instructor-student-table-head">
-              <span>Học viên</span>
-              <span>Khóa học</span>
+              <span>{t("studentsPage.student")}</span>
+              <span>{t("studentsPage.course")}</span>
               <span>Tiến độ</span>
               <span>Chuyên cần</span>
               <span>Trạng thái</span>
@@ -391,8 +393,8 @@ function InstructorStudentsPage() {
         <aside className="instructor-panel instructor-attention-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Can thiệp</p>
-              <h3>Cần hỗ trợ</h3>
+              <p className="instructor-eyebrow">{t("studentsPage.interventionEyebrow")}</p>
+              <h3>{t("studentsPage.needsSupport")}</h3>
             </div>
             <span className="material-symbols-outlined">support_agent</span>
           </div>
@@ -433,7 +435,7 @@ function InstructorStudentsPage() {
           >
             <div className="instructor-create-course-header">
               <div>
-                <p className="instructor-eyebrow">Học viên</p>
+                <p className="instructor-eyebrow">{t("studentsPage.studentEyebrow")}</p>
                 <h3>{selectedStudent.name}</h3>
                 <p>{selectedStudent.course} - {selectedStudent.batch}</p>
               </div>
@@ -494,7 +496,7 @@ function InstructorStudentsPage() {
                 Đóng
               </button>
               <button disabled={isSavingIntervention} onClick={handleSaveIntervention} type="button">
-                {isSavingIntervention ? "Đang lưu..." : "Lưu ghi chú"}
+                {isSavingIntervention ? t("studentsPage.saving") : t("studentsPage.saveNote")}
               </button>
             </div>
           </aside>

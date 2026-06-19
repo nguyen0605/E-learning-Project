@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { attachAuthIfPresent, requireAuth } from "../middleware/auth.middleware.js";
+import {
+  attachAuthIfPresent,
+  requireAuth,
+  requireRole,
+} from "../middleware/auth.middleware.js";
 import {
   addStudentCartItem,
   getStudentCart,
@@ -8,9 +12,13 @@ import {
 import {
   getStudentCourseCategories,
   getStudentCourseDetail,
+  getPublicInstructorDetail,
   getStudentCourses,
   getStudentEnrolledCourses,
   completeStudentLesson,
+  createStudentCourseReview,
+  getStudentCourseReviewEligibility,
+  updateStudentCourseReview,
 } from "../services/studentCourses.service.js";
 import {
   getStudentExamReview,
@@ -36,6 +44,14 @@ import {
   studentAvatarUploadMiddleware,
   updateStudentAccountProfile,
 } from "../services/studentAccount.service.js";
+import {
+  createStudentDiscussion,
+  createStudentDiscussionComment,
+  getStudentInteractionData,
+  reportInteractionContent,
+  toggleDiscussionReaction,
+  updateOwnDiscussion,
+} from "../services/studentInteractions.service.js";
 import {
   createNotification,
   createNotificationForAssignmentTeacher,
@@ -651,5 +667,186 @@ router.get("/courses/:id", attachAuthIfPresent, async (req, res) => {
     handleRouteError(res, error, "Failed to load course detail.");
   }
 });
+
+router.get("/instructors/:id", async (req, res) => {
+  try {
+    const data = await getPublicInstructorDetail(req.params.id);
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: "Instructor not found.",
+      });
+    }
+    res.json({ success: true, data });
+  } catch (error) {
+    handleRouteError(res, error, "Failed to load public instructor detail.");
+  }
+});
+
+router.get("/interactions", requireAuth, requireRole("STUDENT"), async (req, res) => {
+  try {
+    const data = await getStudentInteractionData(req.auth.user.id, {
+      courseId: req.query.courseId,
+      type: req.query.type,
+      mine: req.query.mine === "true",
+      unresolved: req.query.unresolved === "true",
+      search: String(req.query.search ?? "").trim(),
+    });
+    res.json({ success: true, data });
+  } catch (error) {
+    handleRouteError(res, error, "Failed to load student interactions.");
+  }
+});
+
+router.post("/interactions", requireAuth, requireRole("STUDENT"), async (req, res) => {
+  try {
+    const data = await createStudentDiscussion(req.auth.user.id, req.body ?? {});
+    if (!data) return res.status(403).json({ success: false, message: "Bạn không thuộc lớp học này." });
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+router.post("/interactions/:id/comments", requireAuth, requireRole("STUDENT"), async (req, res) => {
+  try {
+    const data = await createStudentDiscussionComment(req.auth.user.id, req.params.id, req.body ?? {});
+    if (!data) return res.status(403).json({ success: false, message: "Không thể phản hồi thảo luận này." });
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+router.post("/interactions/:id/reaction", requireAuth, requireRole("STUDENT"), async (req, res) => {
+  try {
+    const data = await toggleDiscussionReaction(req.auth.user.id, req.params.id);
+    res.json({ success: true, data });
+  } catch (error) {
+    handleRouteError(res, error, "Failed to update discussion reaction.");
+  }
+});
+
+router.patch("/interactions/:id", requireAuth, requireRole("STUDENT"), async (req, res) => {
+  try {
+    const updated = await updateOwnDiscussion(req.auth.user.id, req.params.id, req.body ?? {});
+    if (!updated) return res.status(404).json({ success: false, message: "Không tìm thấy thảo luận của bạn." });
+    res.json({ success: true, data: { updated: true } });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+router.post("/interactions/reports", requireAuth, requireRole("STUDENT"), async (req, res) => {
+  try {
+    const data = await reportInteractionContent(req.auth.user.id, req.body ?? {});
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+function validateCourseReviewPayload(body) {
+  const rating = Number(body?.rating);
+  const teacherRating = Number(body?.teacherRating);
+  const comment = String(body?.comment ?? "").trim();
+
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return { error: "Điểm khóa học phải từ 1 đến 5 sao." };
+  }
+  if (
+    !Number.isInteger(teacherRating) ||
+    teacherRating < 1 ||
+    teacherRating > 5
+  ) {
+    return { error: "Điểm giảng viên phải từ 1 đến 5 sao." };
+  }
+  if (comment.length > 2000) {
+    return { error: "Nội dung đánh giá không được vượt quá 2000 ký tự." };
+  }
+
+  return { rating, teacherRating, comment };
+}
+
+router.get(
+  "/courses/:id/review-eligibility",
+  requireAuth,
+  requireRole("STUDENT"),
+  async (req, res) => {
+    try {
+      const data = await getStudentCourseReviewEligibility(
+        req.auth.user.id,
+        req.params.id,
+      );
+      if (!data) {
+        return res.status(404).json({
+          success: false,
+          message: "Course not found.",
+        });
+      }
+      res.json({ success: true, data });
+    } catch (error) {
+      handleRouteError(res, error, "Failed to load review eligibility.");
+    }
+  },
+);
+
+router.post(
+  "/courses/:id/reviews",
+  requireAuth,
+  requireRole("STUDENT"),
+  async (req, res) => {
+    try {
+      const payload = validateCourseReviewPayload(req.body);
+      if (payload.error) {
+        return res.status(400).json({ success: false, message: payload.error });
+      }
+
+      const result = await createStudentCourseReview(
+        req.auth.user.id,
+        req.params.id,
+        payload,
+      );
+      if (!result.data) {
+        return res.status(result.status).json({
+          success: false,
+          message: result.message,
+        });
+      }
+      res.status(result.status).json({ success: true, data: result.data });
+    } catch (error) {
+      handleRouteError(res, error, "Failed to create course review.");
+    }
+  },
+);
+
+router.put(
+  "/courses/:id/reviews/me",
+  requireAuth,
+  requireRole("STUDENT"),
+  async (req, res) => {
+    try {
+      const payload = validateCourseReviewPayload(req.body);
+      if (payload.error) {
+        return res.status(400).json({ success: false, message: payload.error });
+      }
+
+      const result = await updateStudentCourseReview(
+        req.auth.user.id,
+        req.params.id,
+        payload,
+      );
+      if (!result.data) {
+        return res.status(result.status).json({
+          success: false,
+          message: result.message,
+        });
+      }
+      res.json({ success: true, data: result.data });
+    } catch (error) {
+      handleRouteError(res, error, "Failed to update course review.");
+    }
+  },
+);
 
 export default router;

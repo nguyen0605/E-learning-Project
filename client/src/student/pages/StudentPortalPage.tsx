@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
+import type { AppNotification } from "../../shared/services/notificationApi";
 import AccountDrawer from "../components/account/AccountDrawer";
 import Footer from "../components/Footer";
 import StudentHeader from "../components/StudentHeader";
@@ -39,6 +40,7 @@ function StudentPortalPage() {
   const { logout, updateUser, user } = useAuth();
   const [activeView, setActiveView] = useState<StudentView>("home");
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [focusedReviewId, setFocusedReviewId] = useState<number | null>(null);
   const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
   const [selectedExamAttemptId, setSelectedExamAttemptId] = useState<number | null>(null);
   const [isAccountDrawerOpen, setIsAccountDrawerOpen] = useState(false);
@@ -153,15 +155,64 @@ function StudentPortalPage() {
   useEffect(() => {
     const requestedView = searchParams.get("view");
 
+    const courseId = Number(searchParams.get("courseId"));
+    const reviewId = Number(searchParams.get("reviewId"));
+
+    if (
+      requestedView === "courseDetail" &&
+      Number.isFinite(courseId) &&
+      courseId > 0
+    ) {
+      setSelectedCourseId(courseId);
+      setFocusedReviewId(Number.isFinite(reviewId) && reviewId > 0 ? reviewId : null);
+      setActiveView("courseDetail");
+      setSearchParams({}, { replace: true });
+      return;
+    }
+
     if (requestedView === "myCourses" || requestedView === "cart" || requestedView === "courses") {
-      setActiveView(requestedView);
+      if (Number.isFinite(courseId) && courseId > 0) {
+        setSelectedCourseId(courseId);
+        setFocusedReviewId(Number.isFinite(reviewId) && reviewId > 0 ? reviewId : null);
+        setActiveView("courseDetail");
+      } else {
+        setActiveView(requestedView);
+      }
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams]);
 
   function handleOpenCourse(courseId: number) {
     setSelectedCourseId(courseId);
+    setFocusedReviewId(null);
     setActiveView("courseDetail");
+  }
+
+  function handleOpenNotification(notification: AppNotification) {
+    if (!notification.targetUrl) return;
+
+    const url = new URL(notification.targetUrl, window.location.origin);
+    const view = url.searchParams.get("view");
+    const courseId = Number(url.searchParams.get("courseId"));
+    const reviewId = Number(url.searchParams.get("reviewId") ?? notification.referenceId);
+
+    if (
+      (view === "courseDetail" ||
+        notification.type === "COURSE_REVIEW_RESPONDED" ||
+        notification.referenceType === "COURSE_REVIEW") &&
+      Number.isFinite(courseId) &&
+      courseId > 0
+    ) {
+      setSelectedCourseId(courseId);
+      setFocusedReviewId(Number.isFinite(reviewId) && reviewId > 0 ? reviewId : null);
+      setActiveView("courseDetail");
+      return;
+    }
+
+    const nextView = view as StudentView | null;
+    if (nextView) {
+      setActiveView(nextView);
+    }
   }
 
   function handleStartLearning(courseId: number) {
@@ -252,6 +303,7 @@ function StudentPortalPage() {
       <StudentHeader
         activeView={activeView}
         onNavigate={setActiveView}
+        onOpenNotification={handleOpenNotification}
         onOpenAccountDrawer={handleOpenAccountDrawer}
         user={user}
       />
@@ -271,7 +323,10 @@ function StudentPortalPage() {
         <CoursesPage onOpenCourse={handleOpenCourse} />
       ) : null}
       {activeView === "myCourses" ? (
-        <MyCoursesPage onStartLearning={handleStartLearning} />
+        <MyCoursesPage
+          onReviewCourse={handleOpenCourse}
+          onStartLearning={handleStartLearning}
+        />
       ) : null}
       {activeView === "categories" ? (
         <CategoriesPage onOpenCourse={handleOpenCourse} />
@@ -279,6 +334,7 @@ function StudentPortalPage() {
       {activeView === "courseDetail" && selectedCourseId ? (
         <CourseDetailPage
           courseId={selectedCourseId}
+          focusedReviewId={focusedReviewId}
           onBack={() => setActiveView("courses")}
         />
       ) : null}
@@ -330,7 +386,9 @@ function StudentPortalPage() {
           paymentHistoryData={paymentHistoryData}
         />
       ) : null}
-      {activeView === "interaction" ? <InteractionPage /> : null}
+      {activeView === "interaction" ? (
+        <InteractionPage onReviewCourse={handleOpenCourse} />
+      ) : null}
       <Footer />
     </div>
   );

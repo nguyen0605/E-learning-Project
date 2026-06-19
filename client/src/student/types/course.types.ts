@@ -168,6 +168,59 @@ export type StudentCourseReview = {
   };
 };
 
+export type StudentOwnCourseReview = {
+  id: number;
+  courseId: number;
+  rating: number;
+  teacherRating: number | null;
+  comment: string | null;
+  teacherComment: string | null;
+  status: "VISIBLE" | "HIDDEN" | "REPORTED";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type StudentCourseReviewEligibility = {
+  eligible: boolean;
+  reason: string | null;
+  progressPercent: number;
+  minimumProgress: number;
+  hasEnrollment: boolean;
+  hasSuccessfulPayment: boolean;
+  existingReview: StudentOwnCourseReview | null;
+};
+
+export type PublicInstructorDetail = {
+  id: number;
+  fullName: string;
+  email: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  specialization: string | null;
+  experienceYears: number;
+  qualification: string | null;
+  workplace: string | null;
+  stats: {
+    courseCount: number;
+    studentCount: number;
+    averageRating: number;
+    reviewCount: number;
+  };
+  courses: StudentCourse[];
+  reviews: Array<{
+    id: number;
+    teacherRating: number;
+    comment: string | null;
+    createdAt: string;
+    course: { id: number; name: string };
+    student: {
+      id: number;
+      fullName: string;
+      avatarUrl: string | null;
+    };
+  }>;
+};
+
 export type StudentCourseDetail = StudentCourse & {
   batches: StudentCourseBatch[];
   modules: StudentCourseModule[];

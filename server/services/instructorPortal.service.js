@@ -787,7 +787,9 @@ export async function getInstructorInteractionData(rawTeacherId) {
 
   const [notificationRows] = await db.query(
     `
-      SELECT n.notification_id AS id, n.title, n.content, n.is_read, n.created_at
+      SELECT n.notification_id AS id, n.notification_type AS type,
+             n.title, n.content, n.reference_id, n.target_url,
+             n.is_read, n.created_at
       FROM notifications n
       WHERE n.user_id = ?
       ORDER BY n.created_at DESC
@@ -926,6 +928,9 @@ export async function getInstructorInteractionData(rawTeacherId) {
       id: row.id,
       title: row.title,
       content: row.content,
+      type: row.type,
+      referenceId: row.reference_id === null ? null : Number(row.reference_id),
+      targetUrl: row.target_url,
       isRead: Boolean(row.is_read),
       time: relativeTime(row.created_at),
     })),

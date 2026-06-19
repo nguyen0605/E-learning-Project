@@ -29,6 +29,20 @@ export function requireAuth(req, res, next) {
   next();
 }
 
+export function attachAuthIfPresent(req, res, next) {
+  const token = getBearerToken(req);
+  const user = token ? getSessionUser(token) : null;
+
+  req.auth = user
+    ? {
+        token,
+        user,
+      }
+    : null;
+
+  next();
+}
+
 export function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.auth?.user || !roles.includes(req.auth.user.role)) {

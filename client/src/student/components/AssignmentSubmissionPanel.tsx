@@ -5,6 +5,9 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "../../i18n/locale";
 import type { StatusModalTone } from "../../shared/components/feedback/StatusModal";
 import type {
   StudentAssignment,
@@ -45,14 +48,14 @@ function isGoogleDriveUrl(url: string) {
   }
 }
 
-function formatSubmissionDate(value: string) {
+function formatSubmissionDate(value: string, language: string | undefined) {
   const parsedDate = Date.parse(value);
 
   if (Number.isNaN(parsedDate)) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("vi-VN", {
+  return new Intl.DateTimeFormat(getIntlLocale(language), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(parsedDate);
@@ -67,26 +70,26 @@ function buildInitialState(assignment: StudentAssignment): SubmissionFormState {
   };
 }
 
-function validateForm(state: SubmissionFormState) {
+function validateForm(state: SubmissionFormState, t: TFunction<"student">) {
   const errors: FormErrors = {};
   const note = state.note.trim();
   const githubUrl = state.githubUrl.trim();
   const driveUrl = state.driveUrl.trim();
 
   if (!state.file && !githubUrl && !driveUrl) {
-    errors.general = "Hãy tải file lên hoặc dán ít nhất một link GitHub/Google Drive.";
+    errors.general = t("assignment.fileOrLinkRequired");
   }
 
   if (githubUrl && !isGithubUrl(githubUrl)) {
-    errors.githubUrl = "Link GitHub chưa đúng định dạng.";
+    errors.githubUrl = t("assignment.githubInvalid");
   }
 
   if (driveUrl && !isGoogleDriveUrl(driveUrl)) {
-    errors.driveUrl = "Link Google Drive chưa đúng định dạng.";
+    errors.driveUrl = t("assignment.driveInvalid");
   }
 
   if (note.length > 2000) {
-    errors.note = "Ghi chú tối đa 2000 ký tự.";
+    errors.note = t("assignment.noteTooLong");
   }
 
   return errors;
@@ -97,6 +100,7 @@ function AssignmentSubmissionPanel({
   onFeedback,
   onSubmitted,
 }: AssignmentSubmissionPanelProps) {
+  const { t, i18n } = useTranslation("student");
   const [formState, setFormState] = useState<SubmissionFormState>(() =>
     buildInitialState(assignment),
   );
@@ -115,13 +119,16 @@ function AssignmentSubmissionPanel({
     }
 
     return {
-      submittedAt: formatSubmissionDate(submission.submittedAt),
+      submittedAt: formatSubmissionDate(
+        submission.submittedAt,
+        i18n.resolvedLanguage,
+      ),
       fileLabel:
         submission.originalFileName ??
         submission.fileUrl?.split("/").pop() ??
-        "Tệp đã tải lên",
+        t("assignment.uploadedFile"),
     };
-  }, [assignment.submission]);
+  }, [assignment.submission, i18n.resolvedLanguage, t]);
 
   function handleChange(
     key: keyof SubmissionFormState,
@@ -145,18 +152,18 @@ function AssignmentSubmissionPanel({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const nextErrors = validateForm(formState);
+    const nextErrors = validateForm(formState, t);
 
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       onFeedback(
         "warning",
-        "Bài nộp chưa hợp lệ",
+        t("assignment.invalidTitle"),
         nextErrors.general ??
           nextErrors.githubUrl ??
           nextErrors.driveUrl ??
           nextErrors.note ??
-          "Vui lòng kiểm tra lại thông tin bài nộp.",
+          t("assignment.invalidMessage"),
       );
       return;
     }
@@ -180,14 +187,14 @@ function AssignmentSubmissionPanel({
       setErrors({});
       onFeedback(
         "success",
-        "Nộp bài thành công",
-        "Bài nộp của bạn đã được lưu. Bạn có thể cập nhật lại trước khi giảng viên chấm.",
+        t("assignment.successTitle"),
+        t("assignment.successMessage"),
       );
     } catch (error) {
       onFeedback(
         "error",
-        "Không thể nộp bài",
-        error instanceof Error ? error.message : "Có lỗi xảy ra khi gửi bài tập.",
+        t("assignment.errorTitle"),
+        error instanceof Error ? error.message : t("assignment.errorMessage"),
       );
     } finally {
       setIsSubmitting(false);
@@ -199,15 +206,15 @@ function AssignmentSubmissionPanel({
       <div className="sp-assignment-card-head">
         <div>
           <h3>{assignment.title}</h3>
-          <p>{assignment.description ?? "Giảng viên chưa thêm mô tả cho bài tập này."}</p>
+          <p>{assignment.description ?? t("assignment.noDescription")}</p>
         </div>
-        <span>Điểm tối đa: {assignment.maxScore}</span>
+        <span>{t("assignment.maxScore", { score: assignment.maxScore })}</span>
       </div>
 
       {submissionSummary ? (
         <div className="sp-assignment-submission-summary">
           <div>
-            <strong>Đã nộp</strong>
+            <strong>{t("assignment.submitted")}</strong>
             <small>{submissionSummary.submittedAt}</small>
           </div>
           {assignment.submission?.fileUrl ? (
@@ -230,7 +237,8 @@ function AssignmentSubmissionPanel({
           ) : null}
           {assignment.submission?.feedback ? (
             <p className="sp-assignment-feedback">
-              <strong>Phản hồi:</strong> {assignment.submission.feedback}
+              <strong>{t("assignment.feedback")}</strong>{" "}
+              {assignment.submission.feedback}
             </p>
           ) : null}
         </div>
@@ -238,16 +246,15 @@ function AssignmentSubmissionPanel({
 
       <form className="sp-assignment-form" onSubmit={handleSubmit}>
         <div className="sp-assignment-field">
-          <label htmlFor={`assignment-file-${assignment.id}`}>Tệp bài nộp</label>
+          <label htmlFor={`assignment-file-${assignment.id}`}>
+            {t("assignment.submissionFile")}
+          </label>
           <input
             id={`assignment-file-${assignment.id}`}
             onChange={handleFileChange}
             type="file"
           />
-          <small>
-            Hỗ trợ tải file trực tiếp. Bạn cũng có thể chỉ nộp link GitHub hoặc Google
-            Drive.
-          </small>
+          <small>{t("assignment.fileHelp")}</small>
         </div>
 
         <div className="sp-assignment-grid">
@@ -277,11 +284,13 @@ function AssignmentSubmissionPanel({
         </div>
 
         <div className="sp-assignment-field">
-          <label htmlFor={`assignment-note-${assignment.id}`}>Ghi chú cho giảng viên</label>
+          <label htmlFor={`assignment-note-${assignment.id}`}>
+            {t("assignment.note")}
+          </label>
           <textarea
             id={`assignment-note-${assignment.id}`}
             onChange={(event) => handleChange("note", event.target.value)}
-            placeholder="Mô tả ngắn về cách bạn làm bài, tài khoản chạy thử, hoặc điều giảng viên cần lưu ý."
+            placeholder={t("assignment.notePlaceholder")}
             rows={5}
             value={formState.note}
           />
@@ -293,7 +302,11 @@ function AssignmentSubmissionPanel({
         <div className="sp-assignment-form-actions">
           <button disabled={isSubmitting} type="submit">
             <Icon name="upload_file" />
-            {isSubmitting ? "Đang gửi bài..." : assignment.submission ? "Cập nhật bài nộp" : "Nộp bài"}
+            {isSubmitting
+              ? t("assignment.submitting")
+              : assignment.submission
+                ? t("assignment.update")
+                : t("assignment.submit")}
           </button>
         </div>
       </form>

@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import db from "../db.js";
+import { createNotificationsForRole } from "./notification.service.js";
 
 const sessions = new Map();
 const TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
@@ -105,6 +106,18 @@ export async function registerStudent({ fullName, email, phone, password }) {
 
     await connection.commit();
 
+    await createNotificationsForRole("ADMIN", {
+      type: "USER_REGISTERED",
+      title: "Học viên mới đăng ký",
+      content: `${cleanFullName} vừa tạo tài khoản học viên.`,
+      referenceType: "USER",
+      referenceId: result.insertId,
+      targetUrl: "/admin/users",
+      priority: "NORMAL",
+    }).catch((error) => {
+      console.error("Failed to notify admins about student registration.", error);
+    });
+
     return {
       user: sanitizeUser({
         user_id: result.insertId,
@@ -184,4 +197,21 @@ export function getSessionUser(token) {
 
 export function revokeSession(token) {
   sessions.delete(token);
+}
+
+export function updateSessionUser(token, user) {
+  const session = sessions.get(token);
+
+  if (!session || clearExpiredSession(token, session)) {
+    return null;
+  }
+
+  const nextUser = sanitizeUser(user);
+
+  sessions.set(token, {
+    ...session,
+    user: nextUser,
+  });
+
+  return nextUser;
 }

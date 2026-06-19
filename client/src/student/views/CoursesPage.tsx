@@ -1,41 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Icon from "../components/Icon";
 import StudentCourseCard from "../components/StudentCourseCard";
-import {
-  getCourseCategories,
-  getCourses,
-} from "../services/studentCoursesApi";
-import type {
-  StudentCourse,
-  StudentCourseCategory,
-} from "../types/course.types";
+import { getCourseCategories, getCourses } from "../services/studentCoursesApi";
+import type { StudentCourse, StudentCourseCategory } from "../types/course.types";
 
 type CoursesPageProps = {
   onOpenCourse: (courseId: number) => void;
 };
 
-const levels = [
-  { label: "Tất cả cấp độ", value: "" },
-  { label: "Người mới bắt đầu", value: "BEGINNER" },
-  { label: "Trung cấp", value: "INTERMEDIATE" },
-  { label: "Nâng cao", value: "ADVANCED" },
-];
-
 function CoursesPage({ onOpenCourse }: CoursesPageProps) {
+  const { t } = useTranslation("student");
   const [categories, setCategories] = useState<StudentCourseCategory[]>([]);
   const [courses, setCourses] = useState<StudentCourse[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
-    null,
-  );
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedLevel, setSelectedLevel] = useState("");
   const [searchText, setSearchText] = useState("");
   const [submittedSearch, setSubmittedSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const levels = [
+    { label: t("courses.levels.all"), value: "" },
+    { label: t("courses.levels.BEGINNER"), value: "BEGINNER" },
+    { label: t("courses.levels.INTERMEDIATE"), value: "INTERMEDIATE" },
+    { label: t("courses.levels.ADVANCED"), value: "ADVANCED" },
+  ];
 
   useEffect(() => {
     let isMounted = true;
-
     setIsLoading(true);
     setError("");
 
@@ -48,23 +40,15 @@ function CoursesPage({ onOpenCourse }: CoursesPageProps) {
       }),
     ])
       .then(([categoryData, courseData]) => {
-        if (!isMounted) {
-          return;
+        if (isMounted) {
+          setCategories(categoryData);
+          setCourses(courseData);
         }
-
-        setCategories(categoryData);
-        setCourses(courseData);
       })
-      .catch((fetchError) => {
-        if (!isMounted) {
-          return;
+      .catch(() => {
+        if (isMounted) {
+          setError(t("courses.loadError"));
         }
-
-        setError(
-          fetchError instanceof Error
-            ? fetchError.message
-            : "Không thể tải danh sách khóa học.",
-        );
       })
       .finally(() => {
         if (isMounted) {
@@ -75,11 +59,10 @@ function CoursesPage({ onOpenCourse }: CoursesPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [selectedCategoryId, selectedLevel, submittedSearch]);
+  }, [selectedCategoryId, selectedLevel, submittedSearch, t]);
 
   const totalLessons = useMemo(
-    () =>
-      courses.reduce((total, course) => total + course.stats.lessonCount, 0),
+    () => courses.reduce((total, course) => total + course.stats.lessonCount, 0),
     [courses],
   );
 
@@ -91,14 +74,14 @@ function CoursesPage({ onOpenCourse }: CoursesPageProps) {
     <main className="sp-catalog-layout">
       <aside className="sp-filter-panel">
         <div className="sp-filter-group">
-          <h3>Danh mục</h3>
+          <h3>{t("courses.category")}</h3>
           <label>
             <input
               checked={selectedCategoryId === null}
               onChange={() => setSelectedCategoryId(null)}
               type="radio"
             />
-            Tất cả danh mục
+            {t("courses.allCategories")}
           </label>
           {categories.map((category) => (
             <label key={category.id}>
@@ -113,9 +96,9 @@ function CoursesPage({ onOpenCourse }: CoursesPageProps) {
         </div>
 
         <div className="sp-filter-group">
-          <h3>Trình độ</h3>
+          <h3>{t("courses.level")}</h3>
           {levels.map((level) => (
-            <label key={level.label}>
+            <label key={level.value}>
               <input
                 checked={selectedLevel === level.value}
                 onChange={() => setSelectedLevel(level.value)}
@@ -127,25 +110,24 @@ function CoursesPage({ onOpenCourse }: CoursesPageProps) {
         </div>
 
         <div className="sp-premium-card">
-          <h3>Dữ liệu khóa học từ hệ thống</h3>
-          <p>
-            Danh sách này đang đọc trực tiếp từ bảng khóa học, danh mục, giảng
-            viên, bài học, đăng ký và đánh giá trong database.
-          </p>
+          <h3>{t("courses.systemDataTitle")}</h3>
+          <p>{t("courses.systemDataDescription")}</p>
         </div>
       </aside>
 
       <section className="sp-catalog-main">
         <div className="sp-catalog-head">
           <div>
-            <p className="sp-eyebrow">Khóa học đang mở</p>
-            <h1>Nâng cao chuyên môn của bạn</h1>
+            <p className="sp-eyebrow">{t("courses.eyebrow")}</p>
+            <h1>{t("courses.title")}</h1>
             <p>
-              Có {courses.length} khóa học, {categories.length} danh mục và{" "}
-              {totalLessons} bài học đang sẵn sàng cho học viên.
+              {t("courses.summary", {
+                courses: courses.length,
+                categories: categories.length,
+                lessons: totalLessons,
+              })}
             </p>
           </div>
-
           <div className="sp-course-search">
             <Icon name="search" />
             <input
@@ -155,32 +137,26 @@ function CoursesPage({ onOpenCourse }: CoursesPageProps) {
                   handleSearchSubmit();
                 }
               }}
-              placeholder="Tìm khóa học..."
+              placeholder={t("courses.searchPlaceholder")}
               value={searchText}
             />
             <button onClick={handleSearchSubmit} type="button">
-              Tìm
+              {t("courses.search")}
             </button>
           </div>
         </div>
 
-        {isLoading ? <p className="sp-state-line">Đang tải khóa học...</p> : null}
+        {isLoading ? <p className="sp-state-line">{t("courses.loading")}</p> : null}
         {error ? <p className="sp-state-line error">{error}</p> : null}
-
         {!isLoading && !error ? (
           <div className="sp-course-grid">
             {courses.map((course) => (
-              <StudentCourseCard
-                course={course}
-                key={course.id}
-                onOpen={onOpenCourse}
-              />
+              <StudentCourseCard course={course} key={course.id} onOpen={onOpenCourse} />
             ))}
           </div>
         ) : null}
-
         {!isLoading && !error && courses.length === 0 ? (
-          <p className="sp-state-line">Không tìm thấy khóa học phù hợp.</p>
+          <p className="sp-state-line">{t("courses.notFound")}</p>
         ) : null}
       </section>
     </main>

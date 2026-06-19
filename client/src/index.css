@@ -519,10 +519,28 @@ a {
 .bar {
   position: relative;
   width: 100%;
-  min-height: 32px;
+  min-height: 0;
   border-radius: 18px 18px 8px 8px;
   background: linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%);
   transition: transform 180ms ease, background 180ms ease;
+}
+
+.admin-notification-bell .notification-bell-trigger {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 0;
+  border-radius: 13px;
+  background: #f8fafc;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.bar.zero {
+  height: 3px !important;
+  border-radius: 999px;
+  background: #e2e8f0;
 }
 
 .bar.active {
@@ -545,6 +563,20 @@ a {
   font-size: 0.72rem;
   font-weight: 700;
   white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.bar:hover .tooltip,
+.bar:focus-visible .tooltip,
+.bar.active .tooltip {
+  opacity: 1;
+}
+
+.bar:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.45);
+  outline-offset: 3px;
 }
 
 .bar-label {
@@ -915,14 +947,272 @@ a {
 
 .student-table tbody tr {
   transition: background 180ms ease;
+  cursor: pointer;
 }
 
 .student-table tbody tr:hover {
   background: rgba(248, 250, 252, 0.86);
 }
 
+.student-table tbody tr:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.55);
+  outline-offset: -2px;
+}
+
 .student-table tbody tr.selected {
   background: rgba(37, 99, 235, 0.06);
+}
+
+.student-table tbody tr.student-empty-row {
+  cursor: default;
+}
+
+.student-table tbody tr.student-empty-row:hover {
+  background: transparent;
+}
+
+.student-empty-row td {
+  padding: 48px 24px !important;
+  color: var(--muted);
+  text-align: center;
+}
+
+.admin-filter-empty {
+  grid-column: 1 / -1;
+  padding: 48px 24px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.user-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.user-summary-card {
+  padding: 20px;
+}
+
+.user-summary-card p {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.user-summary-card strong {
+  font-size: 1.7rem;
+}
+
+.user-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.user-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 300px;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: white;
+}
+
+.user-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+.user-management-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.75fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.user-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.user-table th,
+.user-table td {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.user-table th {
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.user-table tbody tr {
+  cursor: pointer;
+}
+
+.user-table tbody tr:hover,
+.user-table tbody tr.selected {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.user-status {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.user-status.active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.user-status.inactive {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.user-status.locked {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.user-detail-panel {
+  overflow: hidden;
+}
+
+.user-detail-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.user-detail-profile img {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+}
+
+.user-detail-profile h3,
+.user-detail-profile p {
+  margin: 0 0 4px;
+}
+
+.user-detail-profile p,
+.user-detail-profile small,
+.user-muted {
+  color: var(--muted);
+}
+
+.user-control-section {
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.user-control-section h4 {
+  margin: 0 0 14px;
+}
+
+.user-control-section > label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.user-control-section select {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: white;
+}
+
+.user-lock-button,
+.user-unlock-button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 11px;
+  border: 0;
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.user-lock-button {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.user-unlock-button {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.user-permission-list,
+.user-related-list {
+  display: grid;
+  gap: 10px;
+}
+
+.user-permission-list label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-related-list > div {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.user-related-list span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.user-error {
+  color: #b91c1c;
+}
+
+@media (max-width: 1100px) {
+  .user-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .user-management-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.student-drawer-state {
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.student-drawer-state.error {
+  color: #dc2626;
 }
 
 .student-table tbody td {
@@ -1443,6 +1733,50 @@ a {
 .course-filter-btn {
   background: rgba(226, 232, 240, 0.7);
   color: var(--muted);
+}
+
+.course-search-input,
+.course-status-filter {
+  min-height: 42px;
+  padding: 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: white;
+}
+
+.course-search-input {
+  width: 250px;
+}
+
+.course-category-tag.hidden,
+.course-status.hidden {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.course-report-panel {
+  margin-top: 22px;
+  padding: 24px;
+}
+
+.course-report-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.course-report-grid > div {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.course-report-grid span {
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .course-primary-btn {

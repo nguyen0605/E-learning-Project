@@ -8,6 +8,11 @@ export type StudentView =
   | "learning"
   | "courseDetail"
   | "exam"
+  | "examTake"
+  | "examReview"
+  | "accountProfile"
+  | "accountCertificates"
+  | "accountPaymentHistory"
   | "interaction";
 
 export type Course = {

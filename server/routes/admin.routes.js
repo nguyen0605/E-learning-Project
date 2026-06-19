@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { requireAuth, requireRole } from "../middleware/auth.middleware.js";
+import { requireAdminPermission } from "../middleware/adminPermission.middleware.js";
 import {
   getAdminGeneralContentData,
   deleteAdminFaq,
@@ -20,8 +22,15 @@ import {
   getAdminStudentsPageData,
   updateAdminStudentStatus,
 } from "../services/adminStudents.service.js";
+import {
+  getAdminUserDetail,
+  getAdminUsersPageData,
+  updateAdminUser,
+  updateAdminUserPermissions,
+} from "../services/adminUsers.service.js";
 
 const router = Router();
+router.use(requireAuth, requireRole("ADMIN"));
 
 function handleRouteError(res, error, message) {
   console.error(message, error);
@@ -45,7 +54,7 @@ router.get("/dashboard", async (req, res) => {
   }
 });
 
-router.get("/students", async (req, res) => {
+router.get("/students", requireAdminPermission("users"), async (req, res) => {
   try {
     const data = await getAdminStudentsPageData();
 
@@ -58,7 +67,66 @@ router.get("/students", async (req, res) => {
   }
 });
 
-router.get("/students/:id", async (req, res) => {
+router.get("/users", requireAdminPermission("users"), async (req, res) => {
+  try {
+    const data = await getAdminUsersPageData();
+    res.json({ success: true, data });
+  } catch (error) {
+    handleRouteError(res, error, "Failed to load admin users data.");
+  }
+});
+
+router.get("/users/:id", requireAdminPermission("users"), async (req, res) => {
+  try {
+    const data = await getAdminUserDetail(req.params.id);
+    if (!data) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+    res.json({ success: true, data });
+  } catch (error) {
+    handleRouteError(res, error, "Failed to load admin user detail.");
+  }
+});
+
+router.patch("/users/:id", requireAdminPermission("users"), async (req, res) => {
+  try {
+    if (Number(req.params.id) === Number(req.auth.user.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Không thể tự thay đổi vai trò hoặc khóa tài khoản đang đăng nhập.",
+      });
+    }
+
+    const data = await updateAdminUser(req.params.id, req.body ?? {});
+    if (!data) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+    res.json({ success: true, data });
+  } catch (error) {
+    handleRouteError(res, error, "Failed to update admin user.");
+  }
+});
+
+router.put("/users/:id/permissions", requireAdminPermission("users"), async (req, res) => {
+  try {
+    if (Number(req.params.id) === Number(req.auth.user.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Không thể tự thay đổi quyền của tài khoản đang đăng nhập.",
+      });
+    }
+
+    const data = await updateAdminUserPermissions(req.params.id, req.body ?? {});
+    if (!data) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+    res.json({ success: true, data });
+  } catch (error) {
+    handleRouteError(res, error, "Failed to update admin permissions.");
+  }
+});
+
+router.get("/students/:id", requireAdminPermission("users"), async (req, res) => {
   try {
     const data = await getAdminStudentDetail(req.params.id);
 
@@ -78,7 +146,7 @@ router.get("/students/:id", async (req, res) => {
   }
 });
 
-router.patch("/students/:id/status", async (req, res) => {
+router.patch("/students/:id/status", requireAdminPermission("users"), async (req, res) => {
   try {
     const { status } = req.body;
 
@@ -107,7 +175,7 @@ router.patch("/students/:id/status", async (req, res) => {
   }
 });
 
-router.get("/courses", async (req, res) => {
+router.get("/courses", requireAdminPermission("courses"), async (req, res) => {
   try {
     const data = await getAdminCoursesPageData();
 
@@ -120,7 +188,7 @@ router.get("/courses", async (req, res) => {
   }
 });
 
-router.get("/courses/:id", async (req, res) => {
+router.get("/courses/:id", requireAdminPermission("courses"), async (req, res) => {
   try {
     const data = await getAdminCourseDetail(req.params.id);
 
@@ -140,11 +208,11 @@ router.get("/courses/:id", async (req, res) => {
   }
 });
 
-router.patch("/courses/:id/review", async (req, res) => {
+router.patch("/courses/:id/review", requireAdminPermission("courses"), async (req, res) => {
   try {
     const { status } = req.body;
 
-    if (!["pending", "approved", "rejected"].includes(status)) {
+    if (!["pending", "approved", "rejected", "hidden"].includes(status)) {
       return res.status(400).json({
         success: false,
         message: "Invalid course review status.",
@@ -169,7 +237,7 @@ router.patch("/courses/:id/review", async (req, res) => {
   }
 });
 
-router.get("/system-config", async (req, res) => {
+router.get("/system-config", requireAdminPermission("system"), async (req, res) => {
   try {
     const data = await getAdminSystemConfigData();
 
@@ -182,7 +250,7 @@ router.get("/system-config", async (req, res) => {
   }
 });
 
-router.put("/system-config", async (req, res) => {
+router.put("/system-config", requireAdminPermission("system"), async (req, res) => {
   try {
     const data = await updateAdminSystemConfigData(req.body ?? {});
 
@@ -195,7 +263,7 @@ router.put("/system-config", async (req, res) => {
   }
 });
 
-router.get("/general-content", async (req, res) => {
+router.get("/general-content", requireAdminPermission("system"), async (req, res) => {
   try {
     const data = await getAdminGeneralContentData();
 
@@ -208,7 +276,7 @@ router.get("/general-content", async (req, res) => {
   }
 });
 
-router.patch("/general-content/faqs/:id", async (req, res) => {
+router.patch("/general-content/faqs/:id", requireAdminPermission("system"), async (req, res) => {
   try {
     const data = await updateAdminFaq(req.params.id, req.body ?? {});
 
@@ -228,7 +296,7 @@ router.patch("/general-content/faqs/:id", async (req, res) => {
   }
 });
 
-router.delete("/general-content/faqs/:id", async (req, res) => {
+router.delete("/general-content/faqs/:id", requireAdminPermission("system"), async (req, res) => {
   try {
     const deleted = await deleteAdminFaq(req.params.id);
 
@@ -250,7 +318,7 @@ router.delete("/general-content/faqs/:id", async (req, res) => {
   }
 });
 
-router.patch("/general-content/banners/:id", async (req, res) => {
+router.patch("/general-content/banners/:id", requireAdminPermission("system"), async (req, res) => {
   try {
     const data = await updateAdminBanner(req.params.id, req.body ?? {});
 

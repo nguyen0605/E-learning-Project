@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import ProtectedRoute from "../auth/ProtectedRoute";
 import { Outlet } from "react-router-dom";
 import { hasInstructorAuthSession } from "../instructor/auth/instructorAuth";
@@ -16,29 +15,44 @@ import CourseManagementPage from "../admin/pages/CourseManagementPage";
 import GeneralContentPage from "../admin/pages/GeneralContentPage";
 import StudentManagementPage from "../admin/pages/StudentManagementPage";
 import SystemConfigurationPage from "../admin/pages/SystemConfigurationPage";
+import UserManagementPage from "../admin/pages/UserManagementPage";
+import {
+  adminPagePaths,
+  getAdminPageFromPath,
+  type AdminPage,
+} from "../admin/adminNavigation";
+import AdminLoginPage from "../admin/pages/AdminLoginPage";
 import StudentLoginPage from "../student/pages/StudentLoginPage";
 import StudentPortalPage from "../student/pages/StudentPortalPage";
 import StudentRegisterPage from "../student/pages/StudentRegisterPage";
 import PaymentReturnPage from "../student/views/PaymentReturnPage";
 
-type AdminPage = "dashboard" | "students" | "courses" | "system" | "content";
-
 function AdminPortal() {
-  const [activePage, setActivePage] = useState<AdminPage>("dashboard");
-  const pageProps = { activePage, onNavigate: setActivePage };
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activePage = getAdminPageFromPath(location.pathname);
 
+  if (!activePage) {
+    return <Navigate replace to="/admin" />;
+  }
+
+  const onNavigate = (page: AdminPage) => {
+    navigate(adminPagePaths[page]);
+  };
+  const pageProps = { activePage, onNavigate };
+
+  if (activePage === "users") {
+    return <UserManagementPage {...pageProps} />;
+  }
   if (activePage === "students") {
     return <StudentManagementPage {...pageProps} />;
   }
-
   if (activePage === "courses") {
     return <CourseManagementPage {...pageProps} />;
   }
-
   if (activePage === "system") {
     return <SystemConfigurationPage {...pageProps} />;
   }
-
   if (activePage === "content") {
     return <GeneralContentPage {...pageProps} />;
   }
@@ -95,14 +109,17 @@ function InstructorRoutes() {
 
 function AdminRoutes() {
   return (
-    <Route
-      path="/admin"
-      element={
-        <ProtectedRoute allowedRoles={["ADMIN"]}>
-          <AdminPortal />
-        </ProtectedRoute>
-      }
-    />
+    <>
+      <Route path="/admin/login" element={<AdminLoginPage />} />
+      <Route
+        path="/admin/*"
+        element={
+          <ProtectedRoute allowedRoles={["ADMIN"]} loginPath="/admin/login">
+            <AdminPortal />
+          </ProtectedRoute>
+        }
+      />
+    </>
   );
 }
 
@@ -110,11 +127,9 @@ function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/student" replace />} />
-
       {StudentRoutes()}
       {InstructorRoutes()}
       {AdminRoutes()}
-
       <Route path="*" element={<Navigate to="/student" replace />} />
     </Routes>
   );

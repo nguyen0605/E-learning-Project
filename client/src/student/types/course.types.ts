@@ -139,6 +139,7 @@ export type StudentCourseLesson = {
   videoUrl: string | null;
   durationMinutes: number;
   isPreview: boolean;
+  isCompleted: boolean;
   orderNo: number;
   resources: StudentLessonResource[];
   assignments: StudentAssignment[];

@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { getIntlLocale } from "../../i18n/locale";
 import Icon from "../components/Icon";
 import { getMyCourses } from "../services/studentCoursesApi";
 import type { StudentEnrolledCourse } from "../types/course.types";
@@ -14,20 +16,19 @@ function getCourseImage(thumbnailUrl: string | null) {
   return thumbnailUrl?.startsWith("http") ? thumbnailUrl : fallbackImage;
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("vi-VN").format(new Date(value));
+function formatDate(value: string, language: string | undefined) {
+  return new Intl.DateTimeFormat(getIntlLocale(language)).format(new Date(value));
 }
 
 function MyCoursesPage({ onStartLearning }: MyCoursesPageProps) {
+  const { t, i18n } = useTranslation("student");
+  const language = i18n.resolvedLanguage;
   const [courses, setCourses] = useState<StudentEnrolledCourse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
-
-    setIsLoading(true);
-    setError("");
 
     getMyCourses()
       .then((data) => {
@@ -40,7 +41,7 @@ function MyCoursesPage({ onStartLearning }: MyCoursesPageProps) {
           setError(
             fetchError instanceof Error
               ? fetchError.message
-              : "Không thể tải khóa học của bạn.",
+              : t("myCourses.loadError"),
           );
         }
       })
@@ -53,27 +54,24 @@ function MyCoursesPage({ onStartLearning }: MyCoursesPageProps) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [t]);
 
   return (
     <main className="sp-my-courses-page">
       <section className="sp-my-courses-hero">
-        <p className="sp-eyebrow">Không gian học tập</p>
-        <h1>Khóa học của bạn</h1>
-        <p>
-          Tiếp tục các khóa học đã đăng ký, theo dõi tiến độ và mở lộ trình bài
-          học của từng lớp.
-        </p>
+        <p className="sp-eyebrow">{t("myCourses.eyebrow")}</p>
+        <h1>{t("myCourses.title")}</h1>
+        <p>{t("myCourses.description")}</p>
       </section>
 
-      {isLoading ? <p className="sp-state-line">Đang tải khóa học...</p> : null}
+      {isLoading ? <p className="sp-state-line">{t("myCourses.loading")}</p> : null}
       {error ? <p className="sp-state-line error">{error}</p> : null}
 
       {!isLoading && !error && courses.length === 0 ? (
         <div className="sp-empty-cart">
           <Icon name="school" />
-          <h2>Bạn chưa có khóa học nào</h2>
-          <p>Hãy đăng ký hoặc thanh toán khóa học để bắt đầu học.</p>
+          <h2>{t("myCourses.emptyTitle")}</h2>
+          <p>{t("myCourses.emptyDescription")}</p>
         </div>
       ) : null}
 
@@ -82,6 +80,14 @@ function MyCoursesPage({ onStartLearning }: MyCoursesPageProps) {
           const canStudy =
             item.enrollment.status === "ACTIVE" ||
             item.enrollment.status === "COMPLETED";
+          const progressPercent = Math.min(
+            100,
+            Math.max(0, item.enrollment.progressPercent),
+          );
+          const progressLabel = new Intl.NumberFormat(
+            getIntlLocale(language),
+            { maximumFractionDigits: 2 },
+          ).format(progressPercent);
 
           return (
             <article className="sp-my-course-card" key={item.enrollment.id}>
@@ -93,22 +99,23 @@ function MyCoursesPage({ onStartLearning }: MyCoursesPageProps) {
                 <span>{item.course.category.name}</span>
                 <h2>{item.course.name}</h2>
                 <p>
-                  Giảng viên: {item.course.teacher.fullName} • Lớp:{" "}
+                  {t("myCourses.teacher")}: {item.course.teacher.fullName} •{" "}
+                  {t("myCourses.class")}:{" "}
                   {item.batch.name}
                 </p>
                 <p>
-                  Thời gian: {formatDate(item.batch.startDate)} -{" "}
-                  {formatDate(item.batch.endDate)}
+                  {t("myCourses.duration")}: {formatDate(item.batch.startDate, language)} -{" "}
+                  {formatDate(item.batch.endDate, language)}
                 </p>
                 <div className="sp-progress-shell">
                   <span
                     style={{
-                      width: `${Math.min(item.enrollment.progressPercent, 100)}%`,
+                      width: `${progressPercent}%`,
                     }}
                   />
                 </div>
                 <small>
-                  Tiến độ {item.enrollment.progressPercent}% •{" "}
+                  {t("myCourses.progress")} {progressLabel}% •{" "}
                   {item.enrollment.status}
                 </small>
               </div>
@@ -118,7 +125,7 @@ function MyCoursesPage({ onStartLearning }: MyCoursesPageProps) {
                 type="button"
               >
                 <Icon name={canStudy ? "play_circle" : "hourglass_top"} />
-                {canStudy ? "Vào học" : "Chờ kích hoạt"}
+                {canStudy ? t("myCourses.start") : t("myCourses.waiting")}
               </button>
             </article>
           );

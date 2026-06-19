@@ -1,60 +1,42 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Icon from "../components/Icon";
 import StudentCourseCard from "../components/StudentCourseCard";
-import {
-  getCourseCategories,
-  getCourses,
-} from "../services/studentCoursesApi";
-import type {
-  StudentCourse,
-  StudentCourseCategory,
-} from "../types/course.types";
+import { getCourseCategories, getCourses } from "../services/studentCoursesApi";
+import type { StudentCourse, StudentCourseCategory } from "../types/course.types";
 
 type CategoriesPageProps = {
   onOpenCourse: (courseId: number) => void;
 };
 
 function CategoriesPage({ onOpenCourse }: CategoriesPageProps) {
+  const { t } = useTranslation("student");
   const [categories, setCategories] = useState<StudentCourseCategory[]>([]);
   const [courses, setCourses] = useState<StudentCourse[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
-    null,
-  );
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [searchText, setSearchText] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
-
     setIsLoading(true);
     setError("");
 
     Promise.all([
       getCourseCategories(),
-      getCourses({
-        categoryId: selectedCategoryId,
-        search: searchText.trim(),
-      }),
+      getCourses({ categoryId: selectedCategoryId, search: searchText.trim() }),
     ])
       .then(([categoryData, courseData]) => {
-        if (!isMounted) {
-          return;
+        if (isMounted) {
+          setCategories(categoryData);
+          setCourses(courseData);
         }
-
-        setCategories(categoryData);
-        setCourses(courseData);
       })
-      .catch((fetchError) => {
-        if (!isMounted) {
-          return;
+      .catch(() => {
+        if (isMounted) {
+          setError(t("categories.loadError"));
         }
-
-        setError(
-          fetchError instanceof Error
-            ? fetchError.message
-            : "Không thể tải dữ liệu danh mục.",
-        );
       })
       .finally(() => {
         if (isMounted) {
@@ -65,7 +47,7 @@ function CategoriesPage({ onOpenCourse }: CategoriesPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [selectedCategoryId, searchText]);
+  }, [selectedCategoryId, searchText, t]);
 
   const selectedCategory = categories.find(
     (category) => category.id === selectedCategoryId,
@@ -74,37 +56,31 @@ function CategoriesPage({ onOpenCourse }: CategoriesPageProps) {
   return (
     <main className="sp-category-page">
       <section className="sp-category-hero">
-        <h1>Làm chủ kỹ năng của bạn với dữ liệu khóa học thực tế.</h1>
-        <p>
-          Khám phá danh mục khóa học đang hoạt động trong hệ thống, cùng thông
-          tin giảng viên, bài học, học phí và đánh giá được lấy trực tiếp từ
-          database.
-        </p>
-
+        <h1>{t("categories.title")}</h1>
+        <p>{t("categories.description")}</p>
         <div className="sp-hero-search">
           <Icon name="search" />
           <input
             onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Tìm kiếm khóa học..."
+            placeholder={t("categories.searchPlaceholder")}
             value={searchText}
           />
-          <button type="button">Khám phá</button>
+          <button type="button">{t("categories.explore")}</button>
         </div>
       </section>
 
       <div className="sp-results-layout">
         <aside className="sp-filter-panel compact">
           <h2>
-            <Icon name="filter_list" /> Danh mục
+            <Icon name="filter_list" /> {t("categories.category")}
           </h2>
-
           <div className="sp-category-list">
             <button
               className={selectedCategoryId === null ? "active" : ""}
               onClick={() => setSelectedCategoryId(null)}
               type="button"
             >
-              Tất cả danh mục
+              {t("categories.all")}
               <span>{categories.reduce((sum, item) => sum + item.courseCount, 0)}</span>
             </button>
             {categories.map((category) => (
@@ -124,19 +100,14 @@ function CategoriesPage({ onOpenCourse }: CategoriesPageProps) {
         <section>
           <div className="sp-results-head">
             <h2>
-              Tìm thấy <span>{courses.length}</span> khóa học
-              {selectedCategory ? (
-                <>
-                  {" "}
-                  thuộc lĩnh vực <span>"{selectedCategory.name}"</span>
-                </>
-              ) : null}
+              {t("categories.result", { count: courses.length })}{" "}
+              {selectedCategory
+                ? t("categories.inCategory", { name: selectedCategory.name })
+                : null}
             </h2>
           </div>
-
-          {isLoading ? <p className="sp-state-line">Đang tải danh mục...</p> : null}
+          {isLoading ? <p className="sp-state-line">{t("categories.loading")}</p> : null}
           {error ? <p className="sp-state-line error">{error}</p> : null}
-
           {!isLoading && !error ? (
             <div className="sp-course-grid">
               {courses.map((course) => (

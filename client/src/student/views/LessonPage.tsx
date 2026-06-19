@@ -1,23 +1,21 @@
+import { useTranslation } from "react-i18next";
 import CourseContent from "../components/CourseContent";
 import Icon from "../components/Icon";
 
-const learnItems = [
-  "Mastering the No-Line Rule",
-  "High-Contrast Typography Hierarchies",
-  "Material Surface Nesting Logic",
-  "Glassmorphism Depth Control",
-];
-
 function LessonPage() {
+  const { t } = useTranslation("student");
+  const learnItems = [1, 2, 3, 4].map((number) =>
+    t(`lessonDemo.outcome${number}`),
+  );
+
   return (
     <main className="sp-lesson-page">
       <section className="sp-lesson-main">
         <div className="sp-video">
           <img
             src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80"
-            alt="Xem trước video bài học"
+            alt={t("lessonDemo.videoAlt")}
           />
-
           <button type="button">
             <Icon name="play_arrow" />
           </button>
@@ -25,36 +23,28 @@ function LessonPage() {
 
         <div className="sp-lesson-title">
           <div>
-            <span>Chương 04</span>
-            <span>Bài học 12</span>
+            <span>{t("lessonDemo.chapter", { number: "04" })}</span>
+            <span>{t("lessonDemo.lesson", { number: 12 })}</span>
           </div>
-
           <button type="button">
-            <Icon name="share" /> Chia sẻ bài học
+            <Icon name="share" /> {t("lessonDemo.share")}
           </button>
         </div>
 
-        <h1>Nguyên Tắc Thiết Kế Giao Diện Hiện Đại</h1>
-
+        <h1>{t("lessonDemo.title")}</h1>
         <nav className="sp-tabs">
           <button className="active" type="button">
-            Tổng quan
+            {t("lessonDemo.overview")}
           </button>
-          <button type="button">Tài liệu</button>
-          <button type="button">Đánh giá</button>
+          <button type="button">{t("lessonDemo.resources")}</button>
+          <button type="button">{t("lessonDemo.reviews")}</button>
         </nav>
 
         <div className="sp-lesson-info">
           <div>
-            <p>
-              Trong bài học này, bạn sẽ tìm hiểu sâu hơn về tác động của khoảng
-              trắng trong thiết kế, tâm lý học thị giác và cách sử dụng màu sắc
-              để tạo nên những trải nghiệm người dùng trực quan và hiệu quả.
-            </p>
-
+            <p>{t("lessonDemo.description")}</p>
             <div className="sp-learn-list">
-              <h3>Bạn sẽ học được gì?</h3>
-
+              <h3>{t("lessonDemo.outcomes")}</h3>
               {learnItems.map((item) => (
                 <span key={item}>
                   <Icon name="check_circle" /> {item}
@@ -62,22 +52,19 @@ function LessonPage() {
               ))}
             </div>
           </div>
-
           <aside className="sp-instructor">
-            <h3>Giảng viên</h3>
-
+            <h3>{t("lessonDemo.instructor")}</h3>
             <p>
               <img
                 src="https://api.dicebear.com/9.x/personas/svg?seed=Julian"
                 alt=""
               />
               <strong>Julian Vane</strong>
-              <small>Chuyên gia Thiết kế UI/UX</small>
+              <small>{t("lessonDemo.instructorRole")}</small>
             </p>
           </aside>
         </div>
       </section>
-
       <aside className="sp-lesson-side">
         <CourseContent />
       </aside>

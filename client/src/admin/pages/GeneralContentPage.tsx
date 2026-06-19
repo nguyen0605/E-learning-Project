@@ -1,84 +1,14 @@
-import { useEffect, useState } from "react";
-import { getAuthHeaders } from "../../auth/authHeaders";
+import AdminDataState from "../components/AdminDataState";
+import AdminSidebar from "../components/AdminSidebar";
+import AdminTopbar from "../components/AdminTopbar";
+import { useAdminData } from "../hooks/useAdminData";
+import type { AdminPage } from "../adminNavigation";
 import "../../index.css";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-
-type AdminPage =
-  | "dashboard"
-  | "students"
-  | "courses"
-  | "system"
-  | "content";
 
 type GeneralContentPageProps = {
   activePage: AdminPage;
   onNavigate: (page: AdminPage) => void;
 };
-
-const navItems = [
-  { key: "dashboard" as const, label: "Tổng quan", icon: "dashboard" },
-  { key: "students" as const, label: "Quản lý học viên", icon: "group" },
-  { key: "courses" as const, label: "Quản lý khóa học", icon: "library_books" },
-  { key: "system" as const, label: "Cấu hình hệ thống", icon: "settings" },
-  { key: "content" as const, label: "Nội dung chung", icon: "description" },
-];
-
-const posts = [
-  {
-    title: "Tương lai của học tập thích ứng",
-    category: "Công nghệ giáo dục",
-    author: "Jane Doe",
-    initials: "JD",
-    status: "Đã xuất bản",
-    statusTone: "published",
-    date: "24/10/2023",
-    image:
-      "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=400&q=80",
-  },
-  {
-    title: "Thiết kế thói quen học tập bền vững",
-    category: "Phát triển cá nhân",
-    author: "Mark Smith",
-    initials: "MS",
-    status: "Bản nháp",
-    statusTone: "draft",
-    date: "12/11/2023",
-    image:
-      "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=400&q=80",
-  },
-];
-
-const faqItems = [
-  {
-    question: "Làm thế nào để yêu cầu hoàn tiền cho khóa học?",
-    answer:
-      "Học viên có thể gửi yêu cầu hoàn tiền trong vòng 30 ngày nếu mới hoàn thành dưới 20% nội dung. Yêu cầu được xử lý tại khu vực thanh toán.",
-    active: true,
-  },
-  {
-    question: "Có thể tải video về để xem ngoại tuyến không?",
-    answer: "",
-    active: false,
-  },
-];
-
-const banners = [
-  {
-    title: "Khuyến mãi mùa hè 2024",
-    subtitle: "Kết thúc sau 12 ngày",
-    active: true,
-    image:
-      "https://images.unsplash.com/photo-1557682250-33bd709cbe85?auto=format&fit=crop&w=500&q=80",
-  },
-  {
-    title: "Học bổng cuối năm",
-    subtitle: "Lên lịch ngày 01/12",
-    active: false,
-    image:
-      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=500&q=80",
-  },
-];
 
 type ContentApiResponse = {
   success: boolean;
@@ -116,34 +46,18 @@ function GeneralContentPage({
   activePage,
   onNavigate,
 }: GeneralContentPageProps) {
-  const [pageData, setPageData] = useState<ContentApiResponse["data"] | null>(null);
+  const {
+    data: pageData,
+    error,
+    isLoading,
+  } = useAdminData<ContentApiResponse["data"]>("/general-content");
 
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadContent() {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/admin/general-content`, {
-          headers: getAuthHeaders(),
-        });
-        if (!response.ok) throw new Error(`Failed with ${response.status}`);
-
-        const result = (await response.json()) as ContentApiResponse;
-        if (!ignore) setPageData(result.data);
-      } catch (error) {
-        console.error(error);
-      }
-    }
-
-    loadContent();
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
+  if (!pageData) {
+    return <AdminDataState error={error} isLoading={isLoading} />;
+  }
 
   const displayedPosts =
-    pageData?.posts.map((post) => ({
+    pageData.posts.map((post) => ({
       title: post.title,
       category: post.category,
       author: post.author,
@@ -152,67 +66,25 @@ function GeneralContentPage({
       statusTone: post.status,
       date: new Date(post.publishedAt).toLocaleDateString("vi-VN"),
       image: post.thumbnail,
-    })) ?? posts;
+    }));
   const displayedFaqs =
-    pageData?.faqs.map((faq) => ({
+    pageData.faqs.map((faq) => ({
       question: faq.question,
       answer: faq.answer,
       active: faq.expanded,
-    })) ?? faqItems;
-  const displayedBanners = pageData?.banners ?? banners;
+    }));
+  const displayedBanners = pageData.banners;
 
   return (
     <div className="admin-shell">
-      <aside className="sidebar">
-        <div className="brand-block">
-          <p className="brand-title">LTHDV E-Learning</p>
-          <p className="brand-subtitle">Trang quản trị</p>
-        </div>
-
-        <nav className="sidebar-nav">
-          {navItems.map((item) => (
-            <button
-              key={item.label}
-              className={`nav-item${item.key === activePage ? " active" : ""}`}
-              type="button"
-              onClick={() => onNavigate(item.key)}
-            >
-              <span className="material-symbols-outlined">{item.icon}</span>
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-
-        <div className="pro-card">
-          <p className="pro-label">Quản trị thông minh</p>
-          <p className="pro-copy">Quản lý blog, FAQ và banner truyền thông cho nền tảng.</p>
-        </div>
-      </aside>
+      <AdminSidebar
+        activePage={activePage}
+        description="Quản lý blog, FAQ và banner truyền thông cho nền tảng."
+        onNavigate={onNavigate}
+      />
 
       <main className="main-panel">
-        <header className="topbar">
-          <label className="searchbar" aria-label="Tìm kiếm">
-            <span className="material-symbols-outlined">search</span>
-            <input type="text" placeholder="Tìm bài viết, FAQ hoặc banner..." />
-          </label>
-
-          <div className="topbar-actions">
-            <button className="icon-button" type="button" aria-label="Thông báo">
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="notification-dot" />
-            </button>
-            <div className="profile-chip">
-              <div>
-                <p className="profile-name">Scholar Admin</p>
-                <p className="profile-role">Quản trị viên</p>
-              </div>
-              <img
-                src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=240&q=80"
-                alt="Quản trị viên"
-              />
-            </div>
-          </div>
-        </header>
+        <AdminTopbar searchPlaceholder="Tìm bài viết, FAQ hoặc banner..." />
 
         <section className="content content-page">
           <div className="content-header">
@@ -244,9 +116,9 @@ function GeneralContentPage({
                     <h3>Bài viết gần đây</h3>
                   </div>
                   <div className="content-pills">
-                    <span className="active">Tất cả ({pageData?.summary.totalPosts ?? 24})</span>
-                    <span>Đã xuất bản ({pageData?.summary.publishedPosts ?? 18})</span>
-                    <span>Bản nháp ({pageData?.summary.draftPosts ?? 6})</span>
+                    <span className="active">Tất cả ({pageData.summary.totalPosts})</span>
+                    <span>Đã xuất bản ({pageData.summary.publishedPosts})</span>
+                    <span>Bản nháp ({pageData.summary.draftPosts})</span>
                   </div>
                 </div>
 
@@ -392,12 +264,12 @@ function GeneralContentPage({
 
               <div className="content-insight-card">
                 <p>Chỉ số tương tác</p>
-                <h3>{pageData ? `${(pageData.insights.monthlyReaders / 1000).toFixed(1)}k` : "12.4k"}</h3>
+                <h3>{`${(pageData.insights.monthlyReaders / 1000).toFixed(1)}k`}</h3>
                 <span>Lượt đọc blog mỗi tháng</span>
                 <div className="content-insight-track">
                   <div className="content-insight-fill" />
                 </div>
-                <small>+{pageData?.insights.growthRate ?? 14}% so với tháng trước</small>
+                <small>+{pageData.insights.growthRate}% so với tháng trước</small>
               </div>
             </aside>
           </div>

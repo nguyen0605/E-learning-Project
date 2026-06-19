@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import StatusModal, {
   type StatusModalTone,
 } from "../../shared/components/feedback/StatusModal";
 import AssignmentSubmissionPanel from "../components/AssignmentSubmissionPanel";
 import Icon from "../components/Icon";
-import { getCourseDetail } from "../services/studentCoursesApi";
+import {
+  completeLesson,
+  getCourseDetail,
+} from "../services/studentCoursesApi";
 import type {
   StudentAssignmentSubmission,
   StudentCourseDetail,
@@ -45,17 +50,6 @@ type FeedbackModalState = {
 const fallbackPoster =
   "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80";
 
-const learningItems: Array<{
-  key: LearningItem;
-  label: string;
-  icon: string;
-}> = [
-  { key: "video", label: "Video bài học", icon: "play_circle" },
-  { key: "reading", label: "Bài đọc", icon: "article" },
-  { key: "quiz", label: "Quiz", icon: "quiz" },
-  { key: "assignment", label: "Bài tập", icon: "assignment" },
-];
-
 function flattenLessons(course: StudentCourseDetail) {
   return course.modules.flatMap((module, moduleIndex) =>
     module.lessons.map((lesson, lessonIndex) => ({
@@ -88,19 +82,24 @@ function isQuizPassed(quiz: StudentQuiz, selectedAnswers: SelectedAnswers) {
   );
 }
 
-function formatDuration(minutes: number) {
+function formatDuration(minutes: number, t: TFunction<"student">) {
   if (!minutes) {
-    return "0 phút";
+    return t("learning.durationMinutes", { count: 0 });
   }
 
   if (minutes < 60) {
-    return `${minutes} phút`;
+    return t("learning.durationMinutes", { count: minutes });
   }
 
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
 
-  return remainingMinutes ? `${hours} giờ ${remainingMinutes} phút` : `${hours} giờ`;
+  return remainingMinutes
+    ? t("learning.durationHoursMinutes", {
+        hours,
+        minutes: remainingMinutes,
+      })
+    : t("learning.durationHours", { count: hours });
 }
 
 function getItemDoneState(item: LearningItem, progress?: LessonProgress) {
@@ -179,6 +178,21 @@ function isPlayableVideoFile(url: string) {
 }
 
 function LearningPage({ courseId, onBack }: LearningPageProps) {
+  const { t } = useTranslation("student");
+  const learningItems: Array<{
+    key: LearningItem;
+    label: string;
+    icon: string;
+  }> = [
+    { key: "video", label: t("learning.items.video"), icon: "play_circle" },
+    { key: "reading", label: t("learning.items.reading"), icon: "article" },
+    { key: "quiz", label: t("learning.items.quiz"), icon: "quiz" },
+    {
+      key: "assignment",
+      label: t("learning.items.assignment"),
+      icon: "assignment",
+    },
+  ];
   const [course, setCourse] = useState<StudentCourseDetail | null>(null);
   const [activeLessonId, setActiveLessonId] = useState<number | null>(null);
   const [activeItem, setActiveItem] = useState<LearningItem>("video");
@@ -199,9 +213,6 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
   useEffect(() => {
     let isMounted = true;
 
-    setIsLoading(true);
-    setError("");
-
     getCourseDetail(courseId)
       .then((data) => {
         if (!isMounted) {
@@ -209,6 +220,47 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
         }
 
         const courseLessons = flattenLessons(data);
+
+        const storedProgress = getStoredLearningProgress(courseId);
+        const databaseProgress = Object.fromEntries(
+          courseLessons
+            .filter((item) => item.lesson.isCompleted)
+            .map((item) => [
+              item.lesson.id,
+              {
+                assignmentDone:
+                  storedProgress[item.lesson.id]?.assignmentDone,
+                quizPassed: true,
+                readingDone: true,
+                videoDone: true,
+              },
+            ]),
+        );
+
+        setProgress({
+          ...storedProgress,
+          ...databaseProgress,
+        });
+
+        const unsyncedLessonIds = courseLessons
+          .filter(
+            (item) =>
+              !item.lesson.isCompleted &&
+              isLessonComplete(storedProgress[item.lesson.id]),
+          )
+          .map((item) => item.lesson.id);
+
+        void Promise.all(
+          unsyncedLessonIds.map((lessonId) => completeLesson(lessonId)),
+        ).catch((syncError) => {
+          if (isMounted) {
+            setError(
+              syncError instanceof Error
+                ? syncError.message
+                : t("learning.loadError"),
+            );
+          }
+        });
 
         setCourse(data);
         setActiveLessonId(courseLessons[0]?.lesson.id ?? null);
@@ -218,7 +270,7 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
           setError(
             fetchError instanceof Error
               ? fetchError.message
-              : "Không thể tải bài học.",
+              : t("learning.loadError"),
           );
         }
       })
@@ -231,7 +283,7 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [courseId]);
+  }, [courseId, t]);
 
   useEffect(() => {
     storeLearningProgress(courseId, progress);
@@ -275,13 +327,29 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
     lessonId: number,
     patch: CourseLearningProgress[number],
   ) {
+    const currentLessonProgress = progress[lessonId] ?? {};
+    const nextLessonProgress = {
+      ...currentLessonProgress,
+      ...patch,
+    };
+
     setProgress((current) => ({
       ...current,
-      [lessonId]: {
-        ...(current[lessonId] ?? {}),
-        ...patch,
-      },
+      [lessonId]: nextLessonProgress,
     }));
+
+    if (
+      !isLessonComplete(currentLessonProgress) &&
+      isLessonComplete(nextLessonProgress)
+    ) {
+      void completeLesson(lessonId).catch((syncError) => {
+        setError(
+          syncError instanceof Error
+            ? syncError.message
+            : t("learning.loadError"),
+        );
+      });
+    }
   }
 
   function updateAssignmentSubmission(
@@ -377,8 +445,8 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
       updateLessonProgress(activeLesson.lesson.id, { quizPassed: true });
       openFeedbackModal(
         "warning",
-        "Quiz chưa sẵn sàng",
-        "Bài này chưa có dữ liệu quiz, hệ thống đã ghi nhận tạm để bạn tiếp tục học.",
+        t("learning.quizUnavailableTitle"),
+        t("learning.quizUnavailableMessage"),
       );
       return;
     }
@@ -391,8 +459,10 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
       setQuizQuestionIndex(firstUnansweredQuestionIndex);
       openFeedbackModal(
         "warning",
-        "Bạn chưa hoàn thành quiz",
-        `Bạn chưa làm câu ${firstUnansweredQuestionIndex + 1}.`,
+        t("learning.quizIncompleteTitle"),
+        t("learning.quizIncompleteMessage", {
+          number: firstUnansweredQuestionIndex + 1,
+        }),
       );
       return;
     }
@@ -401,8 +471,8 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
       updateLessonProgress(activeLesson.lesson.id, { quizPassed: true });
       openFeedbackModal(
         "success",
-        "Hoàn thành quiz",
-        "Bạn đã trả lời đúng toàn bộ câu hỏi. Quiz đã được ghi nhận thành công.",
+        t("learning.quizPassedTitle"),
+        t("learning.quizPassedMessage"),
       );
       return;
     }
@@ -410,8 +480,8 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
     resetQuizState();
     openFeedbackModal(
       "error",
-      "Quiz chưa đạt",
-      "Bạn chưa trả lời đúng hết các câu hỏi. Vui lòng làm lại từ đầu.",
+      t("learning.quizFailedTitle"),
+      t("learning.quizFailedMessage"),
     );
   }
 
@@ -528,28 +598,24 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
               <img src={fallbackPoster} alt="" />
               <span className="material-symbols-outlined">play_arrow</span>
               <p>
-                Định dạng video này không phát trực tiếp bằng web player. Bạn có thể
-                mở ở tab mới để xem.
+                {t("learning.videoUnsupported")}
               </p>
             </div>
           ) : (
             <div className="sp-learning-video-placeholder">
               <img src={fallbackPoster} alt="" />
               <span className="material-symbols-outlined">play_arrow</span>
-              <p>Video của bài học này chưa có URL. Bạn vẫn có thể đánh dấu đã xem.</p>
+              <p>{t("learning.videoMissing")}</p>
             </div>
           )}
         </div>
 
         <div className="sp-learning-reader">
-          <h2>Video bài học</h2>
-          <p>
-            Hãy xem hết video trước khi mở bài đọc. Khi video kết thúc, hệ thống sẽ tự
-            ghi nhận; nếu dữ liệu video đang thiếu, bạn có thể đánh dấu thủ công.
-          </p>
+          <h2>{t("learning.videoTitle")}</h2>
+          <p>{t("learning.videoInstruction")}</p>
           {videoUrl && !youtubeEmbedUrl && !canUseVideoTag ? (
             <a href={videoUrl} rel="noreferrer" target="_blank">
-              Mở video ở tab mới
+              {t("learning.openVideo")}
             </a>
           ) : null}
         </div>
@@ -564,16 +630,16 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
 
     return (
       <section className="sp-learning-content-card sp-learning-reader">
-        <span className="sp-learning-eyebrow">Tài liệu đọc</span>
+        <span className="sp-learning-eyebrow">{t("learning.readingTitle")}</span>
         <h2>{activeLesson.lesson.title}</h2>
         <p>
           {activeLesson.lesson.content ||
-            "Bài học này chưa có nội dung đọc. Giảng viên có thể bổ sung sau."}
+            t("learning.readingMissing")}
         </p>
 
         {activeLesson.lesson.resources.length ? (
           <div className="sp-learning-resources">
-            <h3>Tài nguyên đi kèm</h3>
+            <h3>{t("learning.resources")}</h3>
             {activeLesson.lesson.resources.map((resource) => (
               <a href={resource.url} key={resource.id} rel="noreferrer" target="_blank">
                 <Icon name="download" />
@@ -595,12 +661,11 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
     if (!activeQuiz || !activeQuiz.questions.length || !activeQuizQuestion) {
       return (
         <section className="sp-learning-content-card sp-learning-reader">
-          <span className="sp-learning-eyebrow">Quiz</span>
-          <h2>Quiz chưa được tạo</h2>
-          <p>
-            Bài học này chưa có câu hỏi quiz trong database. Bấm nút nộp quiz để
-            hệ thống ghi nhận tạm và tiếp tục luồng học.
-          </p>
+          <span className="sp-learning-eyebrow">
+            {t("learning.items.quiz")}
+          </span>
+          <h2>{t("learning.quizMissingTitle")}</h2>
+          <p>{t("learning.quizMissingDescription")}</p>
         </section>
       );
     }
@@ -609,18 +674,27 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
       <section className="sp-learning-content-card">
         <div className="sp-learning-component-header">
           <div>
-            <span className="sp-learning-eyebrow">Quiz</span>
+            <span className="sp-learning-eyebrow">
+              {t("learning.items.quiz")}
+            </span>
             <h2>{activeQuiz.title}</h2>
             {activeQuiz.description ? <p>{activeQuiz.description}</p> : null}
           </div>
           <div className="sp-learning-score-box">
             <strong>{activeQuiz.questions.length}</strong>
-            <span>câu hỏi</span>
+            <span>
+              {t("learning.questionCount", {
+                count: activeQuiz.questions.length,
+              })}
+            </span>
           </div>
         </div>
 
         <div className="sp-learning-quiz-layout">
-          <aside className="sp-quiz-nav-grid" aria-label="Điều hướng câu hỏi">
+          <aside
+            className="sp-quiz-nav-grid"
+            aria-label={t("learning.questionNavigation")}
+          >
             {activeQuiz.questions.map((question, index) => {
               const selected = selectedAnswers[question.id]?.length;
 
@@ -644,7 +718,10 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
 
           <article className="sp-quiz-focus">
             <span>
-              Câu {quizQuestionIndex + 1}/{activeQuiz.questions.length}
+              {t("learning.questionProgress", {
+                current: quizQuestionIndex + 1,
+                total: activeQuiz.questions.length,
+              })}
             </span>
             <h3>{activeQuizQuestion.text}</h3>
             <div className="sp-quiz-option-list">
@@ -678,7 +755,7 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
                 onClick={() => setQuizQuestionIndex((index) => Math.max(index - 1, 0))}
                 type="button"
               >
-                <Icon name="chevron_left" /> Câu trước
+                <Icon name="chevron_left" /> {t("learning.previousQuestion")}
               </button>
               <button
                 disabled={quizQuestionIndex === activeQuiz.questions.length - 1}
@@ -689,7 +766,7 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
                 }
                 type="button"
               >
-                Câu tiếp <Icon name="chevron_right" />
+                {t("learning.nextQuestion")} <Icon name="chevron_right" />
               </button>
             </div>
           </article>
@@ -708,11 +785,13 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
       <section className="sp-learning-content-card">
         <div className="sp-learning-component-header">
           <div>
-            <span className="sp-learning-eyebrow">Bài tập</span>
-            <h2>Nhiệm vụ của bài học</h2>
-            <p>Bài tập giúp luyện tập thêm, nhưng không khóa bài học tiếp theo.</p>
+            <span className="sp-learning-eyebrow">
+              {t("learning.items.assignment")}
+            </span>
+            <h2>{t("learning.assignmentTitle")}</h2>
+            <p>{t("learning.assignmentDescription")}</p>
           </div>
-          <span className="sp-learning-optional">Không bắt buộc</span>
+          <span className="sp-learning-optional">{t("learning.optional")}</span>
         </div>
 
         <div className="sp-assignment-list">
@@ -738,8 +817,8 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
             <article className="sp-assignment-card">
               <Icon name="assignment_late" />
               <div>
-                <h3>Chưa có bài tập</h3>
-                <p>Giảng viên chưa tạo bài tập cho bài học này.</p>
+                <h3>{t("learning.noAssignment")}</h3>
+                <p>{t("learning.noAssignmentDescription")}</p>
               </div>
             </article>
           )}
@@ -749,16 +828,16 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
   }
 
   if (isLoading) {
-    return <main className="sp-learning-page">Đang tải bài học...</main>;
+    return <main className="sp-learning-page">{t("learning.loading")}</main>;
   }
 
   if (error || !course || !activeLesson) {
     return (
       <main className="sp-learning-page">
         <button className="sp-back-button" onClick={onBack} type="button">
-          <Icon name="chevron_left" /> Quay lại
+          <Icon name="chevron_left" /> {t("learning.back")}
         </button>
-        <p className="sp-state-line error">{error || "Không tìm thấy bài học."}</p>
+        <p className="sp-state-line error">{error || t("learning.notFound")}</p>
       </main>
     );
   }
@@ -789,7 +868,7 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
 
       <section className="sp-learning-main">
         <button className="sp-back-button" onClick={onBack} type="button">
-          <Icon name="chevron_left" /> Khóa học của bạn
+          <Icon name="chevron_left" /> {t("learning.backToCourses")}
         </button>
 
         <header className="sp-learning-head">
@@ -797,15 +876,23 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
             <span>{activeLesson.moduleTitle}</span>
             <h1>{activeLesson.lesson.title}</h1>
             <p>
-              Chương {activeLesson.moduleIndex + 1} · Bài{" "}
-              {activeLesson.lessonIndex + 1} · {formatDuration(activeLesson.lesson.durationMinutes)}
+              {t("learning.chapterLesson", {
+                chapter: activeLesson.moduleIndex + 1,
+                lesson: activeLesson.lessonIndex + 1,
+                duration: formatDuration(
+                  activeLesson.lesson.durationMinutes,
+                  t,
+                ),
+              })}
             </p>
           </div>
           <div className="sp-learning-status-card">
             <strong>
               {completedLessonCount}/{lessons.length}
             </strong>
-            <span>bài đã mở xong</span>
+            <span>
+              {t("learning.completedLessons")}
+            </span>
           </div>
         </header>
 
@@ -820,26 +907,28 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
             onClick={goToPreviousItem}
             type="button"
           >
-            <Icon name="chevron_left" /> Trước
+            <Icon name="chevron_left" /> {t("learning.previous")}
           </button>
 
           <div>
             <strong>{activeItemMeta?.label}</strong>
             <span>
               {activeItem === "assignment"
-                ? "Bài tập không bắt buộc để mở bài tiếp theo"
-                : "Cần hoàn thành để mở bước kế tiếp"}
+                ? t("learning.assignmentHint")
+                : t("learning.requiredHint")}
             </span>
           </div>
 
           {activeItem === "quiz" ? (
             <button onClick={handleSubmitQuiz} type="button">
-              <Icon name="task_alt" /> Nộp quiz
+              <Icon name="task_alt" /> {t("learning.submitQuiz")}
             </button>
           ) : (
             <button onClick={markCurrentItemDone} type="button">
               <Icon name={isCurrentItemDone ? "check_circle" : "task_alt"} />
-              {isCurrentItemDone ? "Đã hoàn thành" : "Đánh dấu xong"}
+              {isCurrentItemDone
+                ? t("learning.completed")
+                : t("learning.markDone")}
             </button>
           )}
 
@@ -849,8 +938,8 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
             type="button"
           >
             {activeItem === "quiz" && currentProgress.quizPassed && nextLesson
-              ? "Bài tiếp"
-              : "Tiếp tục"}
+              ? t("learning.nextLesson")
+              : t("learning.continue")}
             <Icon name="chevron_right" />
           </button>
         </footer>
@@ -860,14 +949,17 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
         <div className="sp-learning-sidebar-head">
           <h2>{course.name}</h2>
           <p>
-            {completedLessonCount}/{lessons.length} bài hoàn thành
+            {t("learning.sidebarCompleted", {
+              completed: completedLessonCount,
+              total: lessons.length,
+            })}
           </p>
         </div>
 
         {course.modules.map((module, moduleIndex) => (
           <section className="sp-learning-chapter" key={module.id}>
             <h3>
-              <span>Chương {moduleIndex + 1}</span>
+              <span>{t("learning.chapter", { number: moduleIndex + 1 })}</span>
               {module.title}
             </h3>
             {module.lessons.map((lesson) => {
@@ -905,7 +997,7 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
                       }
                     />
                     <span>{lesson.title}</span>
-                    <small>{formatDuration(lesson.durationMinutes)}</small>
+                    <small>{formatDuration(lesson.durationMinutes, t)}</small>
                   </button>
 
                   <div className="sp-learning-component-grid">

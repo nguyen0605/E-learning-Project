@@ -155,7 +155,15 @@ export async function getStudentEnrolledCourses(studentId) {
        e.enrollment_id,
        e.enrolled_at,
        e.status AS enrollment_status,
-       e.progress_percent,
+       CASE
+         WHEN COUNT(DISTINCT l.lesson_id) = 0 THEN 0
+         ELSE ROUND(
+           COUNT(DISTINCT CASE
+             WHEN lp.is_completed = TRUE THEN l.lesson_id
+           END) * 100.0 / COUNT(DISTINCT l.lesson_id),
+           2
+         )
+       END AS calculated_progress_percent,
        cb.batch_id,
        cb.batch_name,
        cb.start_date,
@@ -193,6 +201,9 @@ export async function getStudentEnrolledCourses(studentId) {
      LEFT JOIN enrollments e2 ON e2.batch_id = cb.batch_id
      LEFT JOIN course_modules cm ON cm.course_id = c.course_id
      LEFT JOIN lessons l ON l.module_id = cm.module_id
+     LEFT JOIN lesson_progress lp
+       ON lp.lesson_id = l.lesson_id
+      AND lp.student_id = e.student_id
      WHERE e.student_id = ?
        AND e.status IN ('PENDING', 'ACTIVE', 'COMPLETED')
        AND c.status = 'APPROVED'
@@ -206,7 +217,7 @@ export async function getStudentEnrolledCourses(studentId) {
       id: row.enrollment_id,
       enrolledAt: row.enrolled_at,
       status: row.enrollment_status,
-      progressPercent: toNumber(row.progress_percent),
+      progressPercent: toNumber(row.calculated_progress_percent),
     },
     batch: {
       id: row.batch_id,
@@ -385,7 +396,7 @@ export async function getStudentCourseDetail(courseId, studentId) {
     const placeholders = moduleIds.map(() => "?").join(",");
 
     [lessonRows] = await db.execute(
-       `SELECT
+      `SELECT
          lesson_id,
          module_id,
          lesson_title,
@@ -395,11 +406,18 @@ export async function getStudentCourseDetail(courseId, studentId) {
          video_web_url,
          duration_minutes,
          is_preview,
-         order_no
+         order_no,
+         EXISTS(
+           SELECT 1
+           FROM lesson_progress lp
+           WHERE lp.lesson_id = lessons.lesson_id
+             AND lp.student_id = ?
+             AND lp.is_completed = TRUE
+         ) AS is_completed
        FROM lessons
        WHERE module_id IN (${placeholders})
        ORDER BY module_id, order_no`,
-      moduleIds,
+      [studentId ?? 0, ...moduleIds],
     );
 
     const lessonIds = lessonRows.map((lesson) => lesson.lesson_id);
@@ -590,6 +608,7 @@ export async function getStudentCourseDetail(courseId, studentId) {
       videoUrl: normalizeVideoUrl(lesson.video_web_url || lesson.video_url),
       durationMinutes: toNumber(lesson.duration_minutes),
       isPreview: Boolean(lesson.is_preview),
+      isCompleted: Boolean(lesson.is_completed),
       orderNo: lesson.order_no,
       resources: resourcesByLessonId.get(lesson.lesson_id) ?? [],
       assignments: assignmentsByLessonId.get(lesson.lesson_id) ?? [],
@@ -664,5 +683,71 @@ export async function getStudentCourseDetail(courseId, studentId) {
         avatarUrl: review.student_avatar_url,
       },
     })),
+  };
+}
+
+export async function completeStudentLesson(studentId, lessonId) {
+  const [eligibleRows] = await db.query(
+    `SELECT e.enrollment_id, c.course_id
+     FROM lessons l
+     INNER JOIN course_modules m ON m.module_id = l.module_id
+     INNER JOIN courses c ON c.course_id = m.course_id
+     INNER JOIN course_batches b ON b.course_id = c.course_id
+     INNER JOIN enrollments e
+       ON e.batch_id = b.batch_id
+      AND e.student_id = ?
+      AND e.status IN ('ACTIVE', 'COMPLETED')
+     WHERE l.lesson_id = ?
+     LIMIT 1`,
+    [studentId, lessonId],
+  );
+
+  if (!eligibleRows.length) return null;
+
+  await db.query(
+    `INSERT INTO lesson_progress
+      (student_id, lesson_id, is_completed, completed_at)
+     VALUES (?, ?, TRUE, NOW())
+     ON DUPLICATE KEY UPDATE
+       is_completed = TRUE,
+       completed_at = COALESCE(completed_at, NOW())`,
+    [studentId, lessonId],
+  );
+
+  const { enrollment_id: enrollmentId, course_id: courseId } = eligibleRows[0];
+  const [progressRows] = await db.query(
+    `SELECT
+       COUNT(DISTINCT l.lesson_id) AS total_lessons,
+       COUNT(DISTINCT CASE WHEN lp.is_completed = TRUE THEN l.lesson_id END) AS completed_lessons
+     FROM course_modules m
+     INNER JOIN lessons l ON l.module_id = m.module_id
+     LEFT JOIN lesson_progress lp
+       ON lp.lesson_id = l.lesson_id
+      AND lp.student_id = ?
+     WHERE m.course_id = ?`,
+    [studentId, courseId],
+  );
+
+  const totalLessons = Number(progressRows[0]?.total_lessons ?? 0);
+  const completedLessons = Number(progressRows[0]?.completed_lessons ?? 0);
+  const progressPercent =
+    totalLessons === 0
+      ? 0
+      : Number(((completedLessons / totalLessons) * 100).toFixed(2));
+
+  await db.query(
+    `UPDATE enrollments
+     SET progress_percent = ?,
+         status = CASE WHEN ? >= 100 THEN 'COMPLETED' ELSE status END
+     WHERE enrollment_id = ?`,
+    [progressPercent, progressPercent, enrollmentId],
+  );
+
+  return {
+    lessonId: Number(lessonId),
+    courseId: Number(courseId),
+    completedLessons,
+    totalLessons,
+    progressPercent,
   };
 }

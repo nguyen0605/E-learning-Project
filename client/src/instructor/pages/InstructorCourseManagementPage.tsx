@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from "react";
+﻿/* eslint-disable react-hooks/exhaustive-deps */
+import { useEffect, useState } from "react";
 import InstructorLayout from "../components/InstructorLayout";
 import { getInstructorAuthTeacherId } from "../auth/instructorAuth";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -853,7 +854,8 @@ function InstructorCourseManagementPage() {
     });
   }
 
-  const displayedStats = (pageData?.summary ?? courseManagementStats).map((stat) =>
+  type StatItem = { label: string; value: string; icon: string; tone?: string };
+  const displayedStats = (pageData?.summary ?? courseManagementStats).map((stat: StatItem) =>
     stat.icon === "event_available" ? { ...stat, label: "Lớp nhận học viên" } : stat,
   );
   const displayedCourses: InstructorCourseItem[] = pageData?.instructorCourses ?? instructorCourses;
@@ -2645,7 +2647,7 @@ function InstructorCourseManagementPage() {
           </div>
 
           <div className="instructor-batch-list">
-            {displayedBatches.map((batch) => (
+            {displayedBatches.map((batch: { id: number; code: string; name: string; students: string; status: string; statusValue: string; course?: string; dates?: string; mode?: string }) => (
               <div className="instructor-batch-item" key={batch.code}>
                 <div>
                   <strong>{batch.code}</strong>
@@ -2670,7 +2672,7 @@ function InstructorCourseManagementPage() {
           </div>
 
           <div className="instructor-module-list">
-            {displayedLessonPlanner.map((module) => (
+            {displayedLessonPlanner.map((module: { id: number; module?: string; title: string; courseId: number; lessons?: number; duration?: string; state?: string }) => (
               <div className="instructor-module-item" key={module.title}>
                 <div className="instructor-module-index">{module.module}</div>
                 <div>

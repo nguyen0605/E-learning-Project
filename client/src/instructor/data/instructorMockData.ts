@@ -1,576 +1,573 @@
+// Mock data used by instructor pages during development
 export type InstructorNavKey =
-  | "dashboard"
-  | "courses"
-  | "quizzes"
-  | "students"
-  | "interaction"
-  | "analytics"
-  | "profile";
+	| "dashboard"
+	| "courses"
+	| "quizzes"
+	| "students"
+	| "interaction"
+	| "analytics"
+	| "profile";
 
 export const instructorProfile = {
-  name: "Thầy Minh Anh",
-  role: "Giảng viên chính",
-  avatar:
-    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80",
+	name: "Giảng viên 02",
+	role: "Giảng viên chính",
+	avatar:
+		"https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80",
 };
 
 export const instructorNavItems: {
-  key: InstructorNavKey;
-  label: string;
-  icon: string;
-  path: string;
+	key: InstructorNavKey;
+	label: string;
+	icon: string;
+	path: string;
 }[] = [
-  { key: "dashboard", label: "Tổng quan", icon: "dashboard", path: "/instructor" },
-  {
-    key: "courses",
-    label: "Quản lý khóa học",
-    icon: "library_books",
-    path: "/instructor/courses",
-  },
-  {
-    key: "quizzes",
-    label: "Bài kiểm tra",
-    icon: "quiz",
-    path: "/instructor/quizzes",
-  },
-  { key: "students", label: "Học viên", icon: "group", path: "/instructor/students" },
-  {
-    key: "interaction",
-    label: "Tương tác",
-    icon: "forum",
-    path: "/instructor/interaction",
-  },
-  {
-    key: "analytics",
-    label: "Phân tích",
-    icon: "analytics",
-    path: "/instructor/analytics",
-  },
-  {
-    key: "profile",
-    label: "Hồ sơ",
-    icon: "account_circle",
-    path: "/instructor/profile",
-  },
-];
-
-export const dashboardStats = [
-  {
-    label: "Khóa học đang dạy",
-    value: "8",
-    change: "+2 trong tháng này",
-    icon: "menu_book",
-    tone: "blue",
-  },
-  {
-    label: "Tổng học viên",
-    value: "426",
-    change: "+18.4% tăng trưởng",
-    icon: "groups",
-    tone: "slate",
-  },
-  {
-    label: "Hoàn thành TB",
-    value: "78%",
-    change: "+6.2% cải thiện",
-    icon: "trending_up",
-    tone: "green",
-  },
-  {
-    label: "Cần chấm điểm",
-    value: "23",
-    change: "Cần xử lý",
-    icon: "rate_review",
-    tone: "amber",
-  },
-];
-
-export const teachingSchedule = [
-  {
-    time: "09:00",
-    title: "Workshop ReactJS thực chiến",
-    batch: "FE-React-02",
-    mode: "Google Meet",
-    status: "Sắp diễn ra",
-  },
-  {
-    time: "13:30",
-    title: "Cố vấn Web căn bản",
-    batch: "WEB-BASIC-01",
-    mode: "Zoom",
-    status: "Đã lên lịch",
-  },
-  {
-    time: "19:00",
-    title: "Phân tích tình huống tài chính cá nhân",
-    batch: "FIN-01",
-    mode: "Phòng nội bộ",
-    status: "Đã lên lịch",
-  },
-];
-
-export const coursePerformance = [
-  {
-    title: "ReactJS thực chiến cho người mới",
-    category: "Lập trình",
-    students: 128,
-    completion: 84,
-    rating: 4.9,
-    revenue: "168 triệu",
-    status: "Đã duyệt",
-  },
-  {
-    title: "Nền tảng Web với HTML, CSS, JS",
-    category: "Lập trình",
-    students: 96,
-    completion: 72,
-    rating: 4.7,
-    revenue: "102 triệu",
-    status: "Đã duyệt",
-  },
-  {
-    title: "Tài chính cá nhân cho người trẻ",
-    category: "Kinh doanh",
-    students: 64,
-    completion: 61,
-    rating: 4.8,
-    revenue: "73 triệu",
-    status: "Chờ duyệt",
-  },
+	{ key: "dashboard", label: "Tổng quan", icon: "dashboard", path: "/instructor" },
+	{
+		key: "courses",
+		label: "Quản lý khóa học",
+		icon: "library_books",
+		path: "/instructor/courses",
+	},
+	{
+		key: "quizzes",
+		label: "Bài kiểm tra",
+		icon: "quiz",
+		path: "/instructor/quizzes",
+	},
+	{ key: "students", label: "Học viên", icon: "group", path: "/instructor/students" },
+	{
+		key: "interaction",
+		label: "Tương tác",
+		icon: "forum",
+		path: "/instructor/interaction",
+	},
+	{
+		key: "analytics",
+		label: "Phân tích",
+		icon: "analytics",
+		path: "/instructor/analytics",
+	},
+	{
+		key: "profile",
+		label: "Hồ sơ",
+		icon: "account_circle",
+		path: "/instructor/profile",
+	},
 ];
 
 export const courseManagementStats = [
-  { label: "Khóa học đã xuất bản", value: "6", icon: "verified", tone: "blue" },
-  { label: "Bài học nháp", value: "14", icon: "edit_note", tone: "slate" },
-  { label: "Lớp đang mở", value: "5", icon: "event_available", tone: "green" },
-  { label: "Chờ duyệt", value: "2", icon: "hourglass_top", tone: "amber" },
+	{ label: "Khóa học", value: "12", icon: "menu_book", tone: "primary" },
+	{ label: "Học viên", value: "240", icon: "groups", tone: "accent" },
+	{ label: "Chương", value: "48", icon: "view_list", tone: "muted" },
+	{ label: "Lớp nhận học viên", value: "6", icon: "event_available", tone: "success" },
 ];
 
 export const instructorCourses = [
-  {
-    title: "ReactJS thực chiến cho người mới",
-    category: "Lập trình",
-    level: "Trung cấp",
-    status: "Đã xuất bản",
-    students: 128,
-    modules: 8,
-    lessons: 36,
-    completion: 84,
-    thumbnail:
-      "https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    title: "Nền tảng Web với HTML, CSS, JS",
-    category: "Lập trình",
-    level: "Cơ bản",
-    status: "Đã xuất bản",
-    students: 96,
-    modules: 6,
-    lessons: 28,
-    completion: 72,
-    thumbnail:
-      "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    title: "Tài chính cá nhân cho người trẻ",
-    category: "Kinh doanh",
-    level: "Cơ bản",
-    status: "Chờ duyệt",
-    students: 64,
-    modules: 5,
-    lessons: 22,
-    completion: 61,
-    thumbnail:
-      "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=600&q=80",
-  },
+	{
+		id: 101,
+		title: "Lập trình Python cho người mới",
+		category: "Lập trình",
+		level: "BEGINNER",
+		students: 120,
+		modules: 8,
+		lessons: 32,
+		completion: 72,
+		thumbnail: "",
+		status: "Đã xuất bản",
+		statusTone: "success",
+		workflowStatus: "APPROVED",
+	},
+	{
+		id: 102,
+		title: "Thiết kế Web với React",
+		category: "Frontend",
+		level: "INTERMEDIATE",
+		students: 80,
+		modules: 6,
+		lessons: 24,
+		completion: 55,
+		thumbnail: "",
+		status: "Bản nháp",
+		statusTone: "muted",
+		workflowStatus: "DRAFT",
+	},
 ];
 
 export const courseBatches = [
-  {
-    code: "FE-React-02",
-    course: "ReactJS thực chiến",
-    dates: "12/06 - 24/08",
-    students: "42 / 50",
-    mode: "Trực tuyến",
-    status: "Đang học",
-  },
-  {
-    code: "WEB-BASIC-01",
-    course: "Nền tảng Web",
-    dates: "20/06 - 06/09",
-    students: "38 / 45",
-    mode: "Kết hợp",
-    status: "Đang mở",
-  },
-  {
-    code: "FIN-01",
-    course: "Tài chính cá nhân",
-    dates: "02/07 - 18/08",
-    students: "24 / 35",
-    mode: "Trực tuyến",
-    status: "Đang mở",
-  },
+	{
+		id: 201,
+		code: "BATCH-201",
+		name: "Lớp sáng",
+		students: "30/40",
+		status: "OPEN",
+		statusValue: "OPEN",
+		course: "Lập trình Python cho người mới",
+		dates: "01/06/2026 - 30/06/2026",
+		mode: "Offline",
+	},
+	{
+		id: 202,
+		code: "BATCH-202",
+		name: "Lớp tối",
+		students: "40/40",
+		status: "FULL",
+		statusValue: "FULL",
+		course: "Thiết kế Web với React",
+		dates: "05/06/2026 - 05/07/2026",
+		mode: "Online",
+	},
 ];
 
 export const lessonPlanner = [
-  {
-    module: "Chương 01",
-    title: "Nền tảng React",
-    lessons: 6,
-    duration: "4 giờ 20 phút",
-    state: "Đã xuất bản",
-  },
-  {
-    module: "Chương 02",
-    title: "Component và Props",
-    lessons: 5,
-    duration: "3 giờ 45 phút",
-    state: "Đã xuất bản",
-  },
-  {
-    module: "Chương 03",
-    title: "State, Effect và luồng dữ liệu",
-    lessons: 7,
-    duration: "5 giờ 10 phút",
-    state: "Bản nháp",
-  },
+	{
+		id: 301,
+		module: "Module 1: Giới thiệu",
+		title: "Tuần 1 - Giới thiệu",
+		courseId: 101,
+		lessons: 4,
+		duration: "3 giờ",
+		state: "scheduled",
+		date: "2026-06-01",
+	},
+	{
+		id: 302,
+		module: "Module 2: Cơ bản",
+		title: "Tuần 2 - Cơ bản Python",
+		courseId: 101,
+		lessons: 5,
+		duration: "4 giờ",
+		state: "planned",
+		date: "2026-06-08",
+	},
 ];
 
-export const studentSignals = [
-  {
-    name: "Nguyễn Bảo Trâm",
-    course: "ReactJS thực chiến",
-    progress: 92,
-    note: "Sẵn sàng duyệt dự án cuối khóa",
-  },
-  {
-    name: "Lê Quang Huy",
-    course: "Nền tảng Web",
-    progress: 48,
-    note: "Vắng hai buổi học trực tuyến",
-  },
-  {
-    name: "Phạm Minh Khoa",
-    course: "Tài chính cá nhân",
-    progress: 76,
-    note: "Nộp bài tập muộn",
-  },
+export const dashboardStats = [
+	{ label: "Khóa học đang dạy", value: "8", change: "+2 trong tháng này", icon: "menu_book", tone: "blue" },
+	{ label: "Tổng học viên", value: "426", change: "+18.4% tăng trưởng", icon: "groups", tone: "slate" },
+	{ label: "Hoàn thành TB", value: "78%", change: "+6.2% cải thiện", icon: "trending_up", tone: "green" },
+	{ label: "Cần chấm điểm", value: "23", change: "Cần xử lý", icon: "rate_review", tone: "amber" },
 ];
 
-export const studentManagementStats = [
-  { label: "Học viên ghi danh", value: "426", icon: "groups", tone: "blue" },
-  { label: "Hoạt động tuần này", value: "312", icon: "bolt", tone: "green" },
-  { label: "Có rủi ro", value: "18", icon: "warning", tone: "amber" },
-  { label: "Đã hoàn thành", value: "74", icon: "workspace_premium", tone: "slate" },
-];
-
-export const instructorStudents = [
-  {
-    name: "Nguyễn Bảo Trâm",
-    email: "tram.nguyen@student.vn",
-    course: "ReactJS thực chiến",
-    batch: "FE-React-02",
-    progress: 92,
-    attendance: 96,
-    lastActive: "Hôm nay",
-    status: "Xuất sắc",
-  },
-  {
-    name: "Lê Quang Huy",
-    email: "huy.le@student.vn",
-    course: "Nền tảng Web",
-    batch: "WEB-BASIC-01",
-    progress: 48,
-    attendance: 62,
-    lastActive: "3 ngày trước",
-    status: "Có rủi ro",
-  },
-  {
-    name: "Phạm Minh Khoa",
-    email: "khoa.pham@student.vn",
-    course: "Tài chính cá nhân",
-    batch: "FIN-01",
-    progress: 76,
-    attendance: 88,
-    lastActive: "Hôm qua",
-    status: "Đúng tiến độ",
-  },
-  {
-    name: "Trần Gia Hân",
-    email: "han.tran@student.vn",
-    course: "ReactJS thực chiến",
-    batch: "FE-React-02",
-    progress: 69,
-    attendance: 74,
-    lastActive: "Hôm nay",
-    status: "Cần xem xét",
-  },
-  {
-    name: "Đoàn Thanh Nam",
-    email: "nam.doan@student.vn",
-    course: "Nền tảng Web",
-    batch: "WEB-BASIC-01",
-    progress: 83,
-    attendance: 91,
-    lastActive: "Hôm nay",
-    status: "Đúng tiến độ",
-  },
-];
-
-export const studentAttentionQueue = [
-  {
-    name: "Lê Quang Huy",
-    reason: "Tiến độ dưới 50% và đã vắng hai buổi học.",
-    action: "Gửi ghi chú cố vấn",
-    priority: "Cao",
-  },
-  {
-    name: "Trần Gia Hân",
-    reason: "Bài tập của chương hiện tại đang nộp muộn.",
-    action: "Xem yêu cầu gia hạn",
-    priority: "Trung bình",
-  },
-  {
-    name: "Phạm Minh Khoa",
-    reason: "Điểm bài kiểm tra dưới ngưỡng đạt nhưng chuyên cần vẫn tốt.",
-    action: "Giao bài kiểm tra luyện tập",
-    priority: "Trung bình",
-  },
-];
-
-export const cohortFilters = [
-  "Tất cả lớp",
-  "FE-React-02",
-  "WEB-BASIC-01",
-  "FIN-01",
-];
-
-export const quizManagementStats = [
-  { label: "Bài đã xuất bản", value: "12", icon: "quiz", tone: "blue" },
-  { label: "Ngân hàng câu hỏi", value: "248", icon: "help", tone: "slate" },
-  { label: "Tỷ lệ đạt TB", value: "82%", icon: "fact_check", tone: "green" },
-  { label: "Cần chấm", value: "17", icon: "grading", tone: "amber" },
-];
-
-export const instructorQuizzes = [
-  {
-    title: "Kiểm tra Component React",
-    course: "ReactJS thực chiến",
-    batch: "FE-React-02",
-    questions: 24,
-    duration: "45 phút",
-    attempts: 118,
-    passRate: 86,
-    status: "Đã xuất bản",
-  },
-  {
-    title: "Kiểm tra nền tảng HTML & CSS",
-    course: "Nền tảng Web",
-    batch: "WEB-BASIC-01",
-    questions: 32,
-    duration: "60 phút",
-    attempts: 84,
-    passRate: 78,
-    status: "Đã xuất bản",
-  },
-  {
-    title: "Bài luận tình huống tài chính",
-    course: "Tài chính cá nhân",
-    batch: "FIN-01",
-    questions: 8,
-    duration: "40 phút",
-    attempts: 36,
-    passRate: 69,
-    status: "Bản nháp",
-  },
-];
-
-export const quizQuestionBank = [
-  {
-    topic: "Quản lý State trong React",
-    type: "Nhiều lựa chọn",
-    count: 56,
-    difficulty: "Trung cấp",
-  },
-  {
-    topic: "HTML ngữ nghĩa",
-    type: "Một lựa chọn",
-    count: 42,
-    difficulty: "Cơ bản",
-  },
-  {
-    topic: "Lập kế hoạch ngân sách",
-    type: "Tự luận",
-    count: 18,
-    difficulty: "Cơ bản",
-  },
-];
-
-export const gradingQueue = [
-  {
-    student: "Trần Gia Hân",
-    quiz: "Bài luận tình huống tài chính",
-    submitted: "2 giờ trước",
-    score: "Chờ chấm",
-  },
-  {
-    student: "Phạm Minh Khoa",
-    quiz: "Kiểm tra Component React",
-    submitted: "Hôm qua",
-    score: "Cần xem lại",
-  },
-  {
-    student: "Lê Quang Huy",
-    quiz: "Kiểm tra nền tảng HTML & CSS",
-    submitted: "Hôm qua",
-    score: "Chờ chấm",
-  },
-];
-
-export const interactionStats = [
-  { label: "Chủ đề đang mở", value: "34", icon: "forum", tone: "blue" },
-  { label: "Tin chưa đọc", value: "19", icon: "mark_chat_unread", tone: "amber" },
-  { label: "Đã xử lý hôm nay", value: "11", icon: "task_alt", tone: "green" },
-  { label: "Thông báo", value: "7", icon: "campaign", tone: "slate" },
-];
-
-export const discussionThreads = [
-  {
-    title: "Làm rõ cleanup trong useEffect ở chương dự án",
-    course: "ReactJS thực chiến",
-    batch: "FE-React-02",
-    replies: 14,
-    lastActivity: "12 phút trước",
-    status: "Cần phản hồi",
-  },
-  {
-    title: "Bài tập 02 có thể dùng Flexbox thay CSS Grid không?",
-    course: "Nền tảng Web",
-    batch: "WEB-BASIC-01",
-    replies: 9,
-    lastActivity: "38 phút trước",
-    status: "Đang thảo luận",
-  },
-  {
-    title: "Xin ví dụ cho bảng kế hoạch ngân sách",
-    course: "Tài chính cá nhân",
-    batch: "FIN-01",
-    replies: 6,
-    lastActivity: "2 giờ trước",
-    status: "Đã trả lời",
-  },
-];
-
-export const directMessages = [
-  {
-    student: "Lê Quang Huy",
-    preview: "Em vắng buổi học trước. Thầy cho em xin bản ghi được không ạ?",
-    time: "08:42",
-    priority: "Cao",
-  },
-  {
-    student: "Nguyễn Bảo Trâm",
-    preview: "Thầy xem giúp em đề cương dự án cuối khóa trước thứ Sáu được không ạ?",
-    time: "10:15",
-    priority: "Trung bình",
-  },
-  {
-    student: "Trần Gia Hân",
-    preview: "Em đã nộp bài muộn và có đính kèm ghi chú giải thích.",
-    time: "Hôm qua",
-    priority: "Trung bình",
-  },
-];
-
-export const announcementDrafts = [
-  {
-    title: "Buổi học trực tuyến chuyển sang tối thứ Sáu",
-    target: "FE-React-02",
-    state: "Bản nháp",
-  },
-  {
-    title: "Đã đăng rubric và ví dụ cho bài tập 03",
-    target: "WEB-BASIC-01",
-    state: "Đã lên lịch",
-  },
-  {
-    title: "Thời hạn nhận phản hồi bảng tài chính",
-    target: "FIN-01",
-    state: "Đã xuất bản",
-  },
-];
-
-export const analyticsStats = [
-  { label: "Giờ giảng dạy", value: "146", icon: "schedule", tone: "blue" },
-  { label: "Tỷ lệ hoàn thành", value: "78%", icon: "trending_up", tone: "green" },
-  { label: "Điểm kiểm tra TB", value: "8.2", icon: "score", tone: "slate" },
-  { label: "Tín hiệu rủi ro", value: "18", icon: "crisis_alert", tone: "amber" },
-];
-
-export const engagementTrend = [
-  { label: "T1", value: 46 },
-  { label: "T2", value: 58 },
-  { label: "T3", value: 52 },
-  { label: "T4", value: 74 },
-  { label: "T5", value: 81 },
-  { label: "T6", value: 88 },
-];
-
-export const courseInsights = [
-  {
-    title: "ReactJS thực chiến",
-    completion: 84,
-    quizAverage: 8.7,
-    attendance: 91,
-    trend: "+12%",
-  },
-  {
-    title: "Nền tảng Web",
-    completion: 72,
-    quizAverage: 7.9,
-    attendance: 84,
-    trend: "+6%",
-  },
-  {
-    title: "Tài chính cá nhân",
-    completion: 61,
-    quizAverage: 7.4,
-    attendance: 79,
-    trend: "-3%",
-  },
-];
-
-export const learnerSegments = [
-  { label: "Xuất sắc", value: 34, tone: "blue" },
-  { label: "Đúng tiến độ", value: 48, tone: "green" },
-  { label: "Cần xem xét", value: 12, tone: "amber" },
-  { label: "Có rủi ro", value: 6, tone: "red" },
-];
-
-export const analyticsRecommendations = [
-  {
-    title: "Rà soát Chương 03 trong ReactJS thực chiến",
-    detail: "Tỷ lệ rời bài tăng sau bài đầu tiên về quản lý state.",
-    impact: "Cao",
-  },
-  {
-    title: "Thêm một buổi ôn tập cho Nền tảng Web",
-    detail: "Chuyên cần ổn định nhưng điểm kiểm tra giảm ở phần bố cục.",
-    impact: "Trung bình",
-  },
-  {
-    title: "Đăng ví dụ cho bảng kế hoạch tài chính",
-    detail: "Câu trả lời tự luận cho thấy học viên còn lúng túng ở nhóm ngân sách.",
-    impact: "Trung bình",
-  },
+export const teachingSchedule = [
+	{
+		time: "09:00",
+		title: "Workshop ReactJS thực chiến",
+		batch: "REACT-TEACH-01",
+		mode: "Google Meet",
+		status: "Sắp diễn ra",
+	},
+	{
+		time: "14:00",
+		title: "Ôn tập HTML/CSS",
+		batch: "WEB-TEACH-01",
+		mode: "Zoom",
+		status: "Hôm nay",
+	},
+	{
+		time: "19:30",
+		title: "Tư vấn tài chính cá nhân",
+		batch: "FINANCE-TEACH-01",
+		mode: "Zoom",
+		status: "Tối nay",
+	},
 ];
 
 export const analyticsBars = [
-  { label: "T2", value: 54 },
-  { label: "T3", value: 68 },
-  { label: "T4", value: 42 },
-  { label: "T5", value: 86 },
-  { label: "T6", value: 74 },
-  { label: "T7", value: 92 },
-  { label: "CN", value: 63 },
+	{ label: "T1", value: 44 },
+	{ label: "T2", value: 58 },
+	{ label: "T3", value: 62 },
+	{ label: "T4", value: 74 },
+	{ label: "T5", value: 68 },
+	{ label: "T6", value: 82 },
 ];
+
+export const coursePerformance = [
+	{
+		id: 1,
+		title: "Lập trình Web căn bản với HTML, CSS, JavaScript",
+		category: "Lập trình",
+		students: 3,
+		completion: 89,
+		rating: 5,
+		revenue: "2 triệu",
+		status: "Đã duyệt",
+	},
+	{
+		id: 2,
+		title: "ReactJS thực chiến cho người mới",
+		category: "Lập trình",
+		students: 3,
+		completion: 49,
+		rating: 4,
+		revenue: "3 triệu",
+		status: "Đã duyệt",
+	},
+	{
+		id: 9,
+		title: "Tài chính cá nhân cho người trẻ",
+		category: "Kinh doanh",
+		students: 3,
+		completion: 71,
+		rating: 5,
+		revenue: "2 triệu",
+		status: "Đã duyệt",
+	},
+];
+
+export const studentSignals = [
+	{
+		id: 6,
+		name: "Học viên 06",
+		course: "ReactJS thực chiến cho người mới",
+		note: "Tiến độ dưới 50%, cần hỗ trợ sớm.",
+		progress: 33,
+	},
+	{
+		id: 4,
+		name: "Học viên 04",
+		course: "ReactJS thực chiến cho người mới",
+		note: "Chuyên cần giảm trong tuần gần nhất.",
+		progress: 48,
+	},
+	{
+		id: 3,
+		name: "Học viên 03",
+		course: "Cơ sở dữ liệu",
+		note: "Chưa bắt đầu học sau khi được xếp lớp.",
+		progress: 0,
+	},
+];
+
+export const studentManagementStats = [
+	{ label: "Học viên", value: "15", icon: "groups", tone: "blue" },
+	{ label: "Đang học", value: "12", icon: "school", tone: "green" },
+	{ label: "Cần hỗ trợ", value: "3", icon: "support_agent", tone: "amber" },
+	{ label: "Hoàn thành", value: "2", icon: "verified", tone: "slate" },
+];
+
+export const cohortFilters = [
+	"Tất cả lớp",
+	"WEB-TEACH-01",
+	"REACT-TEACH-01",
+	"FINANCE-TEACH-01",
+	"VUE-TEACH-01",
+	"DOCKER-TEACH-01",
+];
+
+export const instructorStudents = [
+	{
+		id: 1,
+		name: "Học viên 01",
+		email: "hv01@elearning.vn",
+		course: "Lập trình Web căn bản với HTML, CSS, JavaScript",
+		batch: "WEB-TEACH-01",
+		progress: 92,
+		attendance: 88,
+		status: "Xuất sắc",
+		lastActive: "1 ngày trước",
+		latestIntervention: {
+			id: 1,
+			note: "Theo dõi tốt, có thể giao bài nâng cao.",
+			nextAction: "Gửi tài liệu mở rộng.",
+			createdAt: "2026-06-11 08:00:00",
+		},
+	},
+	{
+		id: 4,
+		name: "Học viên 04",
+		email: "hv04@elearning.vn",
+		course: "ReactJS thực chiến cho người mới",
+		batch: "REACT-TEACH-01",
+		progress: 48,
+		attendance: 70,
+		status: "Có rủi ro",
+		lastActive: "5 ngày trước",
+		latestIntervention: {
+			id: 2,
+			note: "Cần nhắc học viên hoàn thành bài React props.",
+			nextAction: "Nhắn tin sau buổi học.",
+			createdAt: "2026-06-11 09:00:00",
+		},
+	},
+	{
+		id: 6,
+		name: "Học viên 06",
+		email: "hv06@elearning.vn",
+		course: "Docker và deploy cơ bản",
+		batch: "DOCKER-TEACH-01",
+		progress: 18,
+		attendance: 70,
+		status: "Có rủi ro",
+		lastActive: "9 ngày trước",
+		latestIntervention: {
+			id: 3,
+			note: "Tiến độ thấp, cần hẹn hỗ trợ riêng.",
+			nextAction: "Gửi lịch phụ đạo.",
+			createdAt: "2026-06-11 10:00:00",
+		},
+	},
+	{
+		id: 9,
+		name: "Học viên 09",
+		email: "hv09@elearning.vn",
+		course: "Tài chính cá nhân cho người trẻ",
+		batch: "FINANCE-TEACH-01",
+		progress: 74,
+		attendance: 70,
+		status: "Cần xem xét",
+		lastActive: "3 ngày trước",
+		latestIntervention: {
+			id: 4,
+			note: "Cần hoàn thành quiz tài chính.",
+			nextAction: "Nhắc trước hạn.",
+			createdAt: "2026-06-11 11:00:00",
+		},
+	},
+];
+
+export const studentAttentionQueue = [
+	{
+		name: "Học viên 06",
+		priority: "Cao",
+		reason: "Tiến độ dưới 50%, cần hỗ trợ sớm.",
+		action: "Chi tiết",
+	},
+	{
+		name: "Học viên 04",
+		priority: "Cao",
+		reason: "Chuyên cần giảm và còn bài chưa hoàn thành.",
+		action: "Chi tiết",
+	},
+	{
+		name: "Học viên 09",
+		priority: "Trung bình",
+		reason: "Cần nhắc hoàn thành bài kiểm tra.",
+		action: "Chi tiết",
+	},
+];
+
+export const interactionStats = [
+	{ label: "Thảo luận mới", value: "7", icon: "forum", tone: "blue" },
+	{ label: "Tin nhắn", value: "12", icon: "mail", tone: "slate" },
+	{ label: "Thông báo", value: "5", icon: "campaign", tone: "green" },
+	{ label: "Cần phản hồi", value: "3", icon: "quickreply", tone: "amber" },
+];
+
+export const discussionThreads = [
+	{
+		id: 1402,
+		title: "Props và state khác nhau như thế nào?",
+		content: "Em vẫn bị nhầm khi truyền dữ liệu qua component.",
+		author: "Học viên 04",
+		course: "ReactJS thực chiến cho người mới",
+		batch: "REACT-TEACH-01",
+		replies: 1,
+		lastActivity: "7 ngày trước",
+		status: "Cần phản hồi",
+		comments: [
+			{
+				id: 1,
+				author: "Học viên 04",
+				time: "7 ngày trước",
+				content: "Em vẫn bị nhầm khi truyền dữ liệu qua component.",
+				isTeacher: false,
+			},
+		],
+	},
+	{
+		id: 1401,
+		title: "Em cần giải thích thêm về responsive",
+		content: "Thầy có thể cho thêm ví dụ về mobile layout không ạ?",
+		author: "Học viên 01",
+		course: "Lập trình Web căn bản với HTML, CSS, JavaScript",
+		batch: "WEB-TEACH-01",
+		replies: 2,
+		lastActivity: "7 ngày trước",
+		status: "Đã trả lời",
+		comments: [
+			{
+				id: 1,
+				author: "Học viên 01",
+				time: "7 ngày trước",
+				content: "Thầy có thể cho thêm ví dụ về mobile layout không ạ?",
+				isTeacher: false,
+			},
+			{
+				id: 2,
+				author: "Giảng viên 02",
+				time: "7 ngày trước",
+				content: "Thầy sẽ bổ sung ví dụ trong buổi tối nay.",
+				isTeacher: true,
+			},
+		],
+	},
+];
+
+export const directMessages = [
+	{
+		student: "Học viên 04",
+		preview: "Em vẫn bị nhầm khi truyền dữ liệu qua component.",
+		time: "7 ngày trước",
+		priority: "Cao",
+	},
+	{
+		student: "Học viên 01",
+		preview: "Thầy có thể cho thêm ví dụ về mobile layout không ạ?",
+		time: "7 ngày trước",
+		priority: "Trung bình",
+	},
+	{
+		student: "Học viên 07",
+		preview: "Thầy có file mẫu để em áp dụng không ạ?",
+		time: "7 ngày trước",
+		priority: "Trung bình",
+	},
+];
+
+export const announcementDrafts = [
+	{ title: "Nhắc lịch học tối nay", target: "WEB-TEACH-01", state: "Đã gửi" },
+	{ title: "Cập nhật bài tập React", target: "REACT-TEACH-01", state: "Bản nháp" },
+	{ title: "Tài liệu ôn tập tài chính", target: "FINANCE-TEACH-01", state: "Đã gửi" },
+];
+
+export const quizManagementStats = [
+	{ label: "Bài kiểm tra", value: "8", icon: "quiz", tone: "blue" },
+	{ label: "Câu hỏi", value: "42", icon: "help", tone: "slate" },
+	{ label: "Lượt làm", value: "96", icon: "assignment_turned_in", tone: "green" },
+	{ label: "Cần chấm", value: "3", icon: "rate_review", tone: "amber" },
+];
+
+export const instructorQuizzes = [
+	{
+		title: "Quiz HTML và CSS cơ bản",
+		course: "Lập trình Web căn bản với HTML, CSS, JavaScript",
+		batch: "WEB-TEACH-01",
+		questions: 2,
+		duration: "30 phút",
+		attempts: 2,
+		passRate: 100,
+		status: "Đã xuất bản",
+	},
+	{
+		title: "Quiz React Props và State",
+		course: "ReactJS thực chiến cho người mới",
+		batch: "REACT-TEACH-01",
+		questions: 2,
+		duration: "45 phút",
+		attempts: 2,
+		passRate: 50,
+		status: "Đã xuất bản",
+	},
+	{
+		title: "Quiz Tài chính cá nhân",
+		course: "Tài chính cá nhân cho người trẻ",
+		batch: "FINANCE-TEACH-01",
+		questions: 2,
+		duration: "35 phút",
+		attempts: 1,
+		passRate: 0,
+		status: "Bản nháp",
+	},
+];
+
+export const quizQuestionBank = [
+	{
+		topic: "HTML cơ bản",
+		title: "Thẻ nào dùng để tạo tiêu đề lớn nhất trong HTML?",
+		course: "Lập trình Web căn bản với HTML, CSS, JavaScript",
+		type: "Trắc nghiệm",
+		difficulty: "Cơ bản",
+		usage: "3 lần dùng",
+		count: 12,
+	},
+	{
+		topic: "React Props và State",
+		title: "Props trong React dùng để làm gì?",
+		course: "ReactJS thực chiến cho người mới",
+		type: "Trắc nghiệm",
+		difficulty: "Trung bình",
+		usage: "2 lần dùng",
+		count: 8,
+	},
+];
+
+export const gradingQueue = [
+	{
+		student: "Học viên 07",
+		quiz: "Quiz Tài chính cá nhân",
+		score: "Chờ chấm",
+		submitted: "1 ngày trước",
+	},
+	{
+		student: "Học viên 04",
+		quiz: "Quiz React Props và State",
+		score: "Chờ chấm",
+		submitted: "2 ngày trước",
+	},
+];
+
+export const analyticsStats = [
+	{ label: "Tỷ lệ hoàn thành", value: "78%", icon: "trending_up", tone: "green" },
+	{ label: "Điểm TB", value: "8.2", icon: "grade", tone: "blue" },
+	{ label: "Chuyên cần", value: "82%", icon: "event_available", tone: "slate" },
+	{ label: "Cần theo dõi", value: "5", icon: "warning", tone: "amber" },
+];
+
+export const engagementTrend = [
+	{ label: "T1", value: 42 },
+	{ label: "T2", value: 55 },
+	{ label: "T3", value: 61 },
+	{ label: "T4", value: 72 },
+	{ label: "T5", value: 66 },
+	{ label: "T6", value: 84 },
+];
+
+export const learnerSegments = [
+	{ label: "Hoàn thành tốt", value: 46, tone: "green" },
+	{ label: "Đang ổn định", value: 38, tone: "blue" },
+	{ label: "Cần hỗ trợ", value: 16, tone: "amber" },
+];
+
+export const courseInsights = [
+	{
+		title: "Lập trình Web căn bản với HTML, CSS, JavaScript",
+		completion: 89,
+		quizAverage: 8.8,
+		attendance: 86,
+		trend: "+12%",
+	},
+	{
+		title: "ReactJS thực chiến cho người mới",
+		completion: 49,
+		quizAverage: 7.2,
+		attendance: 70,
+		trend: "-4%",
+	},
+	{
+		title: "Tài chính cá nhân cho người trẻ",
+		completion: 71,
+		quizAverage: 8.1,
+		attendance: 78,
+		trend: "+6%",
+	},
+];
+
+export const analyticsRecommendations = [
+	{
+		title: "Nhắc nhóm học viên tiến độ thấp",
+		impact: "Ưu tiên cao",
+		detail: "Có 3 học viên dưới 50% tiến độ, nên gửi nhắc việc và gợi ý tài liệu ôn tập.",
+	},
+	{
+		title: "Bổ sung ví dụ React Props",
+		impact: "Tác động vừa",
+		detail: "Câu hỏi về props/state xuất hiện nhiều trong thảo luận, nên thêm bài luyện tập ngắn.",
+	},
+	{
+		title: "Tổng kết lớp tài chính",
+		impact: "Tác động tốt",
+		detail: "Lớp có chuyên cần ổn, phù hợp gửi checklist trước buổi cuối.",
+	},
+];
+
+export default {};

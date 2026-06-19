@@ -1,23 +1,93 @@
-import CourseCard from "../components/CourseCard";
-import FilterGroup from "../components/FilterGroup";
+import { useEffect, useState } from "react";
 import Icon from "../components/Icon";
-import { courses } from "../data/courseData";
+import StudentCourseCard from "../components/StudentCourseCard";
+import {
+  getCourseCategories,
+  getCourses,
+} from "../services/studentCoursesApi";
+import type {
+  StudentCourse,
+  StudentCourseCategory,
+} from "../types/course.types";
 
-function CategoriesPage() {
+type CategoriesPageProps = {
+  onOpenCourse: (courseId: number) => void;
+};
+
+function CategoriesPage({ onOpenCourse }: CategoriesPageProps) {
+  const [categories, setCategories] = useState<StudentCourseCategory[]>([]);
+  const [courses, setCourses] = useState<StudentCourse[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
+    null,
+  );
+  const [searchText, setSearchText] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setIsLoading(true);
+    setError("");
+
+    Promise.all([
+      getCourseCategories(),
+      getCourses({
+        categoryId: selectedCategoryId,
+        search: searchText.trim(),
+      }),
+    ])
+      .then(([categoryData, courseData]) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setCategories(categoryData);
+        setCourses(courseData);
+      })
+      .catch((fetchError) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setError(
+          fetchError instanceof Error
+            ? fetchError.message
+            : "Không thể tải dữ liệu danh mục.",
+        );
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedCategoryId, searchText]);
+
+  const selectedCategory = categories.find(
+    (category) => category.id === selectedCategoryId,
+  );
+
   return (
     <main className="sp-category-page">
       <section className="sp-category-hero">
-        <h1>Làm chủ kỹ năng của bạn với độ chính xác của một chuyên gia.</h1>
-
+        <h1>Làm chủ kỹ năng của bạn với dữ liệu khóa học thực tế.</h1>
         <p>
-          Khám phá bộ sưu tập các khóa học chuyên sâu được tuyển chọn dành cho
-          người học hiện đại. Từ công nghệ, kinh doanh đến thiết kế và nghệ
-          thuật sáng tạo.
+          Khám phá danh mục khóa học đang hoạt động trong hệ thống, cùng thông
+          tin giảng viên, bài học, học phí và đánh giá được lấy trực tiếp từ
+          database.
         </p>
 
         <div className="sp-hero-search">
           <Icon name="search" />
-          <input placeholder="Tìm kiếm 'Lập trình Web' hoặc 'Khoa học Dữ liệu'..." />
+          <input
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder="Tìm kiếm khóa học..."
+            value={searchText}
+          />
           <button type="button">Khám phá</button>
         </div>
       </section>
@@ -25,66 +95,59 @@ function CategoriesPage() {
       <div className="sp-results-layout">
         <aside className="sp-filter-panel compact">
           <h2>
-            <Icon name="filter_list" /> Bộ lọc
+            <Icon name="filter_list" /> Danh mục
           </h2>
 
-          <FilterGroup
-            title="Danh mục"
-            items={[
-              "Thiết kế & Nghệ thuật",
-              "Công nghệ thông tin",
-              "Kinh doanh",
-              "Khoa học xã hội",
-            ]}
-            checkedIndex={0}
-          />
-
-          <div className="sp-slider">
-            <h3>Mức học phí</h3>
-
-            <input type="range" defaultValue="55" />
-
-            <p>
-              <span>0đ</span>
-              <span>10.000.000đ+</span>
-            </p>
-          </div>
-
-          <div className="sp-rating-toggle">
-            <h3>Đánh giá tối thiểu</h3>
-
-            <button type="button">4.0+</button>
-
-            <button className="active" type="button">
-              4.5+
+          <div className="sp-category-list">
+            <button
+              className={selectedCategoryId === null ? "active" : ""}
+              onClick={() => setSelectedCategoryId(null)}
+              type="button"
+            >
+              Tất cả danh mục
+              <span>{categories.reduce((sum, item) => sum + item.courseCount, 0)}</span>
             </button>
+            {categories.map((category) => (
+              <button
+                className={selectedCategoryId === category.id ? "active" : ""}
+                key={category.id}
+                onClick={() => setSelectedCategoryId(category.id)}
+                type="button"
+              >
+                {category.name}
+                <span>{category.courseCount}</span>
+              </button>
+            ))}
           </div>
         </aside>
 
         <section>
           <div className="sp-results-head">
             <h2>
-              Tìm thấy <span>842</span> khóa học thuộc lĩnh vực{" "}
-              <span>"Thiết kế"</span>
+              Tìm thấy <span>{courses.length}</span> khóa học
+              {selectedCategory ? (
+                <>
+                  {" "}
+                  thuộc lĩnh vực <span>"{selectedCategory.name}"</span>
+                </>
+              ) : null}
             </h2>
-
-            <button type="button">
-              Phổ biến nhất <Icon name="expand_more" />
-            </button>
           </div>
 
-          <div className="sp-course-grid">
-            {courses.map((course) => (
-              <CourseCard
-                key={`category-${course.title}`}
-                course={course}
-              />
-            ))}
-          </div>
+          {isLoading ? <p className="sp-state-line">Đang tải danh mục...</p> : null}
+          {error ? <p className="sp-state-line error">{error}</p> : null}
 
-          <button className="sp-load-more" type="button">
-            Xem thêm khóa học
-          </button>
+          {!isLoading && !error ? (
+            <div className="sp-course-grid">
+              {courses.map((course) => (
+                <StudentCourseCard
+                  course={course}
+                  key={`category-${course.id}`}
+                  onOpen={onOpenCourse}
+                />
+              ))}
+            </div>
+          ) : null}
         </section>
       </div>
     </main>

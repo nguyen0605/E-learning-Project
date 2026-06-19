@@ -307,6 +307,7 @@ CREATE TABLE lessons (
 
     content TEXT,
     video_url VARCHAR(255),
+    video_web_url VARCHAR(500),
     duration_minutes INT DEFAULT 0,
     is_preview BOOLEAN DEFAULT FALSE,
     order_no INT NOT NULL,

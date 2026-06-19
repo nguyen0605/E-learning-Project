@@ -57,3 +57,41 @@ export async function removeCartItem(cartItemId: number) {
 
   return readApiData<{ deleted: boolean }>(response);
 }
+
+export type VnpayPaymentCreateResult = {
+  amount: number;
+  cartId: number;
+  itemCount: number;
+  paymentUrl: string;
+  txnRef: string;
+};
+
+export type VnpayPaymentReturnResult = {
+  amount: number;
+  enrolledCount: number;
+  message: string;
+  responseCode?: string;
+  status: "SUCCESS" | "FAILED";
+  txnRef: string;
+};
+
+export async function createVnpayPayment() {
+  const response = await fetch(`${API_BASE_URL}/api/student/payments/vnpay/create`, {
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+
+  return readApiData<VnpayPaymentCreateResult>(response);
+}
+
+export async function verifyVnpayPaymentReturn(search: string) {
+  const query = search.startsWith("?") ? search : `?${search}`;
+  const response = await fetch(`${API_BASE_URL}/api/student/payments/vnpay/return${query}`, {
+    headers: getAuthHeaders(),
+  });
+
+  return readApiData<VnpayPaymentReturnResult>(response);
+}

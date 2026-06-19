@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Icon from "../components/Icon";
-import { getCart, removeCartItem } from "../services/studentCartApi";
+import { createVnpayPayment, getCart, removeCartItem } from "../services/studentCartApi";
 import type { StudentCart } from "../types/cart.types";
 
 const fallbackImage =
@@ -26,6 +26,8 @@ function CartPage() {
   const [cart, setCart] = useState<StudentCart | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isCreatingPayment, setIsCreatingPayment] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
 
   async function loadCart() {
@@ -65,6 +67,25 @@ function CartPage() {
       );
     } finally {
       setRemovingId(null);
+    }
+  }
+
+  async function handleVnpayCheckout() {
+    setIsCreatingPayment(true);
+    setError("");
+
+    try {
+      const payment = await createVnpayPayment();
+      window.location.href = payment.paymentUrl;
+    } catch (checkoutError) {
+      setError(
+        checkoutError instanceof Error
+          ? checkoutError.message
+          : "Không thể tạo giao dịch VNPAY.",
+      );
+      setIsCheckoutOpen(false);
+    } finally {
+      setIsCreatingPayment(false);
     }
   }
 
@@ -153,12 +174,59 @@ function CartPage() {
           <strong>{formatCurrency(summary.total)}</strong>
         </p>
 
-        <button className="sp-checkout" disabled={items.length === 0} type="button">
+        <button
+          className="sp-checkout"
+          disabled={items.length === 0 || isCreatingPayment}
+          onClick={() => setIsCheckoutOpen(true)}
+          type="button"
+        >
           Tiến hành thanh toán
         </button>
 
         <small>Giỏ hàng được lưu theo tài khoản học viên của bạn.</small>
       </aside>
+
+      {isCheckoutOpen ? (
+        <div className="sp-payment-backdrop" onClick={() => setIsCheckoutOpen(false)} role="presentation">
+          <section
+            aria-label="Xác nhận thanh toán"
+            aria-modal="true"
+            className="sp-payment-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <button
+              aria-label="Đóng thanh toán"
+              className="sp-payment-close"
+              onClick={() => setIsCheckoutOpen(false)}
+              type="button"
+            >
+              <Icon name="close" />
+            </button>
+            <p className="sp-eyebrow">Thanh toán</p>
+            <h2>Xác nhận thanh toán VNPAY</h2>
+            <p>
+              Bạn sẽ được chuyển sang cổng thanh toán VNPAY sandbox để hoàn tất
+              đơn hàng {summary.itemCount} khóa học.
+            </p>
+            <div className="sp-payment-total">
+              <span>Tổng thanh toán</span>
+              <strong>{formatCurrency(summary.total)}</strong>
+            </div>
+            <button
+              className="sp-checkout"
+              disabled={isCreatingPayment}
+              onClick={() => void handleVnpayCheckout()}
+              type="button"
+            >
+              {isCreatingPayment ? "Đang tạo giao dịch..." : "Thanh toán qua VNPAY"}
+            </button>
+            <small>
+              Giao dịch thành công sẽ tự thêm khóa học vào mục Khóa học của tôi.
+            </small>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

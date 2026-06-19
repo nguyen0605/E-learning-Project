@@ -14,6 +14,10 @@ import {
   assignmentUploadMiddleware,
   saveStudentAssignmentSubmission,
 } from "../services/studentAssignments.service.js";
+import {
+  createStudentVnpayPayment,
+  verifyStudentVnpayReturn,
+} from "../services/studentPayments.service.js";
 
 const router = Router();
 
@@ -110,6 +114,46 @@ router.delete("/cart/items/:id", async (req, res) => {
     });
   } catch (error) {
     handleRouteError(res, error, "Failed to remove cart item.");
+  }
+});
+
+router.post("/payments/vnpay/create", async (req, res) => {
+  try {
+    const result = await createStudentVnpayPayment(req.auth.user.id, req);
+
+    if (!result.ok) {
+      return res.status(result.status).json({
+        success: false,
+        message: result.message,
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    handleRouteError(res, error, "Failed to create VNPAY payment.");
+  }
+});
+
+router.get("/payments/vnpay/return", async (req, res) => {
+  try {
+    const result = await verifyStudentVnpayReturn(req.auth.user.id, req.query);
+
+    if (!result.ok) {
+      return res.status(result.status).json({
+        success: false,
+        message: result.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    handleRouteError(res, error, "Failed to verify VNPAY payment.");
   }
 });
 

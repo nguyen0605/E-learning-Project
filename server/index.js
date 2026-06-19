@@ -1,6 +1,10 @@
+import "dotenv/config";
 import express from "express";
 import adminRoutes from "./routes/admin.routes.js";
+import authRoutes from "./routes/auth.routes.js";
 import instructorRoutes from "./routes/instructor.routes.js";
+import studentRoutes from "./routes/student.routes.js";
+import { requireAuth, requireRole } from "./middleware/auth.middleware.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -27,7 +31,9 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/admin", adminRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/instructor", instructorRoutes);
+app.use("/api/student", requireAuth, requireRole("STUDENT"), studentRoutes);
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);

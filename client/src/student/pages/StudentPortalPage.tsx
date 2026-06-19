@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Footer from "../components/Footer";
 import StudentHeader from "../components/StudentHeader";
 import type { StudentView } from "../types/student.types";
@@ -15,8 +16,18 @@ import MyCoursesPage from "../views/MyCoursesPage";
 import "./StudentPortalPage.css";
 
 function StudentPortalPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeView, setActiveView] = useState<StudentView>("home");
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const requestedView = searchParams.get("view");
+
+    if (requestedView === "myCourses" || requestedView === "cart" || requestedView === "courses") {
+      setActiveView(requestedView);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   function handleOpenCourse(courseId: number) {
     setSelectedCourseId(courseId);

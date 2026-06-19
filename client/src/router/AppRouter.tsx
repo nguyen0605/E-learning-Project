@@ -19,6 +19,7 @@ import SystemConfigurationPage from "../admin/pages/SystemConfigurationPage";
 import StudentLoginPage from "../student/pages/StudentLoginPage";
 import StudentPortalPage from "../student/pages/StudentPortalPage";
 import StudentRegisterPage from "../student/pages/StudentRegisterPage";
+import PaymentReturnPage from "../student/views/PaymentReturnPage";
 
 type AdminPage = "dashboard" | "students" | "courses" | "system" | "content";
 
@@ -55,6 +56,14 @@ function StudentRoutes() {
         element={
           <ProtectedRoute allowedRoles={["STUDENT"]}>
             <StudentPortalPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/payment-return"
+        element={
+          <ProtectedRoute allowedRoles={["STUDENT"]}>
+            <PaymentReturnPage />
           </ProtectedRoute>
         }
       />

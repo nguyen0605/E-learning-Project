@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import logo from "../../assets/logo-learnX.png";
 import AdminDataState from "../components/AdminDataState";
 import AdminSidebar from "../components/AdminSidebar";
@@ -129,6 +130,7 @@ function AdminDashboardPage({
   activePage,
   onNavigate,
 }: AdminDashboardPageProps) {
+  const { t } = useTranslation("admin");
   const {
     data: dashboard,
     error,
@@ -241,12 +243,12 @@ function AdminDashboardPage({
     <div className="admin-shell">
       <AdminSidebar
         activePage={activePage}
-        description="Dashboard đang kết nối với dữ liệu quản trị thực tế."
+        description={t("descriptions.dashboard")}
         onNavigate={onNavigate}
       />
 
       <main className="main-panel">
-        <AdminTopbar searchPlaceholder="Tìm thống kê, khóa học hoặc người dùng..." />
+        <AdminTopbar searchPlaceholder={t("search.dashboard")} />
 
         <section className="content">
           <div className="hero">

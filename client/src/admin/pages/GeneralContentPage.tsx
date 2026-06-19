@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import AdminDataState from "../components/AdminDataState";
 import AdminSidebar from "../components/AdminSidebar";
 import AdminTopbar from "../components/AdminTopbar";
@@ -46,6 +47,7 @@ function GeneralContentPage({
   activePage,
   onNavigate,
 }: GeneralContentPageProps) {
+  const { t } = useTranslation("admin");
   const {
     data: pageData,
     error,
@@ -79,12 +81,12 @@ function GeneralContentPage({
     <div className="admin-shell">
       <AdminSidebar
         activePage={activePage}
-        description="Quản lý blog, FAQ và banner truyền thông cho nền tảng."
+        description={t("descriptions.content")}
         onNavigate={onNavigate}
       />
 
       <main className="main-panel">
-        <AdminTopbar searchPlaceholder="Tìm bài viết, FAQ hoặc banner..." />
+        <AdminTopbar searchPlaceholder={t("search.content")} />
 
         <section className="content content-page">
           <div className="content-header">

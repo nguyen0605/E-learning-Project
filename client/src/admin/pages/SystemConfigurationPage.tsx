@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import AdminDataState from "../components/AdminDataState";
 import AdminSidebar from "../components/AdminSidebar";
 import AdminTopbar from "../components/AdminTopbar";
@@ -37,6 +38,7 @@ function SystemConfigurationPage({
   activePage,
   onNavigate,
 }: SystemConfigurationPageProps) {
+  const { t } = useTranslation("admin");
   const {
     data: pageData,
     error,
@@ -51,12 +53,12 @@ function SystemConfigurationPage({
     <div className="admin-shell">
       <AdminSidebar
         activePage={activePage}
-        description="Bảng điều khiển tổng cho nhận diện nền tảng và giao thức bảo mật."
+        description={t("descriptions.system")}
         onNavigate={onNavigate}
       />
 
       <main className="main-panel">
-        <AdminTopbar searchPlaceholder="Tìm cấu hình hệ thống..." />
+        <AdminTopbar searchPlaceholder={t("search.system")} />
 
         <section className="content system-page">
           <div className="hero">

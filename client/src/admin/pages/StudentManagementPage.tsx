@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import AdminDataState from "../components/AdminDataState";
 import AdminSidebar from "../components/AdminSidebar";
 import AdminTopbar from "../components/AdminTopbar";
@@ -92,6 +93,7 @@ function StudentManagementPage({
   activePage,
   onNavigate,
 }: StudentManagementPageProps) {
+  const { t } = useTranslation("admin");
   const [activeFilter, setActiveFilter] = useState<StudentFilter>("all");
   const [statusOverrides, setStatusOverrides] = useState<Record<number, string>>({});
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
@@ -260,12 +262,12 @@ function StudentManagementPage({
     <div className="admin-shell">
       <AdminSidebar
         activePage={activePage}
-        description="Theo dõi tiến độ và quản lý học viên trên toàn hệ thống."
+        description={t("descriptions.students")}
         onNavigate={onNavigate}
       />
 
       <main className="main-panel">
-        <AdminTopbar searchPlaceholder="Tìm học viên, hồ sơ hoặc nhật ký..." />
+        <AdminTopbar searchPlaceholder={t("search.students")} />
 
         <section className="content student-page">
           <div className="hero">

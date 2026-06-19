@@ -5,6 +5,8 @@ export type InstructorAuthSession = {
   role: string;
   avatar?: string | null;
   workplace?: string;
+  token: string;
+  expiresAt: string;
 };
 
 const STORAGE_KEY = "instructorAuthSession";
@@ -16,7 +18,12 @@ export function getInstructorAuthSession(): InstructorAuthSession | null {
     if (!rawSession) return null;
 
     const parsed = JSON.parse(rawSession) as InstructorAuthSession;
-    if (!parsed.teacherId || !parsed.email) return null;
+    if (
+      !parsed.teacherId ||
+      !parsed.email ||
+      !parsed.token ||
+      Date.parse(parsed.expiresAt) <= Date.now()
+    ) return null;
 
     return parsed;
   } catch {
@@ -40,4 +47,8 @@ export function hasInstructorAuthSession() {
 
 export function getInstructorAuthTeacherId() {
   return getInstructorAuthSession()?.teacherId ?? FALLBACK_TEACHER_ID;
+}
+
+export function getInstructorAuthToken() {
+  return getInstructorAuthSession()?.token ?? "";
 }

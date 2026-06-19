@@ -1,14 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getIntlLocale } from "../../i18n/locale";
 import Icon from "../components/Icon";
 import { addCartItem } from "../services/studentCartApi";
-import { getCourseDetail } from "../services/studentCoursesApi";
-import type { StudentCourseDetail } from "../types/course.types";
+import {
+  getCourseDetail,
+  getCourseReviewEligibility,
+  saveCourseReview,
+} from "../services/studentCoursesApi";
+import type {
+  StudentCourseDetail,
+  StudentCourseReviewEligibility,
+} from "../types/course.types";
 
 type CourseDetailPageProps = {
   courseId: number;
+  focusedReviewId?: number | null;
+  isPublic?: boolean;
   onBack: () => void;
+  onOpenInstructor?: (teacherId: number) => void;
+  onRequireLogin?: () => void;
 };
 
 const fallbackImage =
@@ -18,7 +29,14 @@ function getCourseImage(course: StudentCourseDetail) {
   return course.thumbnailUrl?.startsWith("http") ? course.thumbnailUrl : fallbackImage;
 }
 
-function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
+function CourseDetailPage({
+  courseId,
+  focusedReviewId = null,
+  isPublic = false,
+  onBack,
+  onOpenInstructor,
+  onRequireLogin,
+}: CourseDetailPageProps) {
   const { t, i18n } = useTranslation("student");
   const language = i18n.resolvedLanguage;
   const [course, setCourse] = useState<StudentCourseDetail | null>(null);
@@ -28,9 +46,15 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
 
-  function isBatchSelectable(batch: StudentCourseDetail["batches"][number]) {
-    return batch.status === "OPEN" || batch.status === "STARTED";
-  }
+  const [reviewEligibility, setReviewEligibility] =
+    useState<StudentCourseReviewEligibility | null>(null);
+  const [courseRating, setCourseRating] = useState(0);
+  const [teacherRating, setTeacherRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [isSavingReview, setIsSavingReview] = useState(false);
+  const reviewsSectionRef = useRef<HTMLElement>(null);
+
 
   function formatCurrency(value: number) {
     return new Intl.NumberFormat(getIntlLocale(language), {
@@ -91,17 +115,35 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
       .map(([, label]) => label);
   }
 
+  function isBatchSelectable(batch: StudentCourseDetail["batches"][number]) {
+    return batch.status === "OPEN" || batch.status === "STARTED";
+  }
+
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
     setError("");
 
-    getCourseDetail(courseId)
-      .then((data) => {
+    Promise.all([
+      getCourseDetail(courseId),
+      isPublic
+        ? Promise.resolve(null)
+        : getCourseReviewEligibility(courseId).catch(() => null),
+    ])
+      .then(([data, eligibility]) => {
         if (isMounted) {
           setCourse(data);
-          const defaultBatch = data.batches.find((batch) => isBatchSelectable(batch)) ?? null;
+          const defaultBatch =
+            data.batches.find((batch) => batch.id === selectedBatchId && isBatchSelectable(batch)) ??
+            data.batches.find((batch) => isBatchSelectable(batch)) ??
+            null;
           setSelectedBatchId(defaultBatch?.id ?? null);
+
+          setReviewEligibility(eligibility);
+          setCourseRating(eligibility?.existingReview?.rating ?? 0);
+          setTeacherRating(eligibility?.existingReview?.teacherRating ?? 0);
+          setReviewComment(eligibility?.existingReview?.comment ?? "");
+
         }
       })
       .catch(() => {
@@ -118,7 +160,19 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [courseId, t]);
+  }, [courseId, isPublic, selectedBatchId, t]);
+
+  useEffect(() => {
+    if (isLoading || !course || !focusedReviewId) return;
+
+    window.setTimeout(() => {
+      const reviewElement = document.getElementById(`course-review-${focusedReviewId}`);
+      (reviewElement ?? reviewsSectionRef.current)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 100);
+  }, [course, focusedReviewId, isLoading]);
 
   if (isLoading) {
     return <main className="sp-course-detail-page">{t("courseDetail.loading")}</main>;
@@ -137,23 +191,72 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
 
   const selectedBatch =
     course.batches.find((batch) => batch.id === selectedBatchId && isBatchSelectable(batch)) ?? null;
+  const purchasableBatch = selectedBatch;
 
   async function handleAddToCart() {
-    if (!selectedBatch) {
+
+    if (isPublic) {
+      onRequireLogin?.();
+      return;
+    }
+    if (!purchasableBatch) {
+
       setCartMessage(t("courseDetail.noBatchForCart"));
       return;
     }
     setIsAddingToCart(true);
     setCartMessage("");
     try {
-      await addCartItem(selectedBatch.id);
-      setCartMessage(`Da chon lop ${selectedBatch.name} vao gio hang.`);
+      await addCartItem(purchasableBatch.id);
+      setCartMessage(`Đã chọn lớp ${purchasableBatch.name} vào giỏ hàng.`);
     } catch (addError) {
       setCartMessage(
         addError instanceof Error ? addError.message : t("courseDetail.addToCartError"),
       );
     } finally {
       setIsAddingToCart(false);
+    }
+  }
+
+  async function handleSaveReview() {
+    if (!reviewEligibility?.eligible) return;
+    if (!courseRating || !teacherRating) {
+      setReviewMessage(t("courseDetail.reviewForm.ratingRequired"));
+      return;
+    }
+
+    const isEditing = Boolean(reviewEligibility.existingReview);
+    setIsSavingReview(true);
+    setReviewMessage("");
+    try {
+      await saveCourseReview(
+        courseId,
+        {
+          rating: courseRating,
+          teacherRating,
+          comment: reviewComment.trim(),
+        },
+        isEditing,
+      );
+      const [nextCourse, nextEligibility] = await Promise.all([
+        getCourseDetail(courseId),
+        getCourseReviewEligibility(courseId),
+      ]);
+      setCourse(nextCourse);
+      setReviewEligibility(nextEligibility);
+      setReviewMessage(
+        isEditing
+          ? t("courseDetail.reviewForm.updated")
+          : t("courseDetail.reviewForm.submitted"),
+      );
+    } catch (saveError) {
+      setReviewMessage(
+        saveError instanceof Error
+          ? saveError.message
+          : t("courseDetail.reviewForm.saveError"),
+      );
+    } finally {
+      setIsSavingReview(false);
     }
   }
 
@@ -174,7 +277,14 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
               {t("courseDetail.reviews", { count: course.stats.reviewCount })})
             </span>
             <span>
-              <Icon name="person" /> {course.teacher.fullName}
+              <Icon name="person" />{" "}
+              <button
+                className="sp-teacher-link"
+                onClick={() => onOpenInstructor?.(course.teacher.id)}
+                type="button"
+              >
+                {course.teacher.fullName}
+              </button>
             </span>
             <span>
               <Icon name="signal_cellular_alt" />{" "}
@@ -249,12 +359,125 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
             </div>
           </article>
 
-          <article className="sp-detail-section">
+          <article className="sp-detail-section" id="course-reviews" ref={reviewsSectionRef}>
             <h2>{t("courseDetail.recentReviews")}</h2>
+            {isPublic ? (
+              <section className="sp-review-form sp-guest-review-lock">
+                <div className="sp-review-form-head">
+                  <div>
+                    <h3>{t("courseDetail.reviewForm.guestTitle")}</h3>
+                    <p>{t("courseDetail.reviewForm.guestCopy")}</p>
+                  </div>
+                  <span className="material-symbols-outlined">lock</span>
+                </div>
+                <div className="sp-guest-review-preview">
+                  <ReviewStars
+                    label={t("courseDetail.reviewForm.courseQuality")}
+                    notRatedLabel={t("courseDetail.reviewForm.notRated")}
+                    onChange={() => undefined}
+                    value={0}
+                  />
+                  <ReviewStars
+                    label={t("courseDetail.reviewForm.teacherQualityShort")}
+                    notRatedLabel={t("courseDetail.reviewForm.notRated")}
+                    onChange={() => undefined}
+                    value={0}
+                  />
+                </div>
+                <button
+                  className="sp-guest-login-button"
+                  onClick={onRequireLogin}
+                  type="button"
+                >
+                  {t("courseDetail.reviewForm.loginButton")}
+                </button>
+              </section>
+            ) : null}
+            {reviewEligibility ? (
+              <section className="sp-review-form">
+                <div className="sp-review-form-head">
+                  <div>
+                    <h3>
+                      {reviewEligibility.existingReview
+                        ? t("courseDetail.reviewForm.editTitle")
+                        : t("courseDetail.reviewForm.title")}
+                    </h3>
+                    <p>
+                      {t("courseDetail.reviewForm.currentProgress")}{" "}
+                      <strong>{reviewEligibility.progressPercent.toFixed(0)}%</strong>
+                    </p>
+                  </div>
+                  {reviewEligibility.existingReview ? (
+                    <span>{t("courseDetail.reviewForm.reviewed")}</span>
+                  ) : null}
+                </div>
+
+                {reviewEligibility.eligible ? (
+                  <>
+                    <ReviewStars
+                      label={t("courseDetail.reviewForm.courseQuality")}
+                      notRatedLabel={t("courseDetail.reviewForm.notRated")}
+                      onChange={setCourseRating}
+                      value={courseRating}
+                    />
+                    <ReviewStars
+                      label={t("courseDetail.reviewForm.teacherQuality", {
+                        name: course.teacher.fullName,
+                      })}
+                      notRatedLabel={t("courseDetail.reviewForm.notRated")}
+                      onChange={setTeacherRating}
+                      value={teacherRating}
+                    />
+                    <label className="sp-review-comment">
+                      {t("courseDetail.reviewForm.comment")}
+                      <textarea
+                        maxLength={2000}
+                        onChange={(event) => setReviewComment(event.target.value)}
+                        placeholder={t("courseDetail.reviewForm.commentPlaceholder")}
+                        rows={4}
+                        value={reviewComment}
+                      />
+                    </label>
+                    <div className="sp-review-form-actions">
+                      <small>{reviewComment.length}/2000</small>
+                      <button
+                        disabled={isSavingReview}
+                        onClick={() => void handleSaveReview()}
+                        type="button"
+                      >
+                        {isSavingReview
+                          ? t("courseDetail.reviewForm.saving")
+                          : reviewEligibility.existingReview
+                            ? t("courseDetail.reviewForm.update")
+                            : t("courseDetail.reviewForm.submit")}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="sp-review-requirement">
+                    {reviewEligibility.reason}
+                  </p>
+                )}
+                {reviewEligibility.existingReview?.teacherComment ? (
+                  <div className="sp-review-teacher-response">
+                    <strong>{t("courseDetail.reviewForm.teacherResponse")}</strong>
+                    <p>{reviewEligibility.existingReview.teacherComment}</p>
+                  </div>
+                ) : null}
+                {reviewMessage ? (
+                  <p className="sp-review-message">{reviewMessage}</p>
+                ) : null}
+              </section>
+            ) : null}
+
             {course.reviews.length ? (
               <div className="sp-review-list">
                 {course.reviews.map((review) => (
-                  <article className="sp-review-card" key={review.id}>
+                  <article
+                    className={`sp-review-card${focusedReviewId === review.id ? " highlighted" : ""}`}
+                    id={`course-review-${review.id}`}
+                    key={review.id}
+                  >
                     <img
                       src={
                         review.student.avatarUrl ??
@@ -266,6 +489,12 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
                       <strong>{review.student.fullName}</strong>
                       <span>{review.rating}/5</span>
                       <p>{review.comment ?? t("courseDetail.noComment")}</p>
+                      {review.teacherComment ? (
+                        <div className="sp-review-teacher-response compact">
+                          <strong>{t("courseDetail.reviewForm.teacherResponse")}</strong>
+                          <p>{review.teacherComment}</p>
+                        </div>
+                      ) : null}
                     </div>
                   </article>
                 ))}
@@ -279,6 +508,11 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
         <aside className="sp-course-detail-side">
           <div className="sp-detail-price-card">
             <strong>{formatCurrency(course.price)}</strong>
+
+            <button onClick={isPublic ? onRequireLogin : undefined} type="button">
+              {isPublic ? t("courseDetail.loginToEnroll") : t("courseDetail.enrollNow")}
+            </button>
+
             <button
               disabled={!selectedBatch}
               onClick={() => void handleAddToCart()}
@@ -424,10 +658,52 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
                 <small>{course.teacher.email}</small>
               </span>
             </p>
+            {onOpenInstructor ? (
+              <button
+                className="sp-view-instructor-button"
+                onClick={() => onOpenInstructor(course.teacher.id)}
+                type="button"
+              >
+                {t("courseDetail.viewInstructorProfile")}
+              </button>
+            ) : null}
           </div>
         </aside>
       </section>
     </main>
+  );
+}
+
+function ReviewStars({
+  label,
+  notRatedLabel,
+  onChange,
+  value,
+}: {
+  label: string;
+  notRatedLabel?: string;
+  onChange: (value: number) => void;
+  value: number;
+}) {
+  return (
+    <div className="sp-review-rating">
+      <strong>{label}</strong>
+      <div aria-label={label} className="sp-review-stars" role="radiogroup">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            aria-checked={value === star}
+            className={star <= value ? "active" : ""}
+            key={star}
+            onClick={() => onChange(star)}
+            role="radio"
+            type="button"
+          >
+            <span className="material-symbols-outlined">star</span>
+          </button>
+        ))}
+        <span>{value ? `${value}/5` : (notRatedLabel ?? "Chưa chấm")}</span>
+      </div>
+    </div>
   );
 }
 

@@ -387,6 +387,325 @@
   gap: 16px;
 }
 
+.sp-review-form {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 24px;
+  padding: 22px;
+  border: 1px solid #dbeafe;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #f8fbff, #ffffff);
+}
+
+.sp-review-form-head,
+.sp-review-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sp-review-form-head h3,
+.sp-review-form-head p {
+  margin: 0;
+}
+
+.sp-review-form-head p {
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.sp-review-form-head > span {
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.sp-review-rating {
+  display: grid;
+  gap: 8px;
+}
+
+.sp-review-stars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.sp-review-stars button {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.sp-review-stars button.active {
+  color: #f59e0b;
+}
+
+.sp-review-stars > span {
+  margin-left: 8px;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.sp-review-comment {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.sp-review-comment textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 13px 14px;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  outline: none;
+  font: inherit;
+  line-height: 1.55;
+}
+
+.sp-review-comment textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 12%);
+}
+
+.sp-review-form-actions small {
+  color: #94a3b8;
+}
+
+.sp-review-form-actions button {
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: #2563eb;
+  color: white;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sp-review-form-actions button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.sp-review-requirement,
+.sp-review-message {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 0.88rem;
+}
+
+.sp-review-message {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.sp-review-teacher-response {
+  display: grid;
+  gap: 6px;
+  padding: 13px 15px;
+  border-left: 4px solid #2563eb;
+  border-radius: 14px;
+  background: #eef6ff;
+  color: #1e3a8a;
+}
+
+.sp-review-teacher-response strong {
+  font-size: 0.86rem;
+}
+
+.sp-review-teacher-response p {
+  margin: 0;
+  color: #334155;
+  line-height: 1.55;
+}
+
+.sp-review-teacher-response.compact {
+  margin-top: 12px;
+  background: #ffffff;
+}
+
+.sp-guest-review-lock {
+  position: relative;
+  overflow: hidden;
+}
+
+.sp-guest-review-lock .sp-review-form-head > span {
+  padding: 9px;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.sp-guest-review-preview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.sp-guest-login-button {
+  width: fit-content;
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: #2563eb;
+  color: white;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.public-catalog .sp-avatar .material-symbols-outlined {
+  font-size: 34px;
+}
+
+.sp-public-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px clamp(24px, 5vw, 72px);
+  border-bottom: 1px solid #e5e7eb;
+  background: rgb(255 255 255 / 94%);
+  backdrop-filter: blur(18px);
+}
+
+.sp-public-header > button,
+.sp-public-header nav button,
+.sp-teacher-link {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sp-public-header img {
+  width: 118px;
+}
+
+.sp-public-header nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sp-public-header nav button {
+  padding: 10px 15px;
+  border-radius: 12px;
+  color: #172033;
+  font-weight: 800;
+}
+
+.sp-public-header nav button.primary {
+  background: #0566d8;
+  color: white;
+}
+
+.public-catalog .sp-catalog-layout,
+.public-catalog .sp-course-detail-page {
+  margin-top: 30px;
+}
+
+.sp-teacher-link {
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+}
+
+.sp-teacher-link:hover {
+  text-decoration: underline;
+}
+
+.sp-view-instructor-button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 11px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sp-public-instructor-page {
+  width: min(1400px, calc(100% - 56px));
+  margin: 36px auto 70px;
+}
+
+.sp-public-instructor-hero {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 34px;
+  align-items: center;
+  padding: clamp(26px, 5vw, 54px);
+  border-radius: 30px;
+  background: linear-gradient(135deg, #eff6ff, #ffffff 55%, #eefdf8);
+}
+
+.sp-public-instructor-hero > img {
+  width: 190px;
+  height: 190px;
+  object-fit: cover;
+  border: 8px solid white;
+  border-radius: 36px;
+  box-shadow: 0 20px 45px rgb(15 23 42 / 14%);
+}
+
+.sp-public-instructor-hero h1 {
+  margin: 5px 0 10px;
+  font-size: clamp(2.2rem, 5vw, 4rem);
+}
+
+.sp-public-instructor-hero p {
+  max-width: 760px;
+  color: #64748b;
+  line-height: 1.7;
+}
+
+.sp-public-instructor-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.sp-public-instructor-stats span {
+  display: grid;
+  min-width: 120px;
+  padding: 14px;
+  border-radius: 16px;
+  background: white;
+  color: #64748b;
+}
+
+.sp-public-instructor-stats b {
+  color: #0f172a;
+  font-size: 1.3rem;
+}
+
+.sp-public-instructor-section {
+  margin-top: 42px;
+}
+
+.sp-public-instructor-section > h2 {
+  margin-bottom: 20px;
+  font-size: 1.8rem;
+}
+
 .sp-module-card {
   overflow: hidden;
   border: 1px solid #e5e7eb;
@@ -619,6 +938,17 @@
 .sp-my-course-card button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
+}
+
+.sp-my-course-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.sp-my-course-card .sp-my-course-actions button.secondary {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .sp-learning-page {
@@ -1601,6 +1931,12 @@
   border-radius: 18px;
   padding: 16px;
   background: #f8fafc;
+}
+
+.sp-review-card.highlighted {
+  border: 1px solid #60a5fa;
+  background: #eff6ff;
+  box-shadow: 0 16px 40px rgb(37 99 235 / 14%);
 }
 
 .sp-review-card span {
@@ -3361,6 +3697,131 @@
   background: transparent;
   color: #005bcc;
   font-weight: 800;
+}
+
+.interaction-live-page .sp-discussion-card {
+  display: block;
+}
+
+.interaction-thread-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.interaction-thread-head small {
+  color: #2563eb;
+  font-weight: 800;
+}
+
+.interaction-status {
+  height: fit-content;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.interaction-status.resolved {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.interaction-comments {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.interaction-comments > div {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.interaction-comments .instructor-answer {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+}
+
+.interaction-comments .instructor-answer span {
+  margin-left: 8px;
+  color: #1d4ed8;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.interaction-reply-box {
+  display: flex;
+  gap: 10px;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.interaction-reply-box input {
+  flex: 1;
+  padding: 11px 13px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+}
+
+.interaction-reply-box button,
+.interaction-modal button {
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: #2563eb;
+  color: white;
+  font-weight: 800;
+}
+
+.interaction-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 52%);
+}
+
+.interaction-modal {
+  display: grid;
+  gap: 13px;
+  width: min(620px, 100%);
+  padding: 26px;
+  border-radius: 22px;
+  background: white;
+}
+
+.interaction-modal input,
+.interaction-modal select,
+.interaction-modal textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  font: inherit;
+}
+
+.interaction-modal > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.interaction-modal button.secondary {
+  background: #eef2f7;
+  color: #334155;
+}
+
+.interaction-review-list {
+  display: grid;
+  gap: 14px;
 }
 
 .sp-footer {

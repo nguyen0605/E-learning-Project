@@ -1,3 +1,5 @@
+import { getInstructorAuthToken } from "../auth/instructorAuth";
+
 export const INSTRUCTOR_API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 type QueryValue = string | number | boolean | null | undefined;
@@ -36,6 +38,9 @@ export async function instructorApiRequest<T>(
     method,
     headers: {
       ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(getInstructorAuthToken()
+        ? { Authorization: `Bearer ${getInstructorAuthToken()}` }
+        : {}),
       ...headers,
     },
     body: body === undefined ? undefined : JSON.stringify(body),

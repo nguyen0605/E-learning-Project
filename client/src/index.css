@@ -971,6 +971,42 @@ a {
   background: transparent;
 }
 
+.teacher-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 280px;
+  padding: 10px 13px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: white;
+  color: var(--muted);
+}
+
+.teacher-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+}
+
+.teacher-specialization {
+  display: grid;
+  gap: 5px;
+  min-width: 150px;
+}
+
+.teacher-specialization strong {
+  font-size: 0.86rem;
+}
+
+.teacher-specialization span,
+.teacher-course-empty {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
 .student-empty-row td {
   padding: 48px 24px !important;
   color: var(--muted);
@@ -1571,6 +1607,22 @@ a {
 
 .student-course-progress-head span {
   color: var(--primary);
+}
+
+.student-course-progress-card small {
+  color: var(--muted);
+}
+
+.teacher-bio {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.teacher-lock-button {
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .student-activity-item {

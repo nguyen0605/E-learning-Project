@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
+import type { AppNotification } from "../../shared/services/notificationApi";
 import AccountDrawer from "../components/account/AccountDrawer";
 import Footer from "../components/Footer";
 import StudentHeader from "../components/StudentHeader";
@@ -34,12 +35,32 @@ import MyCoursesPage from "../views/MyCoursesPage";
 import SchedulePage from "../views/SchedulePage";
 import "./StudentPortalPage.css";
 
+const validStudentViews: StudentView[] = [
+  "home",
+  "courses",
+  "myCourses",
+  "schedule",
+  "categories",
+  "cart",
+  "lesson",
+  "learning",
+  "courseDetail",
+  "exam",
+  "examTake",
+  "examReview",
+  "accountProfile",
+  "accountCertificates",
+  "accountPaymentHistory",
+  "interaction",
+];
+
 function StudentPortalPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { logout, updateUser, user } = useAuth();
   const [activeView, setActiveView] = useState<StudentView>("home");
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [focusedReviewId, setFocusedReviewId] = useState<number | null>(null);
   const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
   const [selectedExamAttemptId, setSelectedExamAttemptId] = useState<number | null>(null);
   const [isAccountDrawerOpen, setIsAccountDrawerOpen] = useState(false);
@@ -60,6 +81,41 @@ function StudentPortalPage() {
   const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
   const [paymentHistoryError, setPaymentHistoryError] = useState("");
   const paymentHistoryRequestRef = useRef(0);
+
+  function navigateStudentView(
+    view: StudentView,
+    options?: {
+      courseId?: number | null;
+      reviewId?: number | null;
+      examId?: number | null;
+      attemptId?: number | null;
+      replace?: boolean;
+    },
+  ) {
+    const params = new URLSearchParams();
+
+    if (view !== "home") {
+      params.set("view", view);
+    }
+
+    if (options?.courseId) {
+      params.set("courseId", String(options.courseId));
+    }
+
+    if (options?.reviewId) {
+      params.set("reviewId", String(options.reviewId));
+    }
+
+    if (options?.examId) {
+      params.set("examId", String(options.examId));
+    }
+
+    if (options?.attemptId) {
+      params.set("attemptId", String(options.attemptId));
+    }
+
+    setSearchParams(params, { replace: options?.replace ?? false });
+  }
 
   useEffect(() => {
     if (!(isAccountDrawerOpen || activeView === "accountProfile") || profileData || profileLoading) {
@@ -152,22 +208,95 @@ function StudentPortalPage() {
   }, [activeView, paymentHistoryData, paymentHistoryLoading]);
 
   useEffect(() => {
-    const requestedView = searchParams.get("view");
+    const requestedViewParam = searchParams.get("view");
+    const requestedView = validStudentViews.includes(requestedViewParam as StudentView)
+      ? (requestedViewParam as StudentView)
+      : "home";
+    const courseId = Number(searchParams.get("courseId"));
+    const reviewId = Number(searchParams.get("reviewId"));
+    const examId = Number(searchParams.get("examId"));
+    const attemptId = Number(searchParams.get("attemptId"));
 
-    if (requestedView === "myCourses" || requestedView === "schedule" || requestedView === "cart" || requestedView === "courses") {
-      setActiveView(requestedView);
-      setSearchParams({}, { replace: true });
+    if (requestedView === "courseDetail" && Number.isFinite(courseId) && courseId > 0) {
+      setSelectedCourseId(courseId);
+      setFocusedReviewId(Number.isFinite(reviewId) && reviewId > 0 ? reviewId : null);
+      setActiveView("courseDetail");
+      return;
     }
+
+    if (requestedView === "learning" && Number.isFinite(courseId) && courseId > 0) {
+      setSelectedCourseId(courseId);
+      setActiveView("learning");
+      return;
+    }
+
+    if (requestedView === "examTake" && Number.isFinite(examId) && examId > 0) {
+      setSelectedExamId(examId);
+      setSelectedExamAttemptId(Number.isFinite(attemptId) && attemptId > 0 ? attemptId : null);
+      setActiveView("examTake");
+      return;
+    }
+
+    if (requestedView === "examReview" && Number.isFinite(examId) && examId > 0) {
+      setSelectedExamId(examId);
+      setSelectedExamAttemptId(Number.isFinite(attemptId) && attemptId > 0 ? attemptId : null);
+      setActiveView("examReview");
+      return;
+    }
+
+    if (requestedView === "myCourses" || requestedView === "cart" || requestedView === "courses") {
+      if (Number.isFinite(courseId) && courseId > 0 && requestedView === "courses") {
+        setSelectedCourseId(courseId);
+        setFocusedReviewId(Number.isFinite(reviewId) && reviewId > 0 ? reviewId : null);
+        setActiveView("courseDetail");
+      } else {
+        setActiveView(requestedView);
+      }
+      return;
+    }
+
+    setActiveView(requestedView);
   }, [searchParams, setSearchParams]);
 
   function handleOpenCourse(courseId: number) {
     setSelectedCourseId(courseId);
-    setActiveView("courseDetail");
+    setFocusedReviewId(null);
+    navigateStudentView("courseDetail", { courseId });
+  }
+
+  function handleOpenNotification(notification: AppNotification) {
+    if (!notification.targetUrl) return;
+
+    const url = new URL(notification.targetUrl, window.location.origin);
+    const view = url.searchParams.get("view");
+    const courseId = Number(url.searchParams.get("courseId"));
+    const reviewId = Number(url.searchParams.get("reviewId") ?? notification.referenceId);
+
+    if (
+      (view === "courseDetail" ||
+        notification.type === "COURSE_REVIEW_RESPONDED" ||
+        notification.referenceType === "COURSE_REVIEW") &&
+      Number.isFinite(courseId) &&
+      courseId > 0
+    ) {
+      setSelectedCourseId(courseId);
+      setFocusedReviewId(Number.isFinite(reviewId) && reviewId > 0 ? reviewId : null);
+      navigateStudentView("courseDetail", {
+        courseId,
+        reviewId: Number.isFinite(reviewId) && reviewId > 0 ? reviewId : null,
+      });
+      return;
+    }
+
+    const nextView = view as StudentView | null;
+    if (nextView) {
+      navigateStudentView(nextView);
+    }
   }
 
   function handleStartLearning(courseId: number) {
     setSelectedCourseId(courseId);
-    setActiveView("learning");
+    navigateStudentView("learning", { courseId });
   }
 
   function handleOpenExam(exam: StudentExam) {
@@ -175,26 +304,36 @@ function StudentPortalPage() {
 
     if (exam.state === "COMPLETED") {
       setSelectedExamAttemptId(exam.attempts.latest?.id ?? null);
-      setActiveView("examReview");
+      navigateStudentView("examReview", {
+        examId: exam.id,
+        attemptId: exam.attempts.latest?.id ?? null,
+      });
       return;
     }
 
     setSelectedExamAttemptId(
       exam.attempts.latest?.status === "IN_PROGRESS" ? exam.attempts.latest.id : null,
     );
-    setActiveView("examTake");
+    navigateStudentView("examTake", {
+      examId: exam.id,
+      attemptId:
+        exam.attempts.latest?.status === "IN_PROGRESS" ? exam.attempts.latest.id : null,
+    });
   }
 
   function handleOpenExamResult(result: StudentExamResult) {
     setSelectedExamId(result.examId);
     setSelectedExamAttemptId(result.attemptId ?? null);
-    setActiveView("examReview");
+    navigateStudentView("examReview", {
+      examId: result.examId,
+      attemptId: result.attemptId ?? null,
+    });
   }
 
   function handleExamSubmitted(examId: number, attemptId: number) {
     setSelectedExamId(examId);
     setSelectedExamAttemptId(attemptId);
-    setActiveView("examReview");
+    navigateStudentView("examReview", { examId, attemptId });
   }
 
   async function handleLogout() {
@@ -209,7 +348,7 @@ function StudentPortalPage() {
   function handleOpenAccountView(
     view: "accountProfile" | "accountCertificates" | "accountPaymentHistory",
   ) {
-    setActiveView(view);
+    navigateStudentView(view);
   }
 
   function handleProfileSaved(
@@ -252,7 +391,8 @@ function StudentPortalPage() {
     <div className="student-portal">
       <StudentHeader
         activeView={activeView}
-        onNavigate={setActiveView}
+        onNavigate={navigateStudentView}
+        onOpenNotification={handleOpenNotification}
         onOpenAccountDrawer={handleOpenAccountDrawer}
         user={user}
       />
@@ -267,12 +407,15 @@ function StudentPortalPage() {
         user={user}
       />
 
-      {activeView === "home" ? <HomePage onNavigate={setActiveView} /> : null}
+      {activeView === "home" ? <HomePage onNavigate={navigateStudentView} /> : null}
       {activeView === "courses" ? (
         <CoursesPage onOpenCourse={handleOpenCourse} />
       ) : null}
       {activeView === "myCourses" ? (
-        <MyCoursesPage onStartLearning={handleStartLearning} />
+        <MyCoursesPage
+          onReviewCourse={handleOpenCourse}
+          onStartLearning={handleStartLearning}
+        />
       ) : null}
       {activeView === "schedule" ? <SchedulePage /> : null}
       {activeView === "categories" ? (
@@ -281,14 +424,15 @@ function StudentPortalPage() {
       {activeView === "courseDetail" && selectedCourseId ? (
         <CourseDetailPage
           courseId={selectedCourseId}
-          onBack={() => setActiveView("courses")}
+          focusedReviewId={focusedReviewId}
+          onBack={() => navigateStudentView("courses")}
         />
       ) : null}
       {activeView === "cart" ? <CartPage /> : null}
       {activeView === "learning" && selectedCourseId ? (
         <LearningPage
           courseId={selectedCourseId}
-          onBack={() => setActiveView("myCourses")}
+          onBack={() => navigateStudentView("myCourses")}
         />
       ) : null}
       {activeView === "lesson" ? <LessonPage /> : null}
@@ -299,7 +443,7 @@ function StudentPortalPage() {
         <ExamTakingPage
           attemptId={selectedExamAttemptId}
           examId={selectedExamId}
-          onBack={() => setActiveView("exam")}
+          onBack={() => navigateStudentView("exam")}
           onSubmitted={handleExamSubmitted}
         />
       ) : null}
@@ -307,7 +451,7 @@ function StudentPortalPage() {
         <ExamReviewPage
           attemptId={selectedExamAttemptId}
           examId={selectedExamId}
-          onBack={() => setActiveView("exam")}
+          onBack={() => navigateStudentView("exam")}
         />
       ) : null}
       {activeView === "accountProfile" ? (
@@ -332,7 +476,9 @@ function StudentPortalPage() {
           paymentHistoryData={paymentHistoryData}
         />
       ) : null}
-      {activeView === "interaction" ? <InteractionPage /> : null}
+      {activeView === "interaction" ? (
+        <InteractionPage onReviewCourse={handleOpenCourse} />
+      ) : null}
       <Footer />
     </div>
   );

@@ -1,4 +1,5 @@
 import db from "../db.js";
+import { createNotification } from "./notification.service.js";
 
 const DEFAULT_TEACHER_ID = 4;
 
@@ -717,8 +718,10 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
       `
         SELECT
           q.quiz_id AS id,
-          q.batch_id AS batchId,
-          b.batch_code AS batchCode,
+          (SELECT MIN(b.batch_id) FROM course_batches b
+           WHERE b.course_id = c.course_id AND b.teacher_id = c.teacher_id) AS batchId,
+          (SELECT MIN(b.batch_code) FROM course_batches b
+           WHERE b.course_id = c.course_id AND b.teacher_id = c.teacher_id) AS batchCode,
           q.lesson_id AS lessonId,
           l.lesson_title AS lessonTitle,
           q.title,
@@ -731,12 +734,15 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
           COUNT(DISTINCT qu.question_id) AS questions,
           COUNT(DISTINCT qa.attempt_id) AS attempts
         FROM quizzes q
-        INNER JOIN course_batches b ON b.batch_id = q.batch_id
-        LEFT JOIN lessons l ON l.lesson_id = q.lesson_id
+        INNER JOIN lessons l ON l.lesson_id = q.lesson_id
+        INNER JOIN course_modules m ON m.module_id = l.module_id
+        INNER JOIN courses c ON c.course_id = m.course_id
         LEFT JOIN questions qu ON qu.quiz_id = q.quiz_id
         LEFT JOIN quiz_attempts qa ON qa.quiz_id = q.quiz_id
-        WHERE b.teacher_id = ? AND b.course_id = ?
-        GROUP BY q.quiz_id, q.batch_id, b.batch_code, q.lesson_id, l.lesson_title, q.title, q.description, q.duration_minutes, q.max_score, q.pass_score, q.attempt_limit, q.created_at
+        WHERE c.teacher_id = ? AND c.course_id = ?
+        GROUP BY q.quiz_id, q.lesson_id, l.lesson_title, q.title, q.description,
+                 q.duration_minutes, q.max_score, q.pass_score,
+                 q.attempt_limit, q.created_at, c.course_id, c.teacher_id
         ORDER BY q.created_at DESC, q.quiz_id DESC
       `,
       [teacherId, courseId],
@@ -751,8 +757,10 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
           q.score
         FROM questions q
         INNER JOIN quizzes qu ON qu.quiz_id = q.quiz_id
-        INNER JOIN course_batches b ON b.batch_id = qu.batch_id
-        WHERE b.teacher_id = ? AND b.course_id = ?
+        INNER JOIN lessons l ON l.lesson_id = qu.lesson_id
+        INNER JOIN course_modules m ON m.module_id = l.module_id
+        INNER JOIN courses c ON c.course_id = m.course_id
+        WHERE c.teacher_id = ? AND c.course_id = ?
         ORDER BY q.question_id ASC
       `,
       [teacherId, courseId],
@@ -767,8 +775,10 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
         FROM answer_options o
         INNER JOIN questions q ON q.question_id = o.question_id
         INNER JOIN quizzes qu ON qu.quiz_id = q.quiz_id
-        INNER JOIN course_batches b ON b.batch_id = qu.batch_id
-        WHERE b.teacher_id = ? AND b.course_id = ?
+        INNER JOIN lessons l ON l.lesson_id = qu.lesson_id
+        INNER JOIN course_modules m ON m.module_id = l.module_id
+        INNER JOIN courses c ON c.course_id = m.course_id
+        WHERE c.teacher_id = ? AND c.course_id = ?
         ORDER BY o.option_id ASC
       `,
       [teacherId, courseId],
@@ -786,9 +796,11 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
           qa.status
         FROM quiz_attempts qa
         INNER JOIN quizzes q ON q.quiz_id = qa.quiz_id
-        INNER JOIN course_batches b ON b.batch_id = q.batch_id
+        INNER JOIN lessons l ON l.lesson_id = q.lesson_id
+        INNER JOIN course_modules m ON m.module_id = l.module_id
+        INNER JOIN courses c ON c.course_id = m.course_id
         INNER JOIN users u ON u.user_id = qa.student_id
-        WHERE b.teacher_id = ? AND b.course_id = ?
+        WHERE c.teacher_id = ? AND c.course_id = ?
         ORDER BY qa.submitted_at DESC, qa.started_at DESC, qa.attempt_id DESC
       `,
       [teacherId, courseId],
@@ -808,9 +820,11 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
         FROM quiz_answers a
         INNER JOIN questions q ON q.question_id = a.question_id
         INNER JOIN quizzes qu ON qu.quiz_id = q.quiz_id
-        INNER JOIN course_batches b ON b.batch_id = qu.batch_id
+        INNER JOIN lessons l ON l.lesson_id = qu.lesson_id
+        INNER JOIN course_modules m ON m.module_id = l.module_id
+        INNER JOIN courses c ON c.course_id = m.course_id
         LEFT JOIN answer_options o ON o.option_id = a.option_id
-        WHERE b.teacher_id = ? AND b.course_id = ?
+        WHERE c.teacher_id = ? AND c.course_id = ?
         ORDER BY a.answer_id ASC
       `,
       [teacherId, courseId],
@@ -828,6 +842,7 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
         INNER JOIN users u ON u.user_id = r.student_id
         INNER JOIN courses c ON c.course_id = r.course_id
         WHERE c.teacher_id = ? AND c.course_id = ?
+          AND r.status = 'VISIBLE'
         ORDER BY r.created_at DESC, r.review_id DESC
         LIMIT 3
       `,
@@ -2318,7 +2333,7 @@ export async function respondInstructorCourseReview(rawTeacherId, rawCourseId, r
 
   const [reviewRows] = await db.query(
     `
-      SELECT r.review_id AS id
+      SELECT r.review_id AS id, r.student_id
       FROM course_reviews r
       INNER JOIN courses c ON c.course_id = r.course_id
       WHERE r.review_id = ? AND r.course_id = ? AND c.teacher_id = ?
@@ -2337,6 +2352,19 @@ export async function respondInstructorCourseReview(rawTeacherId, rawCourseId, r
     `,
     [teacherComment, reviewId],
   );
+
+  await createNotification({
+    userId: Number(reviewRows[0].student_id),
+    type: "COURSE_REVIEW_RESPONDED",
+    title: "Giảng viên đã phản hồi đánh giá",
+    content: teacherComment,
+    referenceType: "COURSE_REVIEW",
+    referenceId: reviewId,
+    targetUrl: `/student?view=courseDetail&courseId=${courseId}&reviewId=${reviewId}`,
+    priority: "NORMAL",
+  }).catch((error) => {
+    console.error("Failed to notify student about review response.", error);
+  });
 
   return { id: reviewId, teacherComment };
 }

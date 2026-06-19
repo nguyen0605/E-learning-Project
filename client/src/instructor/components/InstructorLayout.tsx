@@ -1,7 +1,16 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { NavLink } from "react-router-dom";
-import { instructorApiRequest } from "../api/instructorApi";
-import { clearInstructorAuthSession, getInstructorAuthTeacherId } from "../auth/instructorAuth";
+import { useTranslation } from "react-i18next";
+import { NavLink, useNavigate } from "react-router-dom";
+import { clearStoredAuthSession } from "../../auth/authStorage";
+import logo from "../../assets/logo-learnX.png";
+import LanguageSwitcher from "../../shared/components/language/LanguageSwitcher";
+import {
+  getNotifications,
+  getPushPublicKey,
+  markNotificationRead,
+  savePushSubscription,
+} from "../../shared/services/notificationApi";
+import { clearInstructorAuthSession, getInstructorAuthSession } from "../auth/instructorAuth";
 import {
   instructorNavItems,
   instructorProfile,
@@ -9,14 +18,13 @@ import {
 } from "../data/instructorMockData";
 import "../pages/InstructorPortal.css";
 
-const DEFAULT_TEACHER_ID = getInstructorAuthTeacherId();
-
 type HeaderNotification = {
   id: number;
   title: string;
   content: string;
   isRead: boolean;
   time: string;
+  targetUrl: string | null;
 };
 
 type QuickSearchItem = {
@@ -99,7 +107,20 @@ function normalizeSearchText(value: string) {
     .trim();
 }
 
+function getQuickSearchKey(path: string) {
+  if (path.endsWith("/courses")) return "courses";
+  if (path.endsWith("/quizzes")) return "quizzes";
+  if (path.endsWith("/students")) return "students";
+  if (path.endsWith("/interaction")) return "interaction";
+  if (path.endsWith("/analytics")) return "analytics";
+  if (path.endsWith("/profile")) return "profile";
+  return "dashboard";
+}
+
 function InstructorLayout({ activePage, children, profile }: InstructorLayoutProps) {
+  const navigate = useNavigate();
+  const { t } = useTranslation("instructor");
+  const authSession = getInstructorAuthSession();
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [quickSearchQuery, setQuickSearchQuery] = useState("");
@@ -108,20 +129,41 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const [markingNotificationId, setMarkingNotificationId] = useState<number | null>(null);
+  const [pushState, setPushState] = useState<
+    "unsupported" | "default" | "granted" | "denied" | "subscribed"
+  >(() => {
+    if (
+      typeof window === "undefined" ||
+      !("Notification" in window) ||
+      !("serviceWorker" in navigator)
+    ) {
+      return "unsupported";
+    }
+    return Notification.permission;
+  });
 
+  const sessionProfile = authSession
+    ? {
+        name: authSession.name,
+        role: authSession.role === "TEACHER" ? t("role.teacher") : authSession.role,
+        avatar: authSession.avatar ?? null,
+      }
+    : null;
   const displayedProfile = {
     ...instructorProfile,
+    ...sessionProfile,
     ...profile,
-    avatar: profile?.avatar || instructorProfile.avatar,
+    avatar: profile?.avatar || sessionProfile?.avatar || instructorProfile.avatar,
   };
   const unreadCount = notifications.filter((item) => !item.isRead).length;
   const normalizedSearchQuery = normalizeSearchText(quickSearchQuery);
   const quickSearchResults = normalizedSearchQuery
-    ? quickSearchItems.filter((item) =>
-        normalizeSearchText(`${item.title} ${item.description} ${item.keywords.join(" ")}`).includes(
-          normalizedSearchQuery,
-        ),
-      )
+    ? quickSearchItems.filter((item) => {
+        const key = getQuickSearchKey(item.path);
+        return normalizeSearchText(
+          `${t(`quickSearch.${key}Title`)} ${t(`quickSearch.${key}Desc`)} ${item.keywords.join(" ")}`,
+        ).includes(normalizedSearchQuery);
+      })
     : quickSearchItems.slice(0, 4);
   const shouldShowQuickSearch = isSearchFocused || quickSearchQuery.trim().length > 0;
 
@@ -130,19 +172,19 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
     setNotificationError(null);
 
     try {
-      const payload = await instructorApiRequest<{
-        success: boolean;
-        data?: { notificationItems?: HeaderNotification[] };
-      }>("/api/instructor/interaction", {
-        query: { teacherId: DEFAULT_TEACHER_ID },
-        signal,
-      });
-
-      if (!payload.success) {
-        throw new Error("Không thể tải thông báo.");
-      }
-
-      setNotifications((payload.data?.notificationItems ?? []).slice(0, 5));
+      if (signal?.aborted) return;
+      const data = await getNotifications();
+      if (signal?.aborted) return;
+      setNotifications(
+        data.notifications.slice(0, 5).map((item) => ({
+          id: item.id,
+          title: item.title,
+          content: item.content,
+          isRead: item.isRead,
+          time: new Date(item.createdAt).toLocaleString("vi-VN"),
+          targetUrl: item.targetUrl,
+        })),
+      );
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       setNotificationError(error instanceof Error ? error.message : "Không thể tải thông báo.");
@@ -154,8 +196,25 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
   useEffect(() => {
     const controller = new AbortController();
     loadNotifications(controller.signal);
-    return () => controller.abort();
+    const interval = window.setInterval(
+      () => void loadNotifications(controller.signal),
+      30000,
+    );
+    return () => {
+      window.clearInterval(interval);
+      controller.abort();
+    };
   }, []);
+
+  useEffect(() => {
+    if (pushState === "unsupported") return;
+    void navigator.serviceWorker
+      .getRegistration("/push-sw.js")
+      .then(async (registration) => {
+        const subscription = await registration?.pushManager.getSubscription();
+        if (subscription) setPushState("subscribed");
+      });
+  }, [pushState]);
 
   useEffect(() => {
     if (!showNotificationModal) return;
@@ -169,10 +228,7 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
     setNotificationError(null);
 
     try {
-      await instructorApiRequest(`/api/instructor/notifications/${notificationId}/read`, {
-        method: "PATCH",
-        query: { teacherId: DEFAULT_TEACHER_ID },
-      });
+      await markNotificationRead(notificationId);
 
       setNotifications((current) =>
         current.map((item) => (item.id === notificationId ? { ...item, isRead: true } : item)),
@@ -184,16 +240,52 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
     }
   }
 
+  async function handleOpenNotification(item: HeaderNotification) {
+    if (!item.isRead) {
+      await handleMarkNotificationRead(item.id);
+    }
+    setShowNotificationModal(false);
+    navigate(item.targetUrl || "/instructor/interaction");
+  }
+
+  async function enablePush() {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushState(permission);
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.register("/push-sw.js");
+      const { publicKey } = await getPushPublicKey();
+      const existing = await registration.pushManager.getSubscription();
+      const subscription =
+        existing ??
+        (await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        }));
+
+      await savePushSubscription(subscription.toJSON());
+      setPushState("subscribed");
+      setNotificationError(null);
+    } catch (error) {
+      setNotificationError(
+        error instanceof Error ? error.message : "Không thể bật thông báo đẩy.",
+      );
+    }
+  }
+
   return (
     <div className="instructor-shell">
       <aside className="instructor-sidebar">
         <div className="instructor-brand">
           <div className="instructor-brand-mark">
-            <span className="material-symbols-outlined">school</span>
+            <img alt="LearnX" src={logo} />
           </div>
           <div>
-            <h1>Học viện Lumina</h1>
-            <p>Cổng giảng viên</p>
+            <h1>LearnX</h1>
+            <p>{t("brand.portal")}</p>
           </div>
         </div>
 
@@ -208,18 +300,17 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
               to={item.path}
             >
               <span className="material-symbols-outlined">{item.icon}</span>
-              <span>{item.label}</span>
+              <span>{t(`nav.${item.key}`)}</span>
             </NavLink>
           ))}
         </nav>
 
         <div className="instructor-create-card">
-          <p className="instructor-create-label">Không gian giảng dạy</p>
-          <p>Lên bài học, chấm bài nộp và theo dõi tiến độ từng lớp.</p>
+          <p className="instructor-create-label">{t("sidebar.createLabel")}</p>
+          <p>{t("sidebar.createCopy")}</p>
           <NavLink to="/instructor/courses?createCourse=1">
             <span className="material-symbols-outlined">add</span>
-            Tạo khóa học mới
-          </NavLink>
+            {t("sidebar.createCourse")}</NavLink>
         </div>
       </aside>
 
@@ -231,42 +322,47 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
               onBlur={() => window.setTimeout(() => setIsSearchFocused(false), 140)}
               onChange={(event) => setQuickSearchQuery(event.target.value)}
               onFocus={() => setIsSearchFocused(true)}
-              placeholder="Tìm bài học, học viên hoặc dữ liệu..."
+              placeholder={t("quickSearch.placeholder")}
               value={quickSearchQuery}
             />
             {shouldShowQuickSearch && (
               <div className="instructor-quick-search-panel">
                 <p className="instructor-quick-search-label">
-                  {quickSearchQuery.trim() ? "Kết quả tìm kiếm" : "Truy cập nhanh"}
+                  {quickSearchQuery.trim() ? t("quickSearch.results") : t("quickSearch.quickAccess")}
                 </p>
                 {quickSearchResults.length === 0 ? (
-                  <p className="instructor-quick-search-empty">Không tìm thấy mục phù hợp.</p>
+                  <p className="instructor-quick-search-empty">{t("quickSearch.empty")}</p>
                 ) : (
-                  quickSearchResults.map((item) => (
-                    <NavLink
-                      className="instructor-quick-search-item"
-                      key={item.path}
-                      onClick={() => {
-                        setQuickSearchQuery("");
-                        setIsSearchFocused(false);
-                      }}
-                      to={item.path}
-                    >
-                      <span className="material-symbols-outlined">{item.icon}</span>
-                      <div>
-                        <strong>{item.title}</strong>
-                        <p>{item.description}</p>
-                      </div>
-                    </NavLink>
-                  ))
+                  quickSearchResults.map((item) => {
+                    const key = getQuickSearchKey(item.path);
+
+                    return (
+                      <NavLink
+                        className="instructor-quick-search-item"
+                        key={item.path}
+                        onClick={() => {
+                          setQuickSearchQuery("");
+                          setIsSearchFocused(false);
+                        }}
+                        to={item.path}
+                      >
+                        <span className="material-symbols-outlined">{item.icon}</span>
+                        <div>
+                          <strong>{t(`quickSearch.${key}Title`)}</strong>
+                          <p>{t(`quickSearch.${key}Desc`)}</p>
+                        </div>
+                      </NavLink>
+                    );
+                  })
                 )}
               </div>
             )}
           </label>
 
           <div className="instructor-topbar-actions">
+            <LanguageSwitcher compact />
             <button
-              aria-label="Mở thông báo"
+              aria-label={t("topbar.openNotifications")}
               className="instructor-icon-button"
               onClick={() => setShowNotificationModal(true)}
               type="button"
@@ -298,14 +394,14 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
           role="presentation"
         >
           <aside
-            aria-label="Thông tin giảng viên"
+            aria-label={t("profile.dialogLabel")}
             aria-modal="true"
             className="instructor-profile-popover"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
           >
             <button
-              aria-label="Đóng thông tin giảng viên"
+              aria-label={t("profile.closeLabel")}
               className="instructor-profile-popover-close"
               onClick={() => setShowProfileModal(false)}
               type="button"
@@ -313,25 +409,23 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
               <span className="material-symbols-outlined">close</span>
             </button>
             <img alt="" src={displayedProfile.avatar} />
-            <p className="instructor-eyebrow">Hồ sơ giảng viên</p>
+            <p className="instructor-eyebrow">{t("profile.eyebrow")}</p>
             <h3>{displayedProfile.name}</h3>
             <span>{displayedProfile.role}</span>
-            <p>
-              Thông tin này được dùng để hiển thị trên khu vực giảng viên và các trang quản lý lớp
-              học.
-            </p>
+            <p>{t("profile.description")}</p>
             <NavLink className="instructor-profile-popover-link" to="/instructor/profile">
-              Xem hồ sơ đầy đủ
+              {t("profile.viewFull")}
             </NavLink>
             <button
               className="instructor-profile-popover-logout"
               onClick={() => {
                 clearInstructorAuthSession();
+                clearStoredAuthSession();
                 window.location.href = "/instructor/login";
               }}
               type="button"
             >
-              Đăng xuất
+              {t("profile.logout")}
             </button>
           </aside>
         </div>
@@ -344,7 +438,7 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
           role="presentation"
         >
           <aside
-            aria-label="Thông báo nhanh"
+            aria-label={t("notifications.dialogLabel")}
             aria-modal="true"
             className="instructor-notification-popover"
             onClick={(event) => event.stopPropagation()}
@@ -352,11 +446,11 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
           >
             <div className="instructor-notification-popover-header">
               <div>
-                <p className="instructor-eyebrow">Thông báo</p>
-                <h3>Việc cần chú ý</h3>
+                <p className="instructor-eyebrow">{t("notifications.eyebrow")}</p>
+                <h3>{t("notifications.title")}</h3>
               </div>
               <button
-                aria-label="Đóng thông báo"
+                aria-label={t("notifications.closeLabel")}
                 className="instructor-profile-popover-close"
                 onClick={() => setShowNotificationModal(false)}
                 type="button"
@@ -367,14 +461,35 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
 
             {notificationError && <p className="instructor-notification-error">{notificationError}</p>}
 
+            {pushState === "default" || pushState === "granted" ? (
+              <button
+                className="instructor-notification-push-button"
+                onClick={() => void enablePush()}
+                type="button"
+              >
+                <span className="material-symbols-outlined">notifications_active</span>
+                {t("notifications.enablePush")}
+              </button>
+            ) : null}
+
+            {pushState === "denied" ? (
+              <p className="instructor-notification-error">
+                {t("notifications.pushDenied")}
+              </p>
+            ) : null}
+
             <div className="instructor-notification-list">
               {isLoadingNotifications ? (
-                <p className="instructor-empty-state">Đang tải thông báo...</p>
+                <p className="instructor-empty-state">{t("notifications.loading")}</p>
               ) : notifications.length === 0 ? (
-                <p className="instructor-empty-state">Chưa có thông báo mới.</p>
+                <p className="instructor-empty-state">{t("notifications.empty")}</p>
               ) : (
                 notifications.map((item) => (
-                  <article className={item.isRead ? "is-read" : ""} key={item.id}>
+                  <article
+                    className={item.isRead ? "is-read" : ""}
+                    key={item.id}
+                    onClick={() => void handleOpenNotification(item)}
+                  >
                     <div>
                       <strong>{item.title}</strong>
                       <span>{item.time}</span>
@@ -383,10 +498,13 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
                     {!item.isRead && (
                       <button
                         disabled={markingNotificationId === item.id}
-                        onClick={() => handleMarkNotificationRead(item.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleMarkNotificationRead(item.id);
+                        }}
                         type="button"
                       >
-                        {markingNotificationId === item.id ? "Đang lưu..." : "Đánh dấu đã đọc"}
+                        {markingNotificationId === item.id ? t("notifications.saving") : t("notifications.markRead")}
                       </button>
                     )}
                   </article>
@@ -395,13 +513,20 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
             </div>
 
             <NavLink className="instructor-profile-popover-link" to="/instructor/interaction">
-              Xem tất cả thông báo
+              {t("notifications.viewAll")}
             </NavLink>
           </aside>
         </div>
       )}
     </div>
   );
+}
+
+function urlBase64ToUint8Array(value: string) {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map((character) => character.charCodeAt(0)));
 }
 
 export default InstructorLayout;

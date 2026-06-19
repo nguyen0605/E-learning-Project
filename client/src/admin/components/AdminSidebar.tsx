@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { AdminPage } from "../adminNavigation";
 
 type AdminSidebarProps = {
@@ -6,13 +7,13 @@ type AdminSidebarProps = {
   onNavigate: (page: AdminPage) => void;
 };
 
-const navItems: Array<{ key: AdminPage; label: string; icon: string }> = [
-  { key: "dashboard", label: "Tổng quan", icon: "dashboard" },
-  { key: "users", label: "Quản lý người dùng", icon: "manage_accounts" },
-  { key: "students", label: "Quản lý học viên", icon: "group" },
-  { key: "courses", label: "Quản lý khóa học", icon: "library_books" },
-  { key: "system", label: "Cấu hình hệ thống", icon: "settings" },
-  { key: "content", label: "Nội dung chung", icon: "description" },
+const navItems: Array<{ key: AdminPage; icon: string }> = [
+  { key: "dashboard", icon: "dashboard" },
+  { key: "teachers", icon: "co_present" },
+  { key: "students", icon: "group" },
+  { key: "courses", icon: "library_books" },
+  { key: "system", icon: "settings" },
+  { key: "content", icon: "description" },
 ];
 
 function AdminSidebar({
@@ -20,11 +21,13 @@ function AdminSidebar({
   description,
   onNavigate,
 }: AdminSidebarProps) {
+  const { t } = useTranslation("admin");
+
   return (
     <aside className="sidebar">
       <div className="brand-block">
-        <p className="brand-title">LearnX E-Learning</p>
-        <p className="brand-subtitle">Trang quản trị</p>
+        <p className="brand-title">{t("brand.title")}</p>
+        <p className="brand-subtitle">{t("brand.subtitle")}</p>
       </div>
 
       <nav className="sidebar-nav">
@@ -36,13 +39,13 @@ function AdminSidebar({
             type="button"
           >
             <span className="material-symbols-outlined">{item.icon}</span>
-            <span>{item.label}</span>
+            <span>{t(`nav.${item.key}`)}</span>
           </button>
         ))}
       </nav>
 
       <div className="pro-card">
-        <p className="pro-label">Quản trị thông minh</p>
+        <p className="pro-label">{t("sidebar.proLabel")}</p>
         <p className="pro-copy">{description}</p>
       </div>
     </aside>

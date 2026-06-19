@@ -103,8 +103,10 @@ async function getSummaryStats(teacherId) {
           SELECT COUNT(*)
           FROM assignment_submissions s
           INNER JOIN assignments a ON a.assignment_id = s.assignment_id
-          INNER JOIN course_batches b ON b.batch_id = a.batch_id
-          WHERE b.teacher_id = ?
+          INNER JOIN lessons l ON l.lesson_id = a.lesson_id
+          INNER JOIN course_modules m ON m.module_id = l.module_id
+          INNER JOIN courses c ON c.course_id = m.course_id
+          WHERE c.teacher_id = ?
             AND s.score IS NULL
         ) AS pending_grading
     `,

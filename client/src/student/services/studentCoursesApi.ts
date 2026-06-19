@@ -1,9 +1,12 @@
 import { getAuthHeaders } from "../../auth/authHeaders";
 import type {
+  PublicInstructorDetail,
   StudentCourse,
   StudentCourseCategory,
   StudentCourseDetail,
+  StudentCourseReviewEligibility,
   StudentEnrolledCourse,
+  StudentOwnCourseReview,
 } from "../types/course.types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -78,6 +81,47 @@ export async function getCourseDetail(courseId: number) {
   });
 
   return readApiData<StudentCourseDetail>(response);
+}
+
+export async function getPublicInstructor(teacherId: number) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/student/instructors/${teacherId}`,
+  );
+
+  return readApiData<PublicInstructorDetail>(response);
+}
+
+export async function getCourseReviewEligibility(courseId: number) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/student/courses/${courseId}/review-eligibility`,
+    { headers: getAuthHeaders() },
+  );
+
+  return readApiData<StudentCourseReviewEligibility>(response);
+}
+
+export async function saveCourseReview(
+  courseId: number,
+  payload: {
+    rating: number;
+    teacherRating: number;
+    comment: string;
+  },
+  isEditing: boolean,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/student/courses/${courseId}/reviews${isEditing ? "/me" : ""}`,
+    {
+      method: isEditing ? "PUT" : "POST",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  return readApiData<StudentOwnCourseReview>(response);
 }
 
 export async function getMyCourses() {

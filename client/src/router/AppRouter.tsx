@@ -1,6 +1,12 @@
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import {
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import ProtectedRoute from "../auth/ProtectedRoute";
-import { Outlet } from "react-router-dom";
 import { hasInstructorAuthSession } from "../instructor/auth/instructorAuth";
 import InstructorAnalyticsPage from "../instructor/pages/InstructorAnalyticsPage";
 import InstructorAuthPage from "../instructor/pages/InstructorAuthPage";
@@ -15,13 +21,17 @@ import CourseManagementPage from "../admin/pages/CourseManagementPage";
 import GeneralContentPage from "../admin/pages/GeneralContentPage";
 import StudentManagementPage from "../admin/pages/StudentManagementPage";
 import SystemConfigurationPage from "../admin/pages/SystemConfigurationPage";
-import UserManagementPage from "../admin/pages/UserManagementPage";
+import InstructorManagementPage from "../admin/pages/InstructorManagementPage";
 import {
   adminPagePaths,
   getAdminPageFromPath,
   type AdminPage,
 } from "../admin/adminNavigation";
 import AdminLoginPage from "../admin/pages/AdminLoginPage";
+import GuestCatalogPage from "../guest/pages/GuestCatalogPage";
+import GuestCategoriesPage from "../guest/pages/GuestCategoriesPage";
+import GuestHomePage from "../guest/pages/GuestHomePage";
+import GuestInstructorPage from "../guest/pages/GuestInstructorPage";
 import StudentLoginPage from "../student/pages/StudentLoginPage";
 import StudentPortalPage from "../student/pages/StudentPortalPage";
 import StudentRegisterPage from "../student/pages/StudentRegisterPage";
@@ -41,8 +51,8 @@ function AdminPortal() {
   };
   const pageProps = { activePage, onNavigate };
 
-  if (activePage === "users") {
-    return <UserManagementPage {...pageProps} />;
+  if (activePage === "teachers") {
+    return <InstructorManagementPage {...pageProps} />;
   }
   if (activePage === "students") {
     return <StudentManagementPage {...pageProps} />;
@@ -126,11 +136,18 @@ function AdminRoutes() {
 function AppRouter() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/student" replace />} />
+      <Route path="/" element={<GuestHomePage />} />
+      <Route path="/courses" element={<GuestCatalogPage />} />
+      <Route path="/courses/:courseId" element={<GuestCatalogPage />} />
+      <Route path="/categories" element={<GuestCategoriesPage />} />
+      <Route
+        path="/instructors/:teacherId"
+        element={<GuestInstructorPage />}
+      />
       {StudentRoutes()}
       {InstructorRoutes()}
       {AdminRoutes()}
-      <Route path="*" element={<Navigate to="/student" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { instructorApiRequest } from "../api/instructorApi";
 import { getInstructorAuthTeacherId } from "../auth/instructorAuth";
 import InstructorLayout from "../components/InstructorLayout";
@@ -30,9 +31,10 @@ type InstructorAnalyticsApiResponse = {
 };
 
 function InstructorAnalyticsPage() {
+  const { t } = useTranslation("instructor");
   const [pageData, setPageData] =
     useState<InstructorAnalyticsApiResponse["data"] | null>(null);
-  const [selectedPeriod, setSelectedPeriod] = useState("Học kỳ này");
+  const [selectedPeriod, setSelectedPeriod] = useState<"semester" | "last30Days">("semester");
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
@@ -77,13 +79,13 @@ function InstructorAnalyticsPage() {
   }
 
   function handleTogglePeriod() {
-    const nextPeriod = selectedPeriod === "Học kỳ này" ? "30 ngày gần nhất" : "Học kỳ này";
+    const nextPeriod = selectedPeriod === "semester" ? "last30Days" : "semester";
     setSelectedPeriod(nextPeriod);
-    setToast({ type: "success", message: `Đã chuyển bộ lọc sang ${nextPeriod}.` });
+    setToast({ type: "success", message: `Đã chuyển bộ lọc sang ${t(`analyticsPage.${nextPeriod}`)}.` });
   }
 
   function handleExportAnalyticsReport() {
-    const header = ["Khóa học", "Hoàn thành", "Điểm kiểm tra TB", "Chuyên cần", "Xu hướng"];
+    const header = t("analyticsPage.exportHeaders", { returnObjects: true }) as string[];
     const csv = [
       header.map(csvCell).join(","),
       ...displayedCourseInsights.map((course) =>
@@ -111,8 +113,8 @@ function InstructorAnalyticsPage() {
     <InstructorLayout activePage="analytics">
       <section className="instructor-hero instructor-analytics-hero">
         <div>
-          <p className="instructor-eyebrow">Phân tích</p>
-          <h2>Hiểu tín hiệu học tập</h2>
+          <p className="instructor-eyebrow">{t("analyticsPage.eyebrow")}</p>
+          <h2>{t("analyticsPage.title")}</h2>
           <p>
             So sánh mức độ tương tác, hoàn thành, kết quả kiểm tra và tín hiệu
             rủi ro giữa các khóa học đang giảng dạy.
@@ -121,7 +123,7 @@ function InstructorAnalyticsPage() {
         <div className="instructor-hero-actions">
           <button className="instructor-secondary-button" onClick={handleTogglePeriod} type="button">
             <span className="material-symbols-outlined">date_range</span>
-            {selectedPeriod}
+            {t(`analyticsPage.${selectedPeriod}`)}
           </button>
           <button className="instructor-primary-button" onClick={handleExportAnalyticsReport} type="button">
             <span className="material-symbols-outlined">download</span>
@@ -130,7 +132,7 @@ function InstructorAnalyticsPage() {
         </div>
       </section>
 
-      <section className="instructor-stat-grid" aria-label="Tổng quan phân tích">
+      <section className="instructor-stat-grid" aria-label={t("analyticsPage.statsLabel")}>
         {displayedStats.map((stat) => (
           <article className="instructor-stat-card" key={stat.label}>
             <div className={`instructor-stat-icon ${stat.tone}`}>
@@ -149,8 +151,8 @@ function InstructorAnalyticsPage() {
         <article className="instructor-panel instructor-engagement-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Tương tác</p>
-              <h3>Hoạt động học tập theo tháng</h3>
+              <p className="instructor-eyebrow">{t("analyticsPage.interactionEyebrow")}</p>
+              <h3>{t("analyticsPage.monthlyActivity")}</h3>
             </div>
             <strong>+18%</strong>
           </div>
@@ -167,8 +169,8 @@ function InstructorAnalyticsPage() {
         <aside className="instructor-panel instructor-segment-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Học viên</p>
-              <h3>Phân nhóm học viên</h3>
+              <p className="instructor-eyebrow">{t("analyticsPage.studentsEyebrow")}</p>
+              <h3>{t("analyticsPage.studentSegments")}</h3>
             </div>
             <span className="material-symbols-outlined">donut_large</span>
           </div>
@@ -190,8 +192,8 @@ function InstructorAnalyticsPage() {
         <article className="instructor-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Khóa học</p>
-              <h3>Thông tin hiệu suất</h3>
+              <p className="instructor-eyebrow">{t("analyticsPage.coursesEyebrow")}</p>
+              <h3>{t("analyticsPage.performanceInsights")}</h3>
             </div>
             <button className="instructor-ghost-button" type="button">So sánh</button>
           </div>
@@ -214,8 +216,8 @@ function InstructorAnalyticsPage() {
         <aside className="instructor-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Đề xuất</p>
-              <h3>Hành động giảng dạy</h3>
+              <p className="instructor-eyebrow">{t("analyticsPage.recommendationEyebrow")}</p>
+              <h3>{t("analyticsPage.teachingActions")}</h3>
             </div>
             <span className="material-symbols-outlined">tips_and_updates</span>
           </div>

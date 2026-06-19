@@ -1,4 +1,5 @@
 import db from "../db.js";
+import { createNotification } from "./notification.service.js";
 
 function formatCurrency(value) {
   return Number(value ?? 0);
@@ -173,6 +174,43 @@ export async function reviewAdminCourse(courseId, status) {
     dbStatus,
     courseId,
   ]);
+
+  const [courseRows] = await db.query(
+    "SELECT teacher_id, course_name FROM courses WHERE course_id = ? LIMIT 1",
+    [courseId],
+  );
+  const course = courseRows[0];
+
+  if (course) {
+    const type =
+      status === "approved"
+        ? "COURSE_APPROVED"
+        : status === "rejected"
+          ? "COURSE_REJECTED"
+          : status === "hidden"
+            ? "COURSE_HIDDEN"
+            : "COURSE_PENDING";
+
+    await createNotification({
+      userId: course.teacher_id,
+      type,
+      title:
+        status === "approved"
+          ? "Khóa học đã được duyệt"
+          : status === "rejected"
+            ? "Khóa học bị từ chối"
+            : status === "hidden"
+              ? "Khóa học đã bị ẩn"
+              : "Khóa học đang chờ duyệt",
+      content: `${course.course_name} vừa được cập nhật trạng thái.`,
+      referenceType: "COURSE",
+      referenceId: Number(courseId),
+      targetUrl: `/instructor/courses?courseId=${courseId}`,
+      priority: status === "rejected" || status === "hidden" ? "HIGH" : "NORMAL",
+    }).catch((error) => {
+      console.error("Failed to notify instructor about course review.", error);
+    });
+  }
 
   return {
     id: Number(courseId),

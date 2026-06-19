@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { instructorApiRequest } from "../api/instructorApi";
 import { getInstructorAuthTeacherId } from "../auth/instructorAuth";
@@ -43,6 +44,7 @@ type InstructorDashboardApiResponse = {
 };
 
 function InstructorDashboardPage() {
+  const { t } = useTranslation("instructor");
   const [dashboard, setDashboard] =
     useState<InstructorDashboardApiResponse["data"] | null>(null);
 
@@ -90,8 +92,8 @@ function InstructorDashboardPage() {
     <InstructorLayout activePage="dashboard" profile={dashboard?.profile}>
       <section className="instructor-hero">
         <div>
-          <p className="instructor-eyebrow">Không gian giảng viên</p>
-          <h2>Chào mừng {instructorName}</h2>
+          <p className="instructor-eyebrow">{t("dashboardPage.eyebrow")}</p>
+          <h2>{t("dashboardPage.title", { name: instructorName })}</h2>
           <p>
             Theo dõi lịch dạy, tiến độ học viên, hiệu suất khóa học và các bài
             cần xử lý trong một không gian quản lý rõ ràng.
@@ -103,7 +105,7 @@ function InstructorDashboardPage() {
         </NavLink>
       </section>
 
-      <section className="instructor-stat-grid" aria-label="Tổng quan giảng viên">
+      <section className="instructor-stat-grid" aria-label={t("dashboardPage.statsLabel")}>
         {displayedDashboardStats.map((stat) => (
           <article className="instructor-stat-card" key={stat.label}>
             <div className={`instructor-stat-icon ${stat.tone}`}>
@@ -122,8 +124,8 @@ function InstructorDashboardPage() {
         <article className="instructor-panel instructor-schedule-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Hôm nay</p>
-              <h3>Lịch giảng dạy</h3>
+              <p className="instructor-eyebrow">{t("dashboardPage.todayEyebrow")}</p>
+              <h3>{t("dashboardPage.scheduleTitle")}</h3>
             </div>
             <span className="material-symbols-outlined">calendar_month</span>
           </div>
@@ -151,8 +153,8 @@ function InstructorDashboardPage() {
         <article className="instructor-panel instructor-analytics-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Tương tác</p>
-              <h3>Hoạt động trong tuần</h3>
+              <p className="instructor-eyebrow">{t("dashboardPage.interactionEyebrow")}</p>
+              <h3>{t("dashboardPage.weeklyActivityTitle")}</h3>
             </div>
             <strong>+14%</strong>
           </div>
@@ -172,11 +174,11 @@ function InstructorDashboardPage() {
         <article className="instructor-panel instructor-course-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Khóa học</p>
-              <h3>Tổng quan hiệu suất</h3>
+              <p className="instructor-eyebrow">{t("dashboardPage.courseEyebrow")}</p>
+              <h3>{t("dashboardPage.performanceTitle")}</h3>
             </div>
             <NavLink className="instructor-ghost-button" to="/instructor/courses">
-              Xem tất cả
+              {t("commonActions.all")}
             </NavLink>
           </div>
 
@@ -213,8 +215,8 @@ function InstructorDashboardPage() {
         <article className="instructor-panel instructor-student-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Tín hiệu học viên</p>
-              <h3>Cần theo dõi</h3>
+              <p className="instructor-eyebrow">{t("dashboardPage.studentSignalsEyebrow")}</p>
+              <h3>{t("dashboardPage.studentSignalsTitle")}</h3>
             </div>
             <span className="material-symbols-outlined">school</span>
           </div>

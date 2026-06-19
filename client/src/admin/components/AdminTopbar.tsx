@@ -1,13 +1,16 @@
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
+import LanguageSwitcher from "../../shared/components/language/LanguageSwitcher";
 import NotificationBell from "../../shared/components/notifications/NotificationBell";
 
 type AdminTopbarProps = {
-  searchPlaceholder: string;
+  searchPlaceholder?: string;
 };
 
 function AdminTopbar({ searchPlaceholder }: AdminTopbarProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation("admin");
   const { logout, user } = useAuth();
   const avatar =
     user?.avatarUrl ??
@@ -20,12 +23,14 @@ function AdminTopbar({ searchPlaceholder }: AdminTopbarProps) {
 
   return (
     <header className="topbar">
-      <label className="searchbar" aria-label="Tìm kiếm">
+      <label className="searchbar" aria-label={t("topbar.searchLabel")}>
         <span className="material-symbols-outlined">search</span>
-        <input type="text" placeholder={searchPlaceholder} />
+        <input type="text" placeholder={searchPlaceholder ?? t("topbar.defaultSearch")} />
       </label>
 
       <div className="topbar-actions">
+        <LanguageSwitcher compact />
+
         <NotificationBell
           className="admin-notification-bell"
           onOpenNotification={(notification) => {
@@ -37,16 +42,16 @@ function AdminTopbar({ searchPlaceholder }: AdminTopbarProps) {
 
         <div className="profile-chip">
           <div>
-            <p className="profile-name">{user?.fullName ?? "Quản trị viên"}</p>
-            <p className="profile-role">Quản trị hệ thống</p>
+            <p className="profile-name">{user?.fullName ?? t("topbar.adminName")}</p>
+            <p className="profile-role">{t("topbar.adminRole")}</p>
           </div>
-          <img src={avatar} alt={user?.fullName ?? "Quản trị viên"} />
+          <img src={avatar} alt={user?.fullName ?? t("topbar.adminName")} />
         </div>
 
         <button
           className="icon-button"
           onClick={() => void handleLogout()}
-          title="Đăng xuất"
+          title={t("topbar.logout")}
           type="button"
         >
           <span className="material-symbols-outlined">logout</span>

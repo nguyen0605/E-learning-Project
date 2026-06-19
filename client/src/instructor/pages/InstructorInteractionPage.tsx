@@ -1,4 +1,7 @@
-﻿import { useEffect, useState } from "react";
+
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+
 import { useLocation, useNavigate } from "react-router-dom";
 import { instructorApiRequest } from "../api/instructorApi";
 import { getInstructorAuthTeacherId } from "../auth/instructorAuth";
@@ -35,10 +38,22 @@ type DiscussionThread = {
 };
 type NotificationItem = {
   id: number;
+  type: string;
+  referenceId: number | null;
   title: string;
   content: string;
+  targetUrl: string | null;
   isRead: boolean;
   time: string;
+};
+type SelectedReview = {
+  id: number;
+  courseId: number;
+  courseTitle: string;
+  student: string;
+  rating: number;
+  comment: string | null;
+  teacherComment: string | null;
 };
 type ReminderTask = {
   id: string;
@@ -86,6 +101,7 @@ function getThreadStatusClass(status: string) {
 }
 
 function InstructorInteractionPage() {
+  const { t } = useTranslation("instructor");
   const location = useLocation();
   const navigate = useNavigate();
   const [pageData, setPageData] =
@@ -97,6 +113,10 @@ function InstructorInteractionPage() {
   const [discussionReplyText, setDiscussionReplyText] = useState("");
   const [discussionReplyError, setDiscussionReplyError] = useState<string | null>(null);
   const [isSavingDiscussionReply, setIsSavingDiscussionReply] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<SelectedReview | null>(null);
+  const [reviewReplyText, setReviewReplyText] = useState("");
+  const [reviewReplyError, setReviewReplyError] = useState<string | null>(null);
+  const [isSavingReviewReply, setIsSavingReviewReply] = useState(false);
   const [showComposeForm, setShowComposeForm] = useState(false);
   const [composeMode, setComposeMode] = useState<"announcement" | "message">("announcement");
   const [composeTarget, setComposeTarget] = useState("");
@@ -216,6 +236,91 @@ function InstructorInteractionPage() {
     }
   }
 
+  async function handleSelectReview(notification: NotificationItem) {
+    const targetUrl = notification.targetUrl ?? "";
+    const query = targetUrl.includes("?") ? targetUrl.split("?")[1] : "";
+    const params = new URLSearchParams(query);
+    const courseId = Number(params.get("courseId"));
+    const reviewId = Number(params.get("reviewId") ?? notification.referenceId);
+
+    if (!Number.isFinite(courseId) || !Number.isFinite(reviewId)) {
+      setNotificationError(t("interactionPage.invalidReviewNotification"));
+      return;
+    }
+
+    try {
+      const payload = await instructorApiRequest<{
+        success: boolean;
+        data: {
+          id: number;
+          title: string;
+          reviews: Array<{
+            id: number;
+            student: string;
+            rating: number;
+            comment: string | null;
+            teacherComment: string | null;
+          }>;
+        };
+      }>(`/api/instructor/courses/${courseId}`, {
+        query: { teacherId: DEFAULT_TEACHER_ID },
+      });
+      const review = payload.data.reviews.find((item) => item.id === reviewId);
+      if (!review) throw new Error("Không tìm thấy đánh giá.");
+
+      setSelectedReview({
+        ...review,
+        courseId,
+        courseTitle: payload.data.title,
+      });
+      setReviewReplyText(review.teacherComment ?? "");
+      setReviewReplyError(null);
+      setSelectedDiscussionId(null);
+      if (!notification.isRead) await handleMarkNotificationRead(notification.id);
+      window.setTimeout(() => {
+        document
+          .getElementById("instructor-interaction-reply-box")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
+    } catch (error) {
+      setNotificationError(
+        error instanceof Error ? error.message : "Không thể mở đánh giá.",
+      );
+    }
+  }
+
+  async function handleSaveReviewReply() {
+    if (!selectedReview) return;
+    const teacherComment = reviewReplyText.trim();
+    if (!teacherComment) {
+      setReviewReplyError(t("interactionPage.emptyReply"));
+      return;
+    }
+
+    setIsSavingReviewReply(true);
+    setReviewReplyError(null);
+    try {
+      await instructorApiRequest(
+        `/api/instructor/courses/${selectedReview.courseId}/reviews/${selectedReview.id}/respond`,
+        {
+          method: "PATCH",
+          query: { teacherId: DEFAULT_TEACHER_ID },
+          body: { teacherComment },
+        },
+      );
+      setSelectedReview((current) =>
+        current ? { ...current, teacherComment } : current,
+      );
+      setToast({ type: "success", message: "Đã gửi phản hồi đánh giá." });
+    } catch (error) {
+      setReviewReplyError(
+        error instanceof Error ? error.message : "Không thể gửi phản hồi.",
+      );
+    } finally {
+      setIsSavingReviewReply(false);
+    }
+  }
+
   function openComposeForm(mode: "announcement" | "message", target = "") {
     setComposeMode(mode);
     setComposeTarget(target);
@@ -253,7 +358,10 @@ function InstructorInteractionPage() {
   function handleSubmitCompose() {
     const title = composeTitle.trim();
     const content = composeContent.trim();
-    const target = getComposeTargetLabel();
+
+
+    const target = getComposeTargetLabel() || t("interactionPage.allClasses");
+
 
     if (!title) {
       setComposeError("Hãy nhập tiêu đề.");
@@ -336,8 +444,8 @@ function InstructorInteractionPage() {
     <InstructorLayout activePage="interaction">
       <section className="instructor-hero instructor-interaction-hero">
         <div>
-          <p className="instructor-eyebrow">Tương tác</p>
-          <h2>Giữ kết nối với từng lớp học</h2>
+          <p className="instructor-eyebrow">{t("interactionPage.eyebrow")}</p>
+          <h2>{t("interactionPage.title")}</h2>
           <p>
             Theo dõi thảo luận, tin nhắn trực tiếp và thông báo lớp trong một
             không gian giao tiếp dành cho giảng viên.
@@ -364,12 +472,12 @@ function InstructorInteractionPage() {
           </button>
           <button className="instructor-primary-button" onClick={() => openComposeForm("announcement")} type="button">
             <span className="material-symbols-outlined">campaign</span>
-            Thông báo mới
+            {t("interactionPage.newAnnouncement")}
           </button>
         </div>
       </section>
 
-      <section className="instructor-stat-grid" aria-label="Tổng quan tương tác">
+      <section className="instructor-stat-grid" aria-label={t("interactionPage.statsLabel")}>
         {displayedStats.map((stat) => (
           <article className="instructor-stat-card" key={stat.label}>
             <div className={`instructor-stat-icon ${stat.tone}`}>
@@ -388,8 +496,8 @@ function InstructorInteractionPage() {
         <article className="instructor-panel instructor-reminder-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Nhắc việc</p>
-              <h3>Việc cần chú ý</h3>
+              <p className="instructor-eyebrow">{t("interactionPage.reminderEyebrow")}</p>
+              <h3>{t("interactionPage.needsAttention")}</h3>
             </div>
             <span className="material-symbols-outlined">notifications_active</span>
           </div>
@@ -415,8 +523,8 @@ function InstructorInteractionPage() {
         <aside className="instructor-panel instructor-notification-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Thông báo</p>
-              <h3>Thông báo của giảng viên</h3>
+              <p className="instructor-eyebrow">{t("interactionPage.notificationsEyebrow")}</p>
+              <h3>{t("interactionPage.teacherNotifications")}</h3>
             </div>
             <span className="material-symbols-outlined">campaign</span>
           </div>
@@ -443,9 +551,23 @@ function InstructorInteractionPage() {
                     {notification.isRead
                       ? "Đã đọc"
                       : isMarkingNotificationId === notification.id
-                        ? "Đang lưu..."
+                        ? t("interactionPage.saving")
                         : "Đánh dấu đã đọc"}
                   </button>
+                  {notification.targetUrl ? (
+                    <button
+                      onClick={() =>
+                        notification.type.includes("REVIEW")
+                          ? void handleSelectReview(notification)
+                          : navigate(notification.targetUrl || "/instructor/interaction")
+                      }
+                      type="button"
+                    >
+                      {notification.type.includes("REVIEW")
+                        ? t("interactionPage.viewReviewReply")
+                        : t("interactionPage.openContent")}
+                    </button>
+                  ) : null}
                 </article>
               ))
             )}
@@ -457,23 +579,24 @@ function InstructorInteractionPage() {
         <article className="instructor-panel instructor-discussion-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Thảo luận</p>
-              <h3>Chủ đề trong lớp</h3>
+              <p className="instructor-eyebrow">{t("interactionPage.discussionEyebrow")}</p>
+              <h3>{t("interactionPage.classTopics")}</h3>
             </div>
             <div className="instructor-filter-tabs" aria-label="Bộ lọc chủ đề">
+
               <button
                 className={discussionFilter === "all" ? "active" : ""}
                 onClick={() => setDiscussionFilter("all")}
                 type="button"
               >
-                Tất cả
+                {t("interactionPage.all")}
               </button>
               <button
                 className={discussionFilter === "pending" ? "active" : ""}
                 onClick={() => setDiscussionFilter("pending")}
                 type="button"
               >
-                Cần phản hồi
+                {t("interactionPage.needReply")}
               </button>
               <button
                 className={discussionFilter === "answered" ? "active" : ""}
@@ -482,54 +605,93 @@ function InstructorInteractionPage() {
               >
                 Đã trả lời
               </button>
+
             </div>
           </div>
 
           <div className="instructor-thread-list">
             {filteredThreads.length === 0 ? (
-              <p className="instructor-empty-state">Không có chủ đề phù hợp với bộ lọc này.</p>
+              <p className="instructor-empty-state">Chưa có chủ đề phù hợp với bộ lọc này.</p>
             ) : (
               filteredThreads.map((thread) => (
-                <button
-                  className={`instructor-thread-card ${selectedDiscussion?.id === thread.id ? "active" : ""}`}
-                  key={thread.id ?? thread.title}
-                  onClick={() => {
-                    setSelectedDiscussionId(thread.id ?? null);
-                    setDiscussionReplyError(null);
-                  }}
-                  type="button"
-                >
-                  <div className="instructor-thread-icon">
-                    <span className="material-symbols-outlined">forum</span>
+              <button
+                className={`instructor-thread-card ${selectedDiscussion?.id === thread.id ? "active" : ""}`}
+                key={thread.id ?? thread.title}
+                onClick={() => {
+                  setSelectedDiscussionId(thread.id ?? null);
+                  setSelectedReview(null);
+                  setDiscussionReplyError(null);
+                }}
+                type="button"
+              >
+                <div className="instructor-thread-icon">
+                  <span className="material-symbols-outlined">forum</span>
+                </div>
+                <div>
+                  <h4>{thread.title}</h4>
+                  {thread.author && <strong>{thread.author}</strong>}
+                  <p>{thread.course} · {thread.batch}</p>
+                  <div className="instructor-thread-meta">
+                    <span>{thread.replies} phản hồi</span>
+                    <span>{thread.lastActivity}</span>
                   </div>
-                  <div>
-                    <h4>{thread.title}</h4>
-                    {thread.author && <strong>{thread.author}</strong>}
-                    <p>{thread.course} · {thread.batch}</p>
-                    <div className="instructor-thread-meta">
-                      <span>{thread.replies} phản hồi</span>
-                      <span>{thread.lastActivity}</span>
-                    </div>
-                  </div>
-                  <em className={`instructor-status-pill ${getThreadStatusClass(thread.status)}`}>
-                    {thread.status}
-                  </em>
-                </button>
+                </div>
+                <em className={`instructor-status-pill ${getThreadStatusClass(thread.status)}`}>
+                  {thread.status}
+                </em>
+              </button>
               ))
             )}
           </div>
         </article>
 
-        <aside className="instructor-panel instructor-discussion-reply-panel">
+        <aside
+          className="instructor-panel instructor-discussion-reply-panel"
+          id="instructor-interaction-reply-box"
+        >
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Phản hồi</p>
-              <h3>Trả lời học viên</h3>
+              <p className="instructor-eyebrow">{t("interactionPage.replyEyebrow")}</p>
+              <h3>{t("interactionPage.replyToStudent")}</h3>
             </div>
             <span className="material-symbols-outlined">reply</span>
           </div>
 
-          {!selectedDiscussion ? (
+          {selectedReview ? (
+            <>
+              <div className="instructor-discussion-detail">
+                <strong>{selectedReview.student}</strong>
+                <span>
+                  {selectedReview.courseTitle} · {selectedReview.rating}/5 sao
+                </span>
+                <p>
+                  {selectedReview.comment || t("interactionPage.emptyReviewComment")}
+                </p>
+              </div>
+              <form
+                className="instructor-discussion-reply-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void handleSaveReviewReply();
+                }}
+              >
+                {reviewReplyError ? (
+                  <p className="instructor-course-detail-error">
+                    {reviewReplyError}
+                  </p>
+                ) : null}
+                <textarea
+                  onChange={(event) => setReviewReplyText(event.target.value)}
+                  placeholder={t("interactionPage.replyReviewPlaceholder")}
+                  rows={4}
+                  value={reviewReplyText}
+                />
+                <button disabled={isSavingReviewReply} type="submit">
+                  {isSavingReviewReply ? t("interactionPage.sending") : t("interactionPage.sendReply")}
+                </button>
+              </form>
+            </>
+          ) : !selectedDiscussion ? (
             <p className="instructor-empty-state">Chọn một chủ đề để trả lời.</p>
           ) : (
             <>
@@ -567,10 +729,10 @@ function InstructorInteractionPage() {
                   rows={4}
                   value={discussionReplyText}
                   onChange={(event) => setDiscussionReplyText(event.target.value)}
-                  placeholder="Nhập phản hồi cho học viên..."
+                  placeholder={t("interactionPage.replyDiscussionPlaceholder")}
                 />
                 <button disabled={isSavingDiscussionReply} type="submit">
-                  {isSavingDiscussionReply ? "Đang gửi..." : "Gửi phản hồi"}
+                  {isSavingDiscussionReply ? t("interactionPage.sending") : t("interactionPage.sendReply")}
                 </button>
               </form>
             </>
@@ -581,8 +743,8 @@ function InstructorInteractionPage() {
       <section className="instructor-panel instructor-message-panel">
         <div className="instructor-panel-header">
           <div>
-            <p className="instructor-eyebrow">Hộp thư</p>
-            <h3>Tin nhắn trực tiếp</h3>
+            <p className="instructor-eyebrow">{t("interactionPage.mailboxEyebrow")}</p>
+            <h3>{t("interactionPage.directMessages")}</h3>
           </div>
           <span className="material-symbols-outlined">mail</span>
         </div>
@@ -603,11 +765,11 @@ function InstructorInteractionPage() {
       <section className="instructor-panel instructor-announcement-panel">
         <div className="instructor-panel-header">
           <div>
-            <p className="instructor-eyebrow">Thông báo</p>
-            <h3>Gửi tin cho lớp</h3>
+            <p className="instructor-eyebrow">{t("interactionPage.announcementEyebrow")}</p>
+            <h3>{t("interactionPage.sendToClass")}</h3>
           </div>
           <button className="instructor-ghost-button" onClick={() => openComposeForm("announcement")} type="button">
-            Thông báo mới
+            {t("interactionPage.newAnnouncement")}
           </button>
         </div>
         <div className="instructor-announcement-list">
@@ -642,9 +804,9 @@ function InstructorInteractionPage() {
               </div>
               <div>
                 <p className="instructor-eyebrow">
-                  {composeMode === "announcement" ? "Thông báo" : "Tin nhắn"}
+                  {composeMode === "announcement" ? t("interactionPage.announcementEyebrow") : t("interactionPage.message")}
                 </p>
-                <h3>{composeMode === "announcement" ? "Thông báo mới" : "Nhắn tin cho lớp"}</h3>
+                <h3>{composeMode === "announcement" ? t("interactionPage.newAnnouncement") : t("interactionPage.messageClass")}</h3>
                 <p>Soạn nhanh nội dung để demo luồng tương tác với học viên.</p>
               </div>
               <button
@@ -736,7 +898,7 @@ function InstructorInteractionPage() {
                 <input
                   value={composeTarget}
                   onChange={(event) => setComposeTarget(event.target.value)}
-                  placeholder="VD: WEB-TEACH-01 hoặc Tất cả lớp"
+                  placeholder={t("interactionPage.targetPlaceholder")}
                 />
               </label>
 
@@ -755,16 +917,16 @@ function InstructorInteractionPage() {
                   rows={5}
                   value={composeContent}
                   onChange={(event) => setComposeContent(event.target.value)}
-                  placeholder="Nhập nội dung gửi cho lớp..."
+                  placeholder={t("interactionPage.contentPlaceholder")}
                 />
               </label>
 
               <div className="instructor-create-course-actions instructor-compose-actions">
                 <button type="button" onClick={closeComposeForm}>
-                  Hủy
+                  {t("interactionPage.cancel")}
                 </button>
                 <button type="button" onClick={handleSubmitCompose}>
-                  {composeMode === "announcement" ? "Tạo thông báo" : "Gửi tin nhắn"}
+                  {composeMode === "announcement" ? t("interactionPage.createAnnouncement") : t("interactionPage.sendMessage")}
                 </button>
               </div>
             </div>

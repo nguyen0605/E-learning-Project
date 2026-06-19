@@ -1,8 +1,9 @@
 import bcrypt from "bcryptjs";
 import db from "../db.js";
+import { createAuthSession } from "./auth.service.js";
 
-const DEMO_PASSWORD = "password";
 const LEGACY_DEMO_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+const LEGACY_DEMO_PASSWORDS = new Set(["Password123", "password"]);
 
 function normalizeEmail(value) {
   return String(value ?? "").trim().toLowerCase();
@@ -19,6 +20,18 @@ function toInstructorSession(row) {
   };
 }
 
+function toAuthUser(row) {
+  return {
+    user_id: row.id,
+    full_name: row.name,
+    email: row.email,
+    phone: row.phone ?? null,
+    avatar_url: row.avatar,
+    role: "TEACHER",
+    status: row.status,
+  };
+}
+
 async function getInstructorByEmail(email) {
   const [rows] = await db.query(
     `
@@ -26,6 +39,7 @@ async function getInstructorByEmail(email) {
         u.user_id AS id,
         u.full_name AS name,
         u.email,
+        u.phone,
         u.password_hash AS passwordHash,
         u.avatar_url AS avatar,
         u.status,
@@ -61,12 +75,26 @@ export async function loginInstructor(credentials) {
 
   const isPasswordValid =
     (await bcrypt.compare(password, instructor.passwordHash)) ||
-    (password === DEMO_PASSWORD && instructor.passwordHash === LEGACY_DEMO_HASH);
+    (instructor.passwordHash === LEGACY_DEMO_HASH && LEGACY_DEMO_PASSWORDS.has(password));
   if (!isPasswordValid) {
     throw new Error("Mật khẩu không đúng.");
   }
 
-  return toInstructorSession(instructor);
+  const session = createAuthSession(toAuthUser(instructor), true);
+  return {
+    ...toInstructorSession(instructor),
+    token: session.token,
+    expiresAt: session.expiresAt,
+    user: {
+      id: instructor.id,
+      fullName: instructor.name,
+      email: instructor.email,
+      phone: instructor.phone ?? null,
+      avatarUrl: instructor.avatar,
+      role: "TEACHER",
+      status: instructor.status,
+    },
+  };
 }
 
 export async function registerInstructor(registrationData) {
@@ -123,7 +151,21 @@ export async function registerInstructor(registrationData) {
 
     await connection.commit();
     const instructor = await getInstructorByEmail(email);
-    return toInstructorSession(instructor);
+    const session = createAuthSession(toAuthUser(instructor), true);
+    return {
+      ...toInstructorSession(instructor),
+      token: session.token,
+      expiresAt: session.expiresAt,
+      user: {
+        id: instructor.id,
+        fullName: instructor.name,
+        email: instructor.email,
+        phone: instructor.phone ?? null,
+        avatarUrl: instructor.avatar,
+        role: "TEACHER",
+        status: instructor.status,
+      },
+    };
   } catch (error) {
     await connection.rollback();
     throw error;

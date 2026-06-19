@@ -27,13 +27,18 @@
 
 .instructor-brand-mark {
   display: grid;
-  width: 44px;
+  width: 58px;
   height: 44px;
   place-items: center;
   border-radius: 14px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #004ac6 0%, #2563eb 100%);
-  box-shadow: 0 16px 34px rgba(37, 99, 235, 0.22);
+  background: #ffffff;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+}
+
+.instructor-brand-mark img {
+  width: 46px;
+  height: auto;
+  display: block;
 }
 
 .instructor-brand h1,
@@ -319,6 +324,23 @@
   background: #ba1a1a;
 }
 
+.instructor-notification-push-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 40px);
+  margin: 0 20px 14px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 13px;
+  color: #ffffff;
+  background: #004ac6;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
 .instructor-profile-chip {
   display: flex;
   align-items: center;
@@ -571,10 +593,21 @@
   padding: clamp(32px, 6vw, 72px);
 }
 
+.instructor-auth-visual-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
 .instructor-auth-visual .instructor-brand-mark {
-  width: 68px;
+  width: 94px;
   height: 68px;
   border-radius: 22px;
+}
+
+.instructor-auth-visual .instructor-brand-mark img {
+  width: 76px;
 }
 
 .instructor-auth-visual h1,

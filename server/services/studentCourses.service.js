@@ -1,5 +1,6 @@
 import db from "../db.js";
 import { mapAssignmentSubmission } from "./studentAssignments.service.js";
+import { createNotification } from "./notification.service.js";
 
 const SERVER_BASE_URL =
   process.env.PUBLIC_SERVER_URL ??
@@ -85,6 +86,141 @@ export async function getStudentCourseCategories() {
   }));
 }
 
+export async function getPublicInstructorDetail(teacherId) {
+  const [teacherRows] = await db.query(
+    `SELECT
+       u.user_id,
+       u.full_name,
+       u.email,
+       u.avatar_url,
+       tp.bio,
+       tp.specialization,
+       tp.experience_years,
+       tp.qualification,
+       tp.workplace
+     FROM users u
+     LEFT JOIN teacher_profiles tp ON tp.teacher_id = u.user_id
+     WHERE u.user_id = ?
+       AND u.role = 'TEACHER'
+       AND u.status = 'ACTIVE'
+     LIMIT 1`,
+    [teacherId],
+  );
+
+  if (!teacherRows[0]) return null;
+
+  const [courseRows] = await db.query(
+    `SELECT
+       c.course_id,
+       c.course_name,
+       c.description,
+       c.thumbnail_url,
+       c.level,
+       c.price,
+       c.status,
+       c.created_at,
+       c.updated_at,
+       cc.category_id,
+       cc.category_name,
+       cc.description AS category_description,
+       cc.status AS category_status,
+       u.user_id AS teacher_id,
+       u.full_name AS teacher_name,
+       u.email AS teacher_email,
+       u.avatar_url AS teacher_avatar_url,
+       COALESCE(AVG(cr.rating), 0) AS average_rating,
+       COUNT(DISTINCT cr.review_id) AS review_count,
+       COUNT(DISTINCT e.enrollment_id) AS enrollment_count,
+       COUNT(DISTINCT cm.module_id) AS module_count,
+       COUNT(DISTINCT l.lesson_id) AS lesson_count,
+       COALESCE(SUM(DISTINCT l.duration_minutes), 0) AS total_duration_minutes
+     FROM courses c
+     INNER JOIN course_categories cc ON cc.category_id = c.category_id
+     INNER JOIN users u ON u.user_id = c.teacher_id
+     LEFT JOIN course_reviews cr
+       ON cr.course_id = c.course_id
+     LEFT JOIN course_batches cb ON cb.course_id = c.course_id
+     LEFT JOIN enrollments e ON e.batch_id = cb.batch_id
+     LEFT JOIN course_modules cm ON cm.course_id = c.course_id
+     LEFT JOIN lessons l ON l.module_id = cm.module_id
+     WHERE c.teacher_id = ? AND c.status = 'APPROVED'
+     GROUP BY c.course_id, cc.category_id, u.user_id
+     ORDER BY c.created_at DESC`,
+    [teacherId],
+  );
+
+  const [reviewRows] = await db.query(
+    `SELECT
+       cr.review_id,
+       cr.teacher_rating,
+       cr.comment,
+       cr.created_at,
+       c.course_id,
+       c.course_name,
+       student.user_id AS student_id,
+       student.full_name AS student_name,
+       student.avatar_url AS student_avatar_url
+     FROM course_reviews cr
+     INNER JOIN courses c ON c.course_id = cr.course_id
+     INNER JOIN users student ON student.user_id = cr.student_id
+     WHERE cr.teacher_id = ?
+       AND cr.teacher_rating IS NOT NULL
+     ORDER BY cr.created_at DESC, cr.review_id DESC
+     LIMIT 20`,
+    [teacherId],
+  );
+
+  const teacher = teacherRows[0];
+  const averageTeacherRating =
+    reviewRows.length === 0
+      ? 0
+      : Number(
+          (
+            reviewRows.reduce(
+              (sum, review) => sum + Number(review.teacher_rating),
+              0,
+            ) / reviewRows.length
+          ).toFixed(1),
+        );
+
+  return {
+    id: Number(teacher.user_id),
+    fullName: teacher.full_name,
+    email: teacher.email,
+    avatarUrl: teacher.avatar_url,
+    bio: teacher.bio,
+    specialization: teacher.specialization,
+    experienceYears: Number(teacher.experience_years ?? 0),
+    qualification: teacher.qualification,
+    workplace: teacher.workplace,
+    stats: {
+      courseCount: courseRows.length,
+      studentCount: courseRows.reduce(
+        (sum, course) => sum + Number(course.enrollment_count ?? 0),
+        0,
+      ),
+      averageRating: averageTeacherRating,
+      reviewCount: reviewRows.length,
+    },
+    courses: courseRows.map(mapCourse),
+    reviews: reviewRows.map((review) => ({
+      id: Number(review.review_id),
+      teacherRating: Number(review.teacher_rating),
+      comment: review.comment,
+      createdAt: review.created_at,
+      course: {
+        id: Number(review.course_id),
+        name: review.course_name,
+      },
+      student: {
+        id: Number(review.student_id),
+        fullName: review.student_name,
+        avatarUrl: review.student_avatar_url,
+      },
+    })),
+  };
+}
+
 export async function getStudentCourses({ categoryId, search, level } = {}) {
   const params = [];
   const filters = ["c.status = 'APPROVED'", "cc.status = 'ACTIVE'"];
@@ -132,7 +268,8 @@ export async function getStudentCourses({ categoryId, search, level } = {}) {
      FROM courses c
      INNER JOIN course_categories cc ON cc.category_id = c.category_id
      INNER JOIN users u ON u.user_id = c.teacher_id
-     LEFT JOIN course_reviews cr ON cr.course_id = c.course_id
+     LEFT JOIN course_reviews cr
+       ON cr.course_id = c.course_id
      LEFT JOIN course_batches cb ON cb.course_id = c.course_id
      LEFT JOIN enrollments e ON e.batch_id = cb.batch_id
      LEFT JOIN course_modules cm ON cm.course_id = c.course_id
@@ -197,7 +334,8 @@ export async function getStudentEnrolledCourses(studentId) {
      INNER JOIN courses c ON c.course_id = cb.course_id
      INNER JOIN course_categories cc ON cc.category_id = c.category_id
      INNER JOIN users u ON u.user_id = cb.teacher_id
-     LEFT JOIN course_reviews cr ON cr.course_id = c.course_id
+     LEFT JOIN course_reviews cr
+       ON cr.course_id = c.course_id
      LEFT JOIN enrollments e2 ON e2.batch_id = cb.batch_id
      LEFT JOIN course_modules cm ON cm.course_id = c.course_id
      LEFT JOIN lessons l ON l.module_id = cm.module_id
@@ -259,7 +397,8 @@ export async function getStudentCourseDetail(courseId, studentId) {
      FROM courses c
      INNER JOIN course_categories cc ON cc.category_id = c.category_id
      INNER JOIN users u ON u.user_id = c.teacher_id
-     LEFT JOIN course_reviews cr ON cr.course_id = c.course_id
+     LEFT JOIN course_reviews cr
+       ON cr.course_id = c.course_id
      LEFT JOIN course_batches cb ON cb.course_id = c.course_id
      LEFT JOIN enrollments e ON e.batch_id = cb.batch_id
      LEFT JOIN course_modules cm ON cm.course_id = c.course_id
@@ -278,6 +417,21 @@ export async function getStudentCourseDetail(courseId, studentId) {
   }
 
   const course = mapCourse(courseRows[0]);
+  let canAccessLearningContent = false;
+
+  if (studentId) {
+    const [accessRows] = await db.query(
+      `SELECT 1
+       FROM enrollments e
+       INNER JOIN course_batches b ON b.batch_id = e.batch_id
+       WHERE e.student_id = ?
+         AND b.course_id = ?
+         AND e.status IN ('ACTIVE', 'COMPLETED')
+       LIMIT 1`,
+      [studentId, courseId],
+    );
+    canAccessLearningContent = accessRows.length > 0;
+  }
 
   const [batchRows] = await db.execute(
     `SELECT
@@ -607,15 +761,25 @@ export async function getStudentCourseDetail(courseId, studentId) {
       id: lesson.lesson_id,
       title: lesson.lesson_title,
       type: lesson.lesson_type,
-      content: lesson.content,
-      videoUrl: normalizeVideoUrl(lesson.video_web_url || lesson.video_url),
+      content:
+        canAccessLearningContent || lesson.is_preview ? lesson.content : null,
+      videoUrl:
+        canAccessLearningContent || lesson.is_preview
+          ? normalizeVideoUrl(lesson.video_web_url || lesson.video_url)
+          : null,
       durationMinutes: toNumber(lesson.duration_minutes),
       isPreview: Boolean(lesson.is_preview),
       isCompleted: Boolean(lesson.is_completed),
       orderNo: lesson.order_no,
-      resources: resourcesByLessonId.get(lesson.lesson_id) ?? [],
-      assignments: assignmentsByLessonId.get(lesson.lesson_id) ?? [],
-      quizzes: quizzesByLessonId.get(lesson.lesson_id) ?? [],
+      resources: canAccessLearningContent
+        ? resourcesByLessonId.get(lesson.lesson_id) ?? []
+        : [],
+      assignments: canAccessLearningContent
+        ? assignmentsByLessonId.get(lesson.lesson_id) ?? []
+        : [],
+      quizzes: canAccessLearningContent
+        ? quizzesByLessonId.get(lesson.lesson_id) ?? []
+        : [],
     });
     lessonsByModuleId.set(lesson.module_id, lessons);
   });
@@ -634,9 +798,11 @@ export async function getStudentCourseDetail(courseId, studentId) {
      FROM course_reviews cr
      INNER JOIN users u ON u.user_id = cr.student_id
      WHERE cr.course_id = ?
-     ORDER BY cr.created_at DESC
+     ORDER BY
+       CASE WHEN cr.student_id = ? THEN 0 ELSE 1 END,
+       cr.created_at DESC
      LIMIT 10`,
-    [courseId],
+    [courseId, studentId ?? 0],
   );
 
   return {
@@ -689,6 +855,224 @@ export async function getStudentCourseDetail(courseId, studentId) {
       },
     })),
   };
+}
+
+const MIN_REVIEW_PROGRESS = 30;
+
+function mapStudentReview(row) {
+  if (!row) return null;
+
+  return {
+    id: Number(row.review_id),
+    courseId: Number(row.course_id),
+    rating: Number(row.rating),
+    teacherRating:
+      row.teacher_rating === null ? null : Number(row.teacher_rating),
+    comment: row.comment,
+    teacherComment: row.teacher_comment,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function getStudentCourseReviewEligibility(studentId, courseId) {
+  const [courseRows] = await db.query(
+    `SELECT course_id, teacher_id
+     FROM courses
+     WHERE course_id = ? AND status = 'APPROVED'
+     LIMIT 1`,
+    [courseId],
+  );
+
+  if (!courseRows[0]) return null;
+
+  const [enrollmentRows] = await db.query(
+    `SELECT
+       e.enrollment_id,
+       e.progress_percent,
+       e.status,
+       EXISTS(
+         SELECT 1
+         FROM payments p
+         WHERE p.student_id = e.student_id
+           AND p.batch_id = e.batch_id
+           AND p.payment_status = 'SUCCESS'
+       ) AS has_successful_payment
+     FROM enrollments e
+     INNER JOIN course_batches b ON b.batch_id = e.batch_id
+     WHERE e.student_id = ?
+       AND b.course_id = ?
+       AND e.status IN ('ACTIVE', 'COMPLETED')
+     ORDER BY
+       has_successful_payment DESC,
+       e.progress_percent DESC,
+       e.enrollment_id DESC
+     LIMIT 1`,
+    [studentId, courseId],
+  );
+
+  const enrollment = enrollmentRows[0] ?? null;
+  const progressPercent = Number(enrollment?.progress_percent ?? 0);
+  const hasEnrollment = Boolean(enrollment);
+  const hasSuccessfulPayment = Boolean(enrollment?.has_successful_payment);
+  const eligible =
+    hasEnrollment &&
+    hasSuccessfulPayment &&
+    progressPercent >= MIN_REVIEW_PROGRESS;
+
+  const [reviewRows] = await db.query(
+    `SELECT
+       review_id,
+       course_id,
+       rating,
+       teacher_rating,
+       comment,
+       teacher_comment,
+       status,
+       created_at,
+       updated_at
+     FROM course_reviews
+     WHERE student_id = ? AND course_id = ?
+     LIMIT 1`,
+    [studentId, courseId],
+  );
+
+  let reason = null;
+  if (!hasEnrollment) {
+    reason = "Bạn chưa tham gia khóa học này.";
+  } else if (!hasSuccessfulPayment) {
+    reason = "Bạn cần hoàn tất thanh toán khóa học trước khi đánh giá.";
+  } else if (progressPercent < MIN_REVIEW_PROGRESS) {
+    reason = `Bạn cần hoàn thành tối thiểu ${MIN_REVIEW_PROGRESS}% khóa học để đánh giá.`;
+  }
+
+  return {
+    eligible,
+    reason,
+    progressPercent,
+    minimumProgress: MIN_REVIEW_PROGRESS,
+    hasEnrollment,
+    hasSuccessfulPayment,
+    existingReview: mapStudentReview(reviewRows[0]),
+  };
+}
+
+export async function createStudentCourseReview(
+  studentId,
+  courseId,
+  { rating, teacherRating, comment },
+) {
+  const eligibility = await getStudentCourseReviewEligibility(studentId, courseId);
+  if (!eligibility) return { status: 404, message: "Không tìm thấy khóa học." };
+  if (!eligibility.eligible) {
+    return { status: 403, message: eligibility.reason };
+  }
+  if (eligibility.existingReview) {
+    return {
+      status: 409,
+      message: "Bạn đã đánh giá khóa học này. Hãy sử dụng chức năng chỉnh sửa.",
+    };
+  }
+
+  const [courseRows] = await db.query(
+    "SELECT teacher_id FROM courses WHERE course_id = ? LIMIT 1",
+    [courseId],
+  );
+
+  const [result] = await db.query(
+    `INSERT INTO course_reviews
+      (student_id, course_id, teacher_id, rating, teacher_rating, comment, status)
+     VALUES (?, ?, ?, ?, ?, ?, 'VISIBLE')`,
+    [
+      studentId,
+      courseId,
+      courseRows[0].teacher_id,
+      rating,
+      teacherRating,
+      comment || null,
+    ],
+  );
+
+  const [rows] = await db.query(
+    `SELECT review_id, course_id, rating, teacher_rating, comment, teacher_comment, status,
+            created_at, updated_at
+     FROM course_reviews
+     WHERE review_id = ?`,
+    [result.insertId],
+  );
+
+  await createNotification({
+    userId: Number(courseRows[0].teacher_id),
+    type: "COURSE_REVIEW_CREATED",
+    title: "Có đánh giá mới về khóa học",
+    content: `Học viên vừa đánh giá ${rating}/5 sao cho khóa học và ${teacherRating}/5 sao cho giảng viên.`,
+    referenceType: "COURSE_REVIEW",
+    referenceId: Number(result.insertId),
+    targetUrl: `/instructor/courses?courseId=${courseId}&reviewId=${result.insertId}`,
+    priority: "NORMAL",
+  }).catch((error) => {
+    console.error("Failed to notify instructor about new review.", error);
+  });
+
+  return { status: 201, data: mapStudentReview(rows[0]) };
+}
+
+export async function updateStudentCourseReview(
+  studentId,
+  courseId,
+  { rating, teacherRating, comment },
+) {
+  const eligibility = await getStudentCourseReviewEligibility(studentId, courseId);
+  if (!eligibility) return { status: 404, message: "Không tìm thấy khóa học." };
+  if (!eligibility.eligible) {
+    return { status: 403, message: eligibility.reason };
+  }
+  if (!eligibility.existingReview) {
+    return {
+      status: 404,
+      message: "Bạn chưa có đánh giá để chỉnh sửa.",
+    };
+  }
+
+  await db.query(
+    `UPDATE course_reviews
+     SET rating = ?,
+         teacher_rating = ?,
+         comment = ?
+     WHERE student_id = ? AND course_id = ?`,
+    [rating, teacherRating, comment || null, studentId, courseId],
+  );
+
+  const [rows] = await db.query(
+    `SELECT review_id, course_id, rating, teacher_rating, comment, teacher_comment, status,
+            created_at, updated_at
+     FROM course_reviews
+     WHERE student_id = ? AND course_id = ?
+     LIMIT 1`,
+    [studentId, courseId],
+  );
+
+  const [courseRows] = await db.query(
+    "SELECT teacher_id FROM courses WHERE course_id = ? LIMIT 1",
+    [courseId],
+  );
+  if (courseRows[0]) {
+    await createNotification({
+      userId: Number(courseRows[0].teacher_id),
+      type: "COURSE_REVIEW_UPDATED",
+      title: "Học viên đã cập nhật đánh giá",
+      content: `Đánh giá mới: khóa học ${rating}/5 sao, giảng viên ${teacherRating}/5 sao.`,
+      referenceType: "COURSE_REVIEW",
+      referenceId: Number(rows[0].review_id),
+      targetUrl: `/instructor/courses?courseId=${courseId}&reviewId=${rows[0].review_id}`,
+      priority: "NORMAL",
+    }).catch((error) => {
+      console.error("Failed to notify instructor about updated review.", error);
+    });
+  }
+
+  return { status: 200, data: mapStudentReview(rows[0]) };
 }
 
 export async function completeStudentLesson(studentId, lessonId) {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { instructorApiRequest } from "../api/instructorApi";
 import { getInstructorAuthTeacherId } from "../auth/instructorAuth";
 import InstructorLayout from "../components/InstructorLayout";
@@ -66,6 +67,7 @@ function toProfileForm(profile: InstructorProfileData): ProfileFormData {
 }
 
 function InstructorProfilePage() {
+  const { t } = useTranslation("instructor");
   const [profile, setProfile] = useState<InstructorProfileData | null>(null);
   const [formData, setFormData] = useState<ProfileFormData>(EMPTY_FORM);
   const [isLoading, setIsLoading] = useState(true);
@@ -173,22 +175,20 @@ function InstructorProfilePage() {
     } : undefined}>
       <section className="instructor-hero instructor-profile-hero">
         <div>
-          <p className="instructor-eyebrow">Hồ sơ giảng viên</p>
-          <h2>Thông tin cá nhân</h2>
-          <p>
-            Cập nhật thông tin hiển thị của giảng viên để học viên và hệ thống nhận diện đúng chuyên môn.
-          </p>
+          <p className="instructor-eyebrow">{t("profilePage.eyebrow")}</p>
+          <h2>{t("profilePage.title")}</h2>
+          <p>{t("profilePage.description")}</p>
         </div>
         <button className="instructor-primary-button" disabled={isSaving || isLoading} onClick={handleSaveProfile} type="button">
           <span className="material-symbols-outlined">save</span>
-          {isSaving ? "Đang lưu..." : "Lưu hồ sơ"}
+          {isSaving ? t("profilePage.saving") : t("profilePage.saveProfile")}
         </button>
       </section>
 
       <section className="instructor-profile-grid">
         <aside className="instructor-panel instructor-profile-card">
           {isLoading ? (
-            <p className="instructor-empty-state">Đang tải hồ sơ...</p>
+            <p className="instructor-empty-state">{t("profilePage.loading")}</p>
           ) : (
             <>
               <img
@@ -199,7 +199,7 @@ function InstructorProfilePage() {
                     "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80";
                 }}
               />
-              <h3>{formData.name || "Giảng viên"}</h3>
+              <h3>{formData.name || t("profilePage.teacherFallback")}</h3>
               <p>{formData.specialization || "Chưa cập nhật chuyên môn"}</p>
               <div>
                 <span>{profile?.email ?? "Chưa có email"}</span>
@@ -212,8 +212,8 @@ function InstructorProfilePage() {
         <article className="instructor-panel instructor-profile-form-panel">
           <div className="instructor-panel-header">
             <div>
-              <p className="instructor-eyebrow">Chi tiết</p>
-              <h3>Thông tin hiển thị</h3>
+              <p className="instructor-eyebrow">{t("profilePage.detailEyebrow")}</p>
+              <h3>{t("profilePage.displayInfo")}</h3>
             </div>
             <span className="material-symbols-outlined">badge</span>
           </div>
@@ -290,7 +290,7 @@ function InstructorProfilePage() {
               Hoàn tác
             </button>
             <button disabled={isSaving || isLoading} onClick={handleSaveProfile} type="button">
-              {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+              {isSaving ? t("profilePage.saving") : t("profilePage.saveChanges")}
             </button>
           </div>
         </article>

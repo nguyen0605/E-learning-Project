@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import logo from "../../assets/logo-learnX.png";
 import AdminDataState from "../components/AdminDataState";
 import AdminSidebar from "../components/AdminSidebar";
@@ -49,6 +50,7 @@ function CourseManagementPage({
   activePage,
   onNavigate,
 }: CourseManagementPageProps) {
+  const { t } = useTranslation("admin");
   const [activeCategory, setActiveCategory] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -178,12 +180,12 @@ function CourseManagementPage({
     <div className="admin-shell">
       <AdminSidebar
         activePage={activePage}
-        description="Biên tập, theo dõi và đánh giá các khóa học trong hệ sinh thái."
+        description={t("descriptions.courses")}
         onNavigate={onNavigate}
       />
 
       <main className="main-panel">
-        <AdminTopbar searchPlaceholder="Tìm khóa học, giảng viên hoặc thẻ..." />
+        <AdminTopbar searchPlaceholder={t("search.courses")} />
 
         <section className="content course-page">
           <div className="course-header">

@@ -36,6 +36,9 @@ export async function instructorApiRequest<T>(
     method,
     headers: {
       ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(getInstructorAuthToken()
+        ? { Authorization: `Bearer ${getInstructorAuthToken()}` }
+        : {}),
       ...headers,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -50,3 +53,4 @@ export async function instructorApiRequest<T>(
 
   return payload as T;
 }
+import { getInstructorAuthToken } from "../auth/instructorAuth";

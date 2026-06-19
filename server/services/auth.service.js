@@ -31,7 +31,7 @@ function sanitizeUser(user) {
   };
 }
 
-function createSession(user, remember = false) {
+export function createAuthSession(user, remember = false) {
   const token = crypto.randomBytes(32).toString("hex");
   const expiresAt =
     Date.now() + (remember ? REMEMBER_TOKEN_TTL_MS : TOKEN_TTL_MS);
@@ -112,7 +112,7 @@ export async function registerStudent({ fullName, email, phone, password }) {
       content: `${cleanFullName} vừa tạo tài khoản học viên.`,
       referenceType: "USER",
       referenceId: result.insertId,
-      targetUrl: "/admin/users",
+      targetUrl: "/admin/students",
       priority: "NORMAL",
     }).catch((error) => {
       console.error("Failed to notify admins about student registration.", error);
@@ -176,7 +176,7 @@ export async function loginUser({ account, password, remember = false }) {
     };
   }
 
-  const session = createSession(user, remember);
+  const session = createAuthSession(user, remember);
 
   return {
     authenticated: true,

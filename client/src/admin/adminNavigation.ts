@@ -1,6 +1,6 @@
 export type AdminPage =
   | "dashboard"
-  | "users"
+  | "teachers"
   | "students"
   | "courses"
   | "system"
@@ -8,7 +8,7 @@ export type AdminPage =
 
 export const adminPagePaths: Record<AdminPage, string> = {
   dashboard: "/admin",
-  users: "/admin/users",
+  teachers: "/admin/teachers",
   students: "/admin/students",
   courses: "/admin/courses",
   system: "/admin/system",
@@ -20,6 +20,10 @@ export function getAdminPageFromPath(pathname: string): AdminPage | null {
 
   if (normalizedPath === "/admin") {
     return "dashboard";
+  }
+
+  if (normalizedPath === "/admin/users") {
+    return "teachers";
   }
 
   const matchedEntry = Object.entries(adminPagePaths).find(

@@ -8,7 +8,7 @@ type AdminSidebarProps = {
 
 const navItems: Array<{ key: AdminPage; label: string; icon: string }> = [
   { key: "dashboard", label: "Tổng quan", icon: "dashboard" },
-  { key: "users", label: "Quản lý người dùng", icon: "manage_accounts" },
+  { key: "teachers", label: "Quản lý giảng viên", icon: "co_present" },
   { key: "students", label: "Quản lý học viên", icon: "group" },
   { key: "courses", label: "Quản lý khóa học", icon: "library_books" },
   { key: "system", label: "Cấu hình hệ thống", icon: "settings" },

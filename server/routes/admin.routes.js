@@ -23,11 +23,10 @@ import {
   updateAdminStudentStatus,
 } from "../services/adminStudents.service.js";
 import {
-  getAdminUserDetail,
-  getAdminUsersPageData,
-  updateAdminUser,
-  updateAdminUserPermissions,
-} from "../services/adminUsers.service.js";
+  getAdminTeacherDetail,
+  getAdminTeachersPageData,
+  updateAdminTeacherStatus,
+} from "../services/adminTeachers.service.js";
 
 const router = Router();
 router.use(requireAuth, requireRole("ADMIN"));
@@ -67,62 +66,43 @@ router.get("/students", requireAdminPermission("users"), async (req, res) => {
   }
 });
 
-router.get("/users", requireAdminPermission("users"), async (req, res) => {
+router.get("/teachers", requireAdminPermission("users"), async (req, res) => {
   try {
-    const data = await getAdminUsersPageData();
+    const data = await getAdminTeachersPageData();
     res.json({ success: true, data });
   } catch (error) {
-    handleRouteError(res, error, "Failed to load admin users data.");
+    handleRouteError(res, error, "Failed to load admin teachers data.");
   }
 });
 
-router.get("/users/:id", requireAdminPermission("users"), async (req, res) => {
+router.get("/teachers/:id", requireAdminPermission("users"), async (req, res) => {
   try {
-    const data = await getAdminUserDetail(req.params.id);
+    const data = await getAdminTeacherDetail(req.params.id);
     if (!data) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      return res.status(404).json({ success: false, message: "Teacher not found." });
     }
     res.json({ success: true, data });
   } catch (error) {
-    handleRouteError(res, error, "Failed to load admin user detail.");
+    handleRouteError(res, error, "Failed to load admin teacher detail.");
   }
 });
 
-router.patch("/users/:id", requireAdminPermission("users"), async (req, res) => {
+router.patch("/teachers/:id/status", requireAdminPermission("users"), async (req, res) => {
   try {
-    if (Number(req.params.id) === Number(req.auth.user.id)) {
+    const { status } = req.body ?? {};
+    if (!["active", "suspended", "inactive"].includes(status)) {
       return res.status(400).json({
         success: false,
-        message: "Không thể tự thay đổi vai trò hoặc khóa tài khoản đang đăng nhập.",
+        message: "Invalid teacher status.",
       });
     }
-
-    const data = await updateAdminUser(req.params.id, req.body ?? {});
+    const data = await updateAdminTeacherStatus(req.params.id, status);
     if (!data) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      return res.status(404).json({ success: false, message: "Teacher not found." });
     }
     res.json({ success: true, data });
   } catch (error) {
-    handleRouteError(res, error, "Failed to update admin user.");
-  }
-});
-
-router.put("/users/:id/permissions", requireAdminPermission("users"), async (req, res) => {
-  try {
-    if (Number(req.params.id) === Number(req.auth.user.id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Không thể tự thay đổi quyền của tài khoản đang đăng nhập.",
-      });
-    }
-
-    const data = await updateAdminUserPermissions(req.params.id, req.body ?? {});
-    if (!data) {
-      return res.status(404).json({ success: false, message: "User not found." });
-    }
-    res.json({ success: true, data });
-  } catch (error) {
-    handleRouteError(res, error, "Failed to update admin permissions.");
+    handleRouteError(res, error, "Failed to update admin teacher status.");
   }
 });
 

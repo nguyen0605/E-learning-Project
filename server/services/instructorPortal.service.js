@@ -812,9 +812,11 @@ export async function getInstructorInteractionData(rawTeacherId) {
       SELECT qa.attempt_id AS id, u.full_name AS student, q.title AS quiz, qa.submitted_at
       FROM quiz_attempts qa
       INNER JOIN quizzes q ON q.quiz_id = qa.quiz_id
-      INNER JOIN course_batches b ON b.batch_id = q.batch_id
+      INNER JOIN lessons l ON l.lesson_id = q.lesson_id
+      INNER JOIN course_modules m ON m.module_id = l.module_id
+      INNER JOIN courses c ON c.course_id = m.course_id
       INNER JOIN users u ON u.user_id = qa.student_id
-      WHERE b.teacher_id = ? AND qa.status = 'SUBMITTED'
+      WHERE c.teacher_id = ? AND qa.status = 'SUBMITTED'
       ORDER BY qa.submitted_at DESC, qa.attempt_id DESC
       LIMIT 4
     `,

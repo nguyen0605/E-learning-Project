@@ -7,6 +7,8 @@ import {
   setInstructorAuthSession,
   type InstructorAuthSession,
 } from "../auth/instructorAuth";
+import { setStoredAuthSession } from "../../auth/authStorage";
+import type { AuthSession } from "../../auth/auth.types";
 import "./InstructorPortal.css";
 
 type InstructorAuthPageProps = {
@@ -16,7 +18,7 @@ type InstructorAuthPageProps = {
 type InstructorAuthApiResponse = {
   success: boolean;
   message?: string;
-  data: InstructorAuthSession;
+  data: InstructorAuthSession & AuthSession;
 };
 
 function InstructorAuthPage({ mode }: InstructorAuthPageProps) {
@@ -24,7 +26,7 @@ function InstructorAuthPage({ mode }: InstructorAuthPageProps) {
   const [formData, setFormData] = useState({
     name: "",
     email: mode === "login" ? "gv02@elearning.vn" : "",
-    password: mode === "login" ? "password" : "",
+    password: mode === "login" ? "Password123" : "",
     phone: "",
     specialization: "",
     workplace: "E-learning Center",
@@ -56,6 +58,14 @@ function InstructorAuthPage({ mode }: InstructorAuthPageProps) {
       }
 
       setInstructorAuthSession(payload.data);
+      setStoredAuthSession(
+        {
+          token: payload.data.token,
+          expiresAt: payload.data.expiresAt,
+          user: payload.data.user,
+        },
+        true,
+      );
       navigate("/instructor", { replace: true });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Không thể xác thực tài khoản giảng viên.");
@@ -162,7 +172,7 @@ function InstructorAuthPage({ mode }: InstructorAuthPageProps) {
           <div className="instructor-auth-demo">
             <strong>Tài khoản demo</strong>
             <span>Email: gv02@elearning.vn</span>
-            <span>Mật khẩu: password</span>
+            <span>Mật khẩu: Password123</span>
           </div>
         )}
       </section>

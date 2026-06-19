@@ -1,15 +1,19 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { instructorApiRequest } from "../api/instructorApi";
-import { clearInstructorAuthSession, getInstructorAuthTeacherId } from "../auth/instructorAuth";
+import { clearStoredAuthSession } from "../../auth/authStorage";
+import {
+  getNotifications,
+  getPushPublicKey,
+  markNotificationRead,
+  savePushSubscription,
+} from "../../shared/services/notificationApi";
+import { clearInstructorAuthSession } from "../auth/instructorAuth";
 import {
   instructorNavItems,
   instructorProfile,
   type InstructorNavKey,
 } from "../data/instructorMockData";
 import "../pages/InstructorPortal.css";
-
-const DEFAULT_TEACHER_ID = getInstructorAuthTeacherId();
 
 type HeaderNotification = {
   id: number;
@@ -108,6 +112,18 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const [markingNotificationId, setMarkingNotificationId] = useState<number | null>(null);
+  const [pushState, setPushState] = useState<
+    "unsupported" | "default" | "granted" | "denied" | "subscribed"
+  >(() => {
+    if (
+      typeof window === "undefined" ||
+      !("Notification" in window) ||
+      !("serviceWorker" in navigator)
+    ) {
+      return "unsupported";
+    }
+    return Notification.permission;
+  });
 
   const displayedProfile = {
     ...instructorProfile,
@@ -130,19 +146,18 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
     setNotificationError(null);
 
     try {
-      const payload = await instructorApiRequest<{
-        success: boolean;
-        data?: { notificationItems?: HeaderNotification[] };
-      }>("/api/instructor/interaction", {
-        query: { teacherId: DEFAULT_TEACHER_ID },
-        signal,
-      });
-
-      if (!payload.success) {
-        throw new Error("Không thể tải thông báo.");
-      }
-
-      setNotifications((payload.data?.notificationItems ?? []).slice(0, 5));
+      if (signal?.aborted) return;
+      const data = await getNotifications();
+      if (signal?.aborted) return;
+      setNotifications(
+        data.notifications.slice(0, 5).map((item) => ({
+          id: item.id,
+          title: item.title,
+          content: item.content,
+          isRead: item.isRead,
+          time: new Date(item.createdAt).toLocaleString("vi-VN"),
+        })),
+      );
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       setNotificationError(error instanceof Error ? error.message : "Không thể tải thông báo.");
@@ -154,8 +169,25 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
   useEffect(() => {
     const controller = new AbortController();
     loadNotifications(controller.signal);
-    return () => controller.abort();
+    const interval = window.setInterval(
+      () => void loadNotifications(controller.signal),
+      30000,
+    );
+    return () => {
+      window.clearInterval(interval);
+      controller.abort();
+    };
   }, []);
+
+  useEffect(() => {
+    if (pushState === "unsupported") return;
+    void navigator.serviceWorker
+      .getRegistration("/push-sw.js")
+      .then(async (registration) => {
+        const subscription = await registration?.pushManager.getSubscription();
+        if (subscription) setPushState("subscribed");
+      });
+  }, [pushState]);
 
   useEffect(() => {
     if (!showNotificationModal) return;
@@ -169,10 +201,7 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
     setNotificationError(null);
 
     try {
-      await instructorApiRequest(`/api/instructor/notifications/${notificationId}/read`, {
-        method: "PATCH",
-        query: { teacherId: DEFAULT_TEACHER_ID },
-      });
+      await markNotificationRead(notificationId);
 
       setNotifications((current) =>
         current.map((item) => (item.id === notificationId ? { ...item, isRead: true } : item)),
@@ -181,6 +210,34 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
       setNotificationError(error instanceof Error ? error.message : "Không thể đánh dấu đã đọc.");
     } finally {
       setMarkingNotificationId(null);
+    }
+  }
+
+  async function enablePush() {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushState(permission);
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.register("/push-sw.js");
+      const { publicKey } = await getPushPublicKey();
+      const existing = await registration.pushManager.getSubscription();
+      const subscription =
+        existing ??
+        (await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        }));
+
+      await savePushSubscription(subscription.toJSON());
+      setPushState("subscribed");
+      setNotificationError(null);
+    } catch (error) {
+      setNotificationError(
+        error instanceof Error ? error.message : "Không thể bật thông báo đẩy.",
+      );
     }
   }
 
@@ -327,6 +384,7 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
               className="instructor-profile-popover-logout"
               onClick={() => {
                 clearInstructorAuthSession();
+                clearStoredAuthSession();
                 window.location.href = "/instructor/login";
               }}
               type="button"
@@ -367,6 +425,23 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
 
             {notificationError && <p className="instructor-notification-error">{notificationError}</p>}
 
+            {pushState === "default" || pushState === "granted" ? (
+              <button
+                className="instructor-notification-push-button"
+                onClick={() => void enablePush()}
+                type="button"
+              >
+                <span className="material-symbols-outlined">notifications_active</span>
+                Bật thông báo đẩy
+              </button>
+            ) : null}
+
+            {pushState === "denied" ? (
+              <p className="instructor-notification-error">
+                Trình duyệt đang chặn thông báo đẩy.
+              </p>
+            ) : null}
+
             <div className="instructor-notification-list">
               {isLoadingNotifications ? (
                 <p className="instructor-empty-state">Đang tải thông báo...</p>
@@ -402,6 +477,13 @@ function InstructorLayout({ activePage, children, profile }: InstructorLayoutPro
       )}
     </div>
   );
+}
+
+function urlBase64ToUint8Array(value: string) {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map((character) => character.charCodeAt(0)));
 }
 
 export default InstructorLayout;

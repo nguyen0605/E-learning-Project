@@ -1,6 +1,12 @@
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import {
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import ProtectedRoute from "../auth/ProtectedRoute";
-import { Outlet } from "react-router-dom";
 import { hasInstructorAuthSession } from "../instructor/auth/instructorAuth";
 import InstructorAnalyticsPage from "../instructor/pages/InstructorAnalyticsPage";
 import InstructorAuthPage from "../instructor/pages/InstructorAuthPage";
@@ -15,7 +21,7 @@ import CourseManagementPage from "../admin/pages/CourseManagementPage";
 import GeneralContentPage from "../admin/pages/GeneralContentPage";
 import StudentManagementPage from "../admin/pages/StudentManagementPage";
 import SystemConfigurationPage from "../admin/pages/SystemConfigurationPage";
-import UserManagementPage from "../admin/pages/UserManagementPage";
+import InstructorManagementPage from "../admin/pages/InstructorManagementPage";
 import {
   adminPagePaths,
   getAdminPageFromPath,
@@ -41,8 +47,8 @@ function AdminPortal() {
   };
   const pageProps = { activePage, onNavigate };
 
-  if (activePage === "users") {
-    return <UserManagementPage {...pageProps} />;
+  if (activePage === "teachers") {
+    return <InstructorManagementPage {...pageProps} />;
   }
   if (activePage === "students") {
     return <StudentManagementPage {...pageProps} />;

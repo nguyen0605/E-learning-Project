@@ -319,6 +319,23 @@
   background: #ba1a1a;
 }
 
+.instructor-notification-push-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 40px);
+  margin: 0 20px 14px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 13px;
+  color: #ffffff;
+  background: #004ac6;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
 .instructor-profile-chip {
   display: flex;
   align-items: center;

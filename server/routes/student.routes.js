@@ -38,6 +38,8 @@ import {
 } from "../services/studentAccount.service.js";
 import {
   createNotification,
+  createNotificationForAssignmentTeacher,
+  createNotificationForExamTeacher,
   createNotificationsForRole,
 } from "../services/notification.service.js";
 
@@ -499,6 +501,15 @@ router.post("/exams/:id/attempts/:attemptId/submit", requireAuth, async (req, re
         referenceId: examId,
         targetUrl: "/admin",
       }),
+      createNotificationForExamTeacher(examId, {
+        type: "EXAM_SUBMITTED",
+        title: "Có bài thi mới cần xem",
+        content: `${req.auth.user.fullName} vừa nộp bài thi #${examId}.`,
+        referenceType: "EXAM",
+        referenceId: examId,
+        targetUrl: "/instructor/quizzes",
+        priority: "HIGH",
+      }),
     ]).catch((error) => {
       console.error("Failed to create exam submission notifications.", error);
     });
@@ -594,6 +605,15 @@ router.post("/assignments/:id/submission", requireAuth, (req, res) => {
           referenceType: "ASSIGNMENT",
           referenceId: assignmentId,
           targetUrl: "/admin",
+        }),
+        createNotificationForAssignmentTeacher(assignmentId, {
+          type: "ASSIGNMENT_SUBMITTED",
+          title: "Có bài tập mới được nộp",
+          content: `${req.auth.user.fullName} vừa nộp bài tập #${assignmentId}.`,
+          referenceType: "ASSIGNMENT",
+          referenceId: assignmentId,
+          targetUrl: "/instructor/quizzes",
+          priority: "HIGH",
         }),
       ]).catch((error) => {
         console.error("Failed to create assignment submission notifications.", error);

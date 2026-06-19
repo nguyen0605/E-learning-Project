@@ -128,6 +128,39 @@ export async function createNotificationsForRole(role, notification) {
   return users.length;
 }
 
+export async function createNotificationForAssignmentTeacher(
+  assignmentId,
+  notification,
+) {
+  const [rows] = await db.query(
+    `SELECT DISTINCT c.teacher_id AS teacher_id
+     FROM assignments a
+     INNER JOIN lessons l ON l.lesson_id = a.lesson_id
+     INNER JOIN course_modules m ON m.module_id = l.module_id
+     INNER JOIN courses c ON c.course_id = m.course_id
+     WHERE a.assignment_id = ?
+     LIMIT 1`,
+    [assignmentId],
+  );
+
+  if (!rows[0]) return null;
+  return createNotification({ ...notification, userId: rows[0].teacher_id });
+}
+
+export async function createNotificationForExamTeacher(examId, notification) {
+  const [rows] = await db.query(
+    `SELECT DISTINCT c.teacher_id AS teacher_id
+     FROM course_exams ce
+     INNER JOIN courses c ON c.course_id = ce.course_id
+     WHERE ce.exam_id = ?
+     LIMIT 1`,
+    [examId],
+  );
+
+  if (!rows[0]?.teacher_id) return null;
+  return createNotification({ ...notification, userId: rows[0].teacher_id });
+}
+
 export function getVapidPublicKey() {
   return vapidPublicKey;
 }

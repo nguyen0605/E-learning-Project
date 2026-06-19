@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireAuth, requireRole } from "../middleware/auth.middleware.js";
 import { loginInstructor, registerInstructor } from "../services/instructorAuth.service.js";
 import { getInstructorDashboardData } from "../services/instructorDashboard.service.js";
 import {
@@ -86,6 +87,18 @@ router.post("/auth/register", async (req, res) => {
 
     handleRouteError(res, error, "Failed to register instructor.");
   }
+});
+
+router.use(requireAuth, requireRole("TEACHER"), (req, res, next) => {
+  Object.defineProperty(req, "query", {
+    configurable: true,
+    enumerable: true,
+    value: {
+      ...req.query,
+      teacherId: String(req.auth.user.id),
+    },
+  });
+  next();
 });
 
 router.get("/dashboard", async (req, res) => {

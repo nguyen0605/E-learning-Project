@@ -191,6 +191,38 @@ function CartPage() {
               Bạn sẽ được chuyển sang cổng thanh toán VNPAY sandbox để hoàn tất
               đơn hàng {summary.itemCount} khóa học.
             </p>
+            <div className="sp-payment-methods" aria-label="Phương thức thanh toán">
+              <button className="sp-payment-method active" type="button">
+                <span className="sp-payment-method-icon">
+                  <Icon name="credit_card" />
+                </span>
+                <span>
+                  <strong>VNPAY</strong>
+                  <small>Thanh toán qua cổng VNPAY sandbox</small>
+                </span>
+                <em>Đang dùng</em>
+              </button>
+              <button className="sp-payment-method" disabled type="button">
+                <span className="sp-payment-method-icon">
+                  <Icon name="account_balance" />
+                </span>
+                <span>
+                  <strong>Chuyển khoản ngân hàng</strong>
+                  <small>Nhận thông tin tài khoản và xác nhận thủ công</small>
+                </span>
+                <em>Sắp hỗ trợ</em>
+              </button>
+              <button className="sp-payment-method" disabled type="button">
+                <span className="sp-payment-method-icon">
+                  <Icon name="account_balance_wallet" />
+                </span>
+                <span>
+                  <strong>Ví MoMo</strong>
+                  <small>Thanh toán nhanh qua ví điện tử</small>
+                </span>
+                <em>Sắp hỗ trợ</em>
+              </button>
+            </div>
             <div className="sp-payment-total">
               <span>Tổng thanh toán</span>
               <strong>{formatCurrency(summary.total, language)}</strong>

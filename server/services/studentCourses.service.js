@@ -294,11 +294,14 @@ export async function getStudentCourseDetail(courseId, studentId) {
        learning_mode,
        online_platform,
        default_meeting_url,
+       classroom_name,
+       classroom_address,
        timezone,
        status,
        note
      FROM course_batches
      WHERE course_id = ?
+       AND status IN ('OPEN', 'STARTED', 'FULL', 'FINISHED')
      ORDER BY start_date DESC, batch_id DESC`,
     [courseId],
   );
@@ -652,6 +655,8 @@ export async function getStudentCourseDetail(courseId, studentId) {
       learningMode: batch.learning_mode,
       onlinePlatform: batch.online_platform,
       defaultMeetingUrl: batch.default_meeting_url,
+      classroomName: batch.classroom_name,
+      classroomAddress: batch.classroom_address,
       timezone: batch.timezone,
       status: batch.status,
       note: batch.note,

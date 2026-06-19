@@ -29,10 +29,14 @@ type AssignmentSubmission = {
 };
 type AssignmentItem = {
   id: number;
+  batchId: number;
+  lessonId: number | null;
   title: string;
   description: string;
   course: string;
   batch: string;
+  lessonTitle: string;
+  moduleTitle: string;
   dueDateInput: string;
   dueDate: string;
   maxScore: string;
@@ -45,8 +49,15 @@ type BatchOption = {
   batchCode: string;
   courseName: string;
 };
+type LessonOption = {
+  id: number;
+  batchId: number;
+  title: string;
+  moduleTitle: string;
+};
 type AssignmentFormData = {
   batchId: string;
+  lessonId: string;
   title: string;
   description: string;
   dueDate: string;
@@ -61,6 +72,7 @@ type InstructorQuizzesApiResponse = {
     quizQuestionBank: QuestionBankItem[];
     gradingQueue: GradingItem[];
     batchOptions: BatchOption[];
+    lessonOptions: LessonOption[];
     assignmentItems: AssignmentItem[];
   };
 };
@@ -120,6 +132,7 @@ function InstructorQuizTestsPage() {
   const { toast, setToast } = useInstructorToast();
   const [assignmentFormData, setAssignmentFormData] = useState<AssignmentFormData>({
     batchId: "",
+    lessonId: "",
     title: "",
     description: "",
     dueDate: "",
@@ -150,6 +163,7 @@ function InstructorQuizTestsPage() {
       setAssignmentFormData((current) => ({
         ...current,
         batchId: current.batchId || String(payload.data.batchOptions[0]?.id ?? ""),
+        lessonId: current.lessonId || String(payload.data.lessonOptions[0]?.id ?? ""),
       }));
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
@@ -174,14 +188,17 @@ function InstructorQuizTestsPage() {
 
   function openAssignmentForm(assignment?: AssignmentItem) {
     const matchedBatchId = assignment
-      ? String(pageData?.batchOptions.find((batch) => batch.batchCode === assignment.batch)?.id ?? "")
+      ? String(assignment.batchId)
       : assignmentFormData.batchId || String(displayedBatchOptions[0]?.id ?? "");
+    const batchLessonOptions =
+      pageData?.lessonOptions.filter((lesson) => lesson.batchId === Number(matchedBatchId)) ?? [];
 
     setShowAssignmentForm(true);
     setEditingAssignmentId(assignment?.id ?? null);
     setAssignmentFormError(null);
     setAssignmentFormData({
       batchId: matchedBatchId,
+      lessonId: assignment?.lessonId ? String(assignment.lessonId) : String(batchLessonOptions[0]?.id ?? ""),
       title: assignment?.title ?? "",
       description: assignment?.description ?? "",
       dueDate: assignment?.dueDateInput ?? "",
@@ -199,12 +216,17 @@ function InstructorQuizTestsPage() {
       description: "",
       dueDate: "",
       maxScore: "10",
+      lessonId: "",
     }));
   }
 
   async function handleSubmitAssignment() {
     if (!assignmentFormData.batchId) {
-      setAssignmentFormError("Hãy chọn lớp cho bài tập.");
+      setAssignmentFormError("Hãy chọn khóa nhận bài tập.");
+      return;
+    }
+    if (!assignmentFormData.lessonId) {
+      setAssignmentFormError("H?y ch?n b?i h?c nh?n b?i t?p.");
       return;
     }
     if (!assignmentFormData.title.trim()) {
@@ -230,6 +252,7 @@ function InstructorQuizTestsPage() {
           query: { teacherId: DEFAULT_TEACHER_ID },
           body: {
             batchId: Number(assignmentFormData.batchId),
+            lessonId: Number(assignmentFormData.lessonId),
             title: assignmentFormData.title,
             description: assignmentFormData.description,
             dueDate: assignmentFormData.dueDate,
@@ -386,6 +409,12 @@ function InstructorQuizTestsPage() {
   const displayedQuestionBank = pageData?.quizQuestionBank ?? quizQuestionBank;
   const displayedGradingQueue = pageData?.gradingQueue ?? gradingQueue;
   const displayedBatchOptions = pageData?.batchOptions ?? [];
+  const displayedLessonOptions = pageData?.lessonOptions ?? [];
+  const selectedAssignmentBatchId =
+    Number(assignmentFormData.batchId || displayedBatchOptions[0]?.id || 0);
+  const assignmentLessonOptions = displayedLessonOptions.filter(
+    (lesson) => lesson.batchId === selectedAssignmentBatchId,
+  );
   const displayedAssignments = pageData?.assignmentItems ?? [];
   const normalizedAssignmentSearch = assignmentSearch.trim().toLowerCase();
   const filteredAssignments = displayedAssignments
@@ -396,6 +425,8 @@ function InstructorQuizTestsPage() {
         assignment.description,
         assignment.course,
         assignment.batch,
+        assignment.lessonTitle,
+        assignment.moduleTitle,
       ].some((value) => value.toLowerCase().includes(normalizedAssignmentSearch));
       const filteredSubmissions = assignment.submissionItems.filter((submission) => {
         const statusMatches =
@@ -610,7 +641,7 @@ function InstructorQuizTestsPage() {
           </label>
 
           <select
-            aria-label="Lọc bài tập theo lớp"
+            aria-label="Lọc bài tập theo khóa/lớp"
             value={assignmentBatchFilter}
             onChange={(event) => setAssignmentBatchFilter(event.target.value)}
           >
@@ -702,6 +733,12 @@ function InstructorQuizTestsPage() {
                   >
                     <strong>{assignment.title}</strong>
                     <span>{assignment.course} · {assignment.batch}</span>
+                    {assignment.lessonTitle && (
+                      <small>
+                        Bài học: {assignment.moduleTitle ? `${assignment.moduleTitle} - ` : ""}
+                        {assignment.lessonTitle}
+                      </small>
+                    )}
                     <p>{assignment.description || "Không có mô tả bài tập"}</p>
                     <em>{assignment.pendingSubmissions} chờ chấm</em>
                     <small>Hạn: {assignment.dueDate}</small>
@@ -843,7 +880,7 @@ function InstructorQuizTestsPage() {
                 <div>
                   <p className="instructor-eyebrow">Bài tập</p>
                   <h3>{editingAssignmentId ? "Sửa bài tập" : "Tạo bài tập mới"}</h3>
-                  <p>Giao bài cho một lớp, đặt hạn nộp và điểm tối đa để chấm bài nộp của học viên.</p>
+                  <p>Giao bài theo khóa và bài học, đặt hạn nộp và điểm tối đa để chấm bài nộp của học viên.</p>
                 </div>
                 <button
                   aria-label="Đóng form tạo bài tập"
@@ -859,12 +896,20 @@ function InstructorQuizTestsPage() {
 
               <div className="instructor-create-course-grid">
                 <label className="instructor-create-course-field instructor-create-course-field-wide">
-                  <span>Lớp nhận bài tập *</span>
+                  <span>Khóa nhận bài tập *</span>
                   <select
                     value={assignmentFormData.batchId || displayedBatchOptions[0]?.id || ""}
-                    onChange={(event) =>
-                      setAssignmentFormData({ ...assignmentFormData, batchId: event.target.value })
-                    }
+                    onChange={(event) => {
+                      const nextBatchId = event.target.value;
+                      const nextLessonId =
+                        displayedLessonOptions.find((lesson) => lesson.batchId === Number(nextBatchId))?.id ?? "";
+
+                      setAssignmentFormData({
+                        ...assignmentFormData,
+                        batchId: nextBatchId,
+                        lessonId: String(nextLessonId),
+                      });
+                    }}
                   >
                     {displayedBatchOptions.length === 0 ? (
                       <option value="">Chưa có lớp</option>
@@ -872,6 +917,26 @@ function InstructorQuizTestsPage() {
                       displayedBatchOptions.map((batch) => (
                         <option key={batch.id} value={batch.id}>
                           {batch.batchCode} - {batch.courseName}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </label>
+
+                <label className="instructor-create-course-field instructor-create-course-field-wide">
+                  <span>Bài học nhận bài tập *</span>
+                  <select
+                    value={assignmentFormData.lessonId || assignmentLessonOptions[0]?.id || ""}
+                    onChange={(event) =>
+                      setAssignmentFormData({ ...assignmentFormData, lessonId: event.target.value })
+                    }
+                  >
+                    {assignmentLessonOptions.length === 0 ? (
+                      <option value="">Chưa có bài học trong lớp này</option>
+                    ) : (
+                      assignmentLessonOptions.map((lesson) => (
+                        <option key={lesson.id} value={lesson.id}>
+                          {lesson.moduleTitle} - {lesson.title}
                         </option>
                       ))
                     )}
@@ -935,7 +1000,7 @@ function InstructorQuizTestsPage() {
                     Xóa bài tập
                   </button>
                 )}
-                <button disabled={isCreatingAssignment || displayedBatchOptions.length === 0} type="submit">
+                <button disabled={isCreatingAssignment || displayedBatchOptions.length === 0 || assignmentLessonOptions.length === 0} type="submit">
                   {isCreatingAssignment
                     ? editingAssignmentId
                       ? "Đang lưu..."

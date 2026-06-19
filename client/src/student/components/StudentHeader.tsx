@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+﻿import { useTranslation } from "react-i18next";
 import logo from "../../assets/logo-learnX.png";
 import type { AuthUser } from "../../auth/auth.types";
 import { normalizeLanguage } from "../../i18n/locale";
@@ -14,11 +14,12 @@ type StudentHeaderProps = {
   user: AuthUser | null;
 };
 
-const navItems: Array<{ labelKey: string; view: StudentView }> = [
-  { labelKey: "header.nav.courses", view: "courses" },
-  { labelKey: "header.nav.myCourses", view: "myCourses" },
-  { labelKey: "header.nav.cart", view: "cart" },
-  { labelKey: "header.nav.interaction", view: "interaction" },
+const navItems: Array<{ label: string; labelKey: string; view: StudentView }> = [
+  { label: "Khóa học", labelKey: "header.nav.courses", view: "courses" },
+  { label: "Khóa học của tôi", labelKey: "header.nav.myCourses", view: "myCourses" },
+  { label: "Lịch học", labelKey: "header.nav.schedule", view: "schedule" },
+  { label: "Giỏ hàng", labelKey: "header.nav.cart", view: "cart" },
+  { label: "Tương tác", labelKey: "header.nav.interaction", view: "interaction" },
 ];
 
 function StudentHeader({
@@ -50,7 +51,7 @@ function StudentHeader({
             type="button"
             onClick={() => onNavigate(item.view)}
           >
-            {t(item.labelKey)}
+            {t(item.labelKey, { defaultValue: item.label })}
           </button>
         ))}
         <button
@@ -128,3 +129,4 @@ function StudentHeader({
 }
 
 export default StudentHeader;
+

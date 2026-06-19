@@ -52,6 +52,8 @@ export type StudentCourseBatch = {
   learningMode: "ONLINE" | "OFFLINE" | "HYBRID";
   onlinePlatform: string;
   defaultMeetingUrl: string | null;
+  classroomName: string | null;
+  classroomAddress: string | null;
   timezone: string;
   status: string;
   note: string | null;

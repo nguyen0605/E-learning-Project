@@ -146,32 +146,51 @@ export async function updateInstructorProfile(rawTeacherId, profileData) {
     [name, phone || null, avatar || null, teacherId],
   );
 
-  await db.query(
+  const profilePayload = [
+    bio || null,
+    specialization || null,
+    experienceYears,
+    qualification || null,
+    workplace || null,
+  ];
+  const [profileRows] = await db.query(
     `
-      INSERT INTO teacher_profiles (
-        teacher_id,
-        bio,
-        specialization,
-        experience_years,
-        qualification,
-        workplace
-      ) VALUES (?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        bio = VALUES(bio),
-        specialization = VALUES(specialization),
-        experience_years = VALUES(experience_years),
-        qualification = VALUES(qualification),
-        workplace = VALUES(workplace)
+      SELECT teacher_id
+      FROM teacher_profiles
+      WHERE teacher_id = ?
+      LIMIT 1
     `,
-    [
-      teacherId,
-      bio || null,
-      specialization || null,
-      experienceYears,
-      qualification || null,
-      workplace || null,
-    ],
+    [teacherId],
   );
+
+  if (profileRows[0]) {
+    await db.query(
+      `
+        UPDATE teacher_profiles
+        SET bio = ?,
+            specialization = ?,
+            experience_years = ?,
+            qualification = ?,
+            workplace = ?
+        WHERE teacher_id = ?
+      `,
+      [...profilePayload, teacherId],
+    );
+  } else {
+    await db.query(
+      `
+        INSERT INTO teacher_profiles (
+          bio,
+          specialization,
+          experience_years,
+          qualification,
+          workplace,
+          teacher_id
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [...profilePayload, teacherId],
+    );
+  }
 
   return getInstructorProfileData(teacherId);
 }
@@ -421,20 +440,25 @@ export async function getInstructorQuizzesData(rawTeacherId) {
       SELECT
         a.assignment_id AS id,
         a.batch_id AS batchId,
+        a.lesson_id AS lessonId,
         a.title,
         a.description,
         a.due_date AS dueDate,
         a.max_score AS maxScore,
         c.course_name AS course,
         b.batch_code AS batch,
+        l.lesson_title AS lessonTitle,
+        cm.module_title AS moduleTitle,
         COUNT(s.submission_id) AS submissions,
         SUM(CASE WHEN s.submission_id IS NOT NULL AND s.score IS NULL THEN 1 ELSE 0 END) AS pendingSubmissions
       FROM assignments a
       INNER JOIN course_batches b ON b.batch_id = a.batch_id
       INNER JOIN courses c ON c.course_id = b.course_id
+      LEFT JOIN lessons l ON l.lesson_id = a.lesson_id
+      LEFT JOIN course_modules cm ON cm.module_id = l.module_id
       LEFT JOIN assignment_submissions s ON s.assignment_id = a.assignment_id
       WHERE b.teacher_id = ?
-      GROUP BY a.assignment_id, a.batch_id, a.title, a.description, a.due_date, a.max_score, c.course_name, b.batch_code
+      GROUP BY a.assignment_id, a.batch_id, a.lesson_id, a.title, a.description, a.due_date, a.max_score, c.course_name, b.batch_code, l.lesson_title, cm.module_title
       ORDER BY a.due_date DESC, a.assignment_id DESC
     `,
     [teacherId],
@@ -450,6 +474,22 @@ export async function getInstructorQuizzesData(rawTeacherId) {
       INNER JOIN courses c ON c.course_id = b.course_id
       WHERE b.teacher_id = ?
       ORDER BY b.batch_code ASC, b.batch_id ASC
+    `,
+    [teacherId],
+  );
+
+  const [lessonOptionRows] = await db.query(
+    `
+      SELECT
+        b.batch_id AS batchId,
+        l.lesson_id AS id,
+        l.lesson_title AS title,
+        cm.module_title AS moduleTitle
+      FROM course_batches b
+      INNER JOIN course_modules cm ON cm.course_id = b.course_id
+      INNER JOIN lessons l ON l.module_id = cm.module_id
+      WHERE b.teacher_id = ?
+      ORDER BY b.batch_code ASC, cm.order_no ASC, l.order_no ASC, l.lesson_id ASC
     `,
     [teacherId],
   );
@@ -523,12 +563,22 @@ export async function getInstructorQuizzesData(rawTeacherId) {
       batchCode: row.batchCode,
       courseName: row.courseName,
     })),
+    lessonOptions: lessonOptionRows.map((row) => ({
+      id: row.id,
+      batchId: row.batchId,
+      title: row.title,
+      moduleTitle: row.moduleTitle,
+    })),
     assignmentItems: assignmentRows.map((assignment) => ({
       id: assignment.id,
+      batchId: assignment.batchId,
+      lessonId: assignment.lessonId,
       title: assignment.title,
       description: assignment.description ?? "",
       course: assignment.course,
       batch: assignment.batch,
+      lessonTitle: assignment.lessonTitle ?? "",
+      moduleTitle: assignment.moduleTitle ?? "",
       dueDateInput: assignment.dueDate ? formatDateTimeInput(assignment.dueDate) : "",
       dueDate: assignment.dueDate ? new Date(assignment.dueDate).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" }) : "Chưa có hạn",
       maxScore: assignment.maxScore == null ? "10" : String(Number(assignment.maxScore)),
@@ -554,19 +604,21 @@ export async function getInstructorQuizzesData(rawTeacherId) {
 export async function createInstructorAssignment(rawTeacherId, assignmentData) {
   const teacherId = normalizeTeacherId(rawTeacherId);
   const batchId = Number(assignmentData?.batchId);
+  const lessonId = Number(assignmentData?.lessonId);
   const title = String(assignmentData?.title ?? "").trim();
   const description = String(assignmentData?.description ?? "").trim();
   const dueDate = String(assignmentData?.dueDate ?? "").trim().replace("T", " ");
   const maxScore = Number(assignmentData?.maxScore ?? 10);
 
   if (!Number.isFinite(batchId) || batchId <= 0) throw new Error("Invalid batch id.");
+  if (!Number.isFinite(lessonId) || lessonId <= 0) throw new Error("Lesson is required.");
   if (!title) throw new Error("Assignment title is required.");
   if (!dueDate) throw new Error("Due date is required.");
   if (!Number.isFinite(maxScore) || maxScore <= 0) throw new Error("Max score must be greater than 0.");
 
   const [batchRows] = await db.query(
     `
-      SELECT batch_id AS id
+      SELECT batch_id AS id, course_id AS courseId
       FROM course_batches
       WHERE batch_id = ? AND teacher_id = ?
       LIMIT 1
@@ -576,17 +628,31 @@ export async function createInstructorAssignment(rawTeacherId, assignmentData) {
 
   if (!batchRows[0]) throw new Error("Batch not found for this instructor.");
 
+  const [lessonRows] = await db.query(
+    `
+      SELECT l.lesson_id AS id
+      FROM lessons l
+      INNER JOIN course_modules cm ON cm.module_id = l.module_id
+      WHERE l.lesson_id = ? AND cm.course_id = ?
+      LIMIT 1
+    `,
+    [lessonId, batchRows[0].courseId],
+  );
+
+  if (!lessonRows[0]) throw new Error("Lesson not found for this batch course.");
+
   const [result] = await db.query(
     `
-      INSERT INTO assignments (batch_id, title, description, due_date, max_score)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO assignments (batch_id, lesson_id, title, description, due_date, max_score)
+      VALUES (?, ?, ?, ?, ?, ?)
     `,
-    [batchId, title, description, dueDate, maxScore],
+    [batchId, lessonId, title, description, dueDate, maxScore],
   );
 
   return {
     id: result.insertId,
     batchId,
+    lessonId,
     title,
     description,
     dueDate,
@@ -599,6 +665,7 @@ export async function updateInstructorAssignment(rawTeacherId, rawAssignmentId, 
   const teacherId = normalizeTeacherId(rawTeacherId);
   const assignmentId = Number(rawAssignmentId);
   const batchId = Number(assignmentData?.batchId);
+  const lessonId = Number(assignmentData?.lessonId);
   const title = String(assignmentData?.title ?? "").trim();
   const description = String(assignmentData?.description ?? "").trim();
   const dueDate = String(assignmentData?.dueDate ?? "").trim().replace("T", " ");
@@ -606,6 +673,7 @@ export async function updateInstructorAssignment(rawTeacherId, rawAssignmentId, 
 
   if (!Number.isFinite(assignmentId) || assignmentId <= 0) throw new Error("Invalid assignment id.");
   if (!Number.isFinite(batchId) || batchId <= 0) throw new Error("Invalid batch id.");
+  if (!Number.isFinite(lessonId) || lessonId <= 0) throw new Error("Lesson is required.");
   if (!title) throw new Error("Assignment title is required.");
   if (!dueDate) throw new Error("Due date is required.");
   if (!Number.isFinite(maxScore) || maxScore <= 0) throw new Error("Max score must be greater than 0.");
@@ -625,7 +693,7 @@ export async function updateInstructorAssignment(rawTeacherId, rawAssignmentId, 
 
   const [batchRows] = await db.query(
     `
-      SELECT batch_id AS id
+      SELECT batch_id AS id, course_id AS courseId
       FROM course_batches
       WHERE batch_id = ? AND teacher_id = ?
       LIMIT 1
@@ -635,18 +703,32 @@ export async function updateInstructorAssignment(rawTeacherId, rawAssignmentId, 
 
   if (!batchRows[0]) throw new Error("Batch not found for this instructor.");
 
+  const [lessonRows] = await db.query(
+    `
+      SELECT l.lesson_id AS id
+      FROM lessons l
+      INNER JOIN course_modules cm ON cm.module_id = l.module_id
+      WHERE l.lesson_id = ? AND cm.course_id = ?
+      LIMIT 1
+    `,
+    [lessonId, batchRows[0].courseId],
+  );
+
+  if (!lessonRows[0]) throw new Error("Lesson not found for this batch course.");
+
   await db.query(
     `
       UPDATE assignments
-      SET batch_id = ?, title = ?, description = ?, due_date = ?, max_score = ?
+      SET batch_id = ?, lesson_id = ?, title = ?, description = ?, due_date = ?, max_score = ?
       WHERE assignment_id = ?
     `,
-    [batchId, title, description, dueDate, maxScore, assignmentId],
+    [batchId, lessonId, title, description, dueDate, maxScore, assignmentId],
   );
 
   return {
     id: assignmentId,
     batchId,
+    lessonId,
     title,
     description,
     dueDate,
@@ -796,6 +878,21 @@ export async function getInstructorInteractionData(rawTeacherId) {
     [teacherId],
   );
 
+  const [targetRows] = await db.query(
+    `
+      SELECT
+        c.course_id AS courseId,
+        c.course_name AS courseName,
+        b.batch_id AS batchId,
+        b.batch_code AS batchCode
+      FROM courses c
+      LEFT JOIN course_batches b ON b.course_id = c.course_id AND b.teacher_id = c.teacher_id
+      WHERE c.teacher_id = ?
+      ORDER BY c.course_name ASC, b.batch_code ASC, b.batch_id ASC
+    `,
+    [teacherId],
+  );
+
   const [pendingCourseRows] = await db.query(
     `
       SELECT course_id AS id, course_name AS title, updated_at
@@ -879,6 +976,30 @@ export async function getInstructorInteractionData(rawTeacherId) {
   ].slice(0, 10);
 
   const unreadNotifications = notificationRows.filter((row) => !row.is_read).length;
+  const targetCourseMap = new Map();
+  const targetBatches = [];
+
+  targetRows.forEach((row) => {
+    if (!targetCourseMap.has(row.courseId)) {
+      targetCourseMap.set(row.courseId, {
+        id: row.courseId,
+        title: row.courseName,
+        batches: [],
+      });
+    }
+
+    if (row.batchId) {
+      const batch = {
+        id: row.batchId,
+        code: row.batchCode,
+        courseId: row.courseId,
+        courseTitle: row.courseName,
+      };
+
+      targetCourseMap.get(row.courseId).batches.push(batch);
+      targetBatches.push(batch);
+    }
+  });
 
   return {
     teacherId,
@@ -920,6 +1041,10 @@ export async function getInstructorInteractionData(rawTeacherId) {
       target: "Tất cả lớp",
       state: row.is_read ? "Đã đọc" : "Chưa đọc",
     })),
+    announcementTargets: {
+      courses: Array.from(targetCourseMap.values()),
+      batches: targetBatches,
+    },
     notificationItems: notificationRows.map((row) => ({
       id: row.id,
       title: row.title,

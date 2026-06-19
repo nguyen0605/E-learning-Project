@@ -101,6 +101,92 @@ async function getActiveCartItems(connection, studentId) {
   return rows;
 }
 
+async function validateCartItemsForEnrollment(connection, studentId, items) {
+  if (!items.length) {
+    return {
+      ok: false,
+      status: 400,
+      message: "Giỏ hàng không còn khóa học để ghi danh.",
+    };
+  }
+
+  const batchIds = items.map((item) => Number(item.batch_id));
+  const placeholders = batchIds.map(() => "?").join(", ");
+  const [batchRows] = await connection.execute(
+    `SELECT
+       cb.batch_id,
+       cb.course_id,
+       cb.status,
+       cb.max_students,
+       COUNT(DISTINCT CASE
+         WHEN e.status IN ('PENDING', 'ACTIVE', 'COMPLETED') THEN e.enrollment_id
+         ELSE NULL
+       END) AS enrolled_count
+     FROM course_batches cb
+     LEFT JOIN enrollments e ON e.batch_id = cb.batch_id
+     WHERE cb.batch_id IN (${placeholders})
+     GROUP BY cb.batch_id, cb.course_id, cb.status, cb.max_students`,
+    batchIds,
+  );
+
+  const batchById = new Map(
+    batchRows.map((row) => [Number(row.batch_id), row]),
+  );
+
+  for (const item of items) {
+    const batch = batchById.get(Number(item.batch_id));
+
+    if (!batch) {
+      return {
+        ok: false,
+        status: 404,
+        message: "Lớp học đã bị xóa hoặc không còn tồn tại.",
+      };
+    }
+
+    if (!["OPEN", "STARTED"].includes(String(batch.status))) {
+      return {
+        ok: false,
+        status: 409,
+        message: "Lớp học này không còn mở để ghi danh.",
+      };
+    }
+
+    if (
+      Number(batch.max_students ?? 0) > 0 &&
+      Number(batch.enrolled_count ?? 0) >= Number(batch.max_students ?? 0)
+    ) {
+      return {
+        ok: false,
+        status: 409,
+        message: "Lớp học bạn chọn đã đủ số lượng học viên.",
+      };
+    }
+  }
+
+  const courseIds = [...new Set(batchRows.map((row) => Number(row.course_id)))];
+  const coursePlaceholders = courseIds.map(() => "?").join(", ");
+  const [enrollmentRows] = await connection.execute(
+    `SELECT DISTINCT cb.course_id
+     FROM enrollments e
+     INNER JOIN course_batches cb ON cb.batch_id = e.batch_id
+     WHERE e.student_id = ?
+       AND e.status IN ('PENDING', 'ACTIVE', 'COMPLETED')
+       AND cb.course_id IN (${coursePlaceholders})`,
+    [studentId, ...courseIds],
+  );
+
+  if (enrollmentRows.length) {
+    return {
+      ok: false,
+      status: 409,
+      message: "Bạn đã ghi danh một lớp của khóa học này rồi.",
+    };
+  }
+
+  return { ok: true };
+}
+
 export async function createStudentVnpayPayment(studentId, req) {
   const config = getVnpayConfig();
 
@@ -326,6 +412,13 @@ export async function verifyStudentVnpayReturn(studentId, query) {
         status: 400,
         message: "Giỏ hàng không còn khóa học để ghi danh.",
       };
+    }
+
+    const validation = await validateCartItemsForEnrollment(connection, studentId, items);
+
+    if (!validation.ok) {
+      await connection.rollback();
+      return validation;
     }
 
     for (const item of items) {

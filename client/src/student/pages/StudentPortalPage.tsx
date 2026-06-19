@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import AccountDrawer from "../components/account/AccountDrawer";
@@ -31,6 +31,7 @@ import InteractionPage from "../views/InteractionPage";
 import LessonPage from "../views/LessonPage";
 import LearningPage from "../views/LearningPage";
 import MyCoursesPage from "../views/MyCoursesPage";
+import SchedulePage from "../views/SchedulePage";
 import "./StudentPortalPage.css";
 
 function StudentPortalPage() {
@@ -153,7 +154,7 @@ function StudentPortalPage() {
   useEffect(() => {
     const requestedView = searchParams.get("view");
 
-    if (requestedView === "myCourses" || requestedView === "cart" || requestedView === "courses") {
+    if (requestedView === "myCourses" || requestedView === "schedule" || requestedView === "cart" || requestedView === "courses") {
       setActiveView(requestedView);
       setSearchParams({}, { replace: true });
     }
@@ -273,6 +274,7 @@ function StudentPortalPage() {
       {activeView === "myCourses" ? (
         <MyCoursesPage onStartLearning={handleStartLearning} />
       ) : null}
+      {activeView === "schedule" ? <SchedulePage /> : null}
       {activeView === "categories" ? (
         <CategoriesPage onOpenCourse={handleOpenCourse} />
       ) : null}
@@ -337,3 +339,4 @@ function StudentPortalPage() {
 }
 
 export default StudentPortalPage;
+

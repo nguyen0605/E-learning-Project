@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { instructorApiRequest } from "../api/instructorApi";
 import { getInstructorAuthTeacherId } from "../auth/instructorAuth";
@@ -49,6 +49,19 @@ type ReminderTask = {
   icon: string;
   time: string;
 };
+type DiscussionFilter = "all" | "pending" | "answered";
+type ComposeTargetType = "all" | "course" | "batch";
+type AnnouncementTargetCourse = {
+  id: number;
+  title: string;
+  batches: AnnouncementTargetBatch[];
+};
+type AnnouncementTargetBatch = {
+  id: number;
+  code: string;
+  courseId: number;
+  courseTitle: string;
+};
 
 type InstructorInteractionApiResponse = {
   success: boolean;
@@ -57,6 +70,10 @@ type InstructorInteractionApiResponse = {
     discussionThreads: DiscussionThread[];
     directMessages: DirectMessage[];
     announcementDrafts: AnnouncementDraft[];
+    announcementTargets?: {
+      courses: AnnouncementTargetCourse[];
+      batches: AnnouncementTargetBatch[];
+    };
     notificationItems: NotificationItem[];
     reminderTasks: ReminderTask[];
   };
@@ -76,12 +93,16 @@ function InstructorInteractionPage() {
   const [isMarkingNotificationId, setIsMarkingNotificationId] = useState<number | null>(null);
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const [selectedDiscussionId, setSelectedDiscussionId] = useState<number | null>(null);
+  const [discussionFilter, setDiscussionFilter] = useState<DiscussionFilter>("all");
   const [discussionReplyText, setDiscussionReplyText] = useState("");
   const [discussionReplyError, setDiscussionReplyError] = useState<string | null>(null);
   const [isSavingDiscussionReply, setIsSavingDiscussionReply] = useState(false);
   const [showComposeForm, setShowComposeForm] = useState(false);
   const [composeMode, setComposeMode] = useState<"announcement" | "message">("announcement");
   const [composeTarget, setComposeTarget] = useState("");
+  const [composeTargetType, setComposeTargetType] = useState<ComposeTargetType>("all");
+  const [composeCourseId, setComposeCourseId] = useState("");
+  const [composeBatchId, setComposeBatchId] = useState("");
   const [composeTitle, setComposeTitle] = useState("");
   const [composeContent, setComposeContent] = useState("");
   const [composeError, setComposeError] = useState<string | null>(null);
@@ -198,6 +219,9 @@ function InstructorInteractionPage() {
   function openComposeForm(mode: "announcement" | "message", target = "") {
     setComposeMode(mode);
     setComposeTarget(target);
+    setComposeTargetType(target ? "batch" : "all");
+    setComposeCourseId("");
+    setComposeBatchId("");
     setComposeTitle(mode === "announcement" ? "" : "Tin nhắn cho lớp");
     setComposeContent("");
     setComposeError(null);
@@ -209,13 +233,36 @@ function InstructorInteractionPage() {
     setComposeError(null);
   }
 
+  function getComposeTargetLabel() {
+    const targets = pageData?.announcementTargets;
+
+    if (composeTargetType === "all") {
+      return "Tất cả lớp";
+    }
+
+    if (composeTargetType === "course") {
+      return targets?.courses.find((course) => String(course.id) === composeCourseId)?.title ?? "";
+    }
+
+    return (
+      targets?.batches.find((batch) => String(batch.id) === composeBatchId)?.code ??
+      composeTarget.trim()
+    );
+  }
+
   function handleSubmitCompose() {
     const title = composeTitle.trim();
     const content = composeContent.trim();
-    const target = composeTarget.trim() || "Tất cả lớp";
+    const target = getComposeTargetLabel();
 
     if (!title) {
       setComposeError("Hãy nhập tiêu đề.");
+      return;
+    }
+
+    
+    if (!target) {
+      setComposeError("Hãy chọn nơi nhận.");
       return;
     }
 
@@ -260,15 +307,30 @@ function InstructorInteractionPage() {
 
   const displayedStats = pageData?.interactionStats ?? interactionStats;
   const displayedThreads: DiscussionThread[] = pageData?.discussionThreads ?? discussionThreads;
+  const filteredThreads = displayedThreads.filter((thread) => {
+    if (discussionFilter === "pending") return Number(thread.replies) === 0;
+    if (discussionFilter === "answered") return Number(thread.replies) > 0;
+    return true;
+  });
   const displayedMessages = pageData?.directMessages ?? directMessages;
   const displayedAnnouncements = pageData?.announcementDrafts ?? announcementDrafts;
+  const displayedTargets = pageData?.announcementTargets ?? { courses: [], batches: [] };
   const displayedNotifications = pageData?.notificationItems ?? [];
   const displayedReminders = pageData?.reminderTasks ?? [];
   const unreadCount = displayedNotifications.filter((item) => !item.isRead).length;
   const selectedDiscussion =
-    displayedThreads.find((thread) => thread.id === selectedDiscussionId) ??
-    displayedThreads[0] ??
+    filteredThreads.find((thread) => thread.id === selectedDiscussionId) ??
+    filteredThreads[0] ??
     null;
+
+  useEffect(() => {
+    if (!composeTarget || composeBatchId || displayedTargets.batches.length === 0) return;
+
+    const matchedBatch = displayedTargets.batches.find((batch) => batch.code === composeTarget);
+    if (matchedBatch) {
+      setComposeBatchId(String(matchedBatch.id));
+    }
+  }, [composeBatchId, composeTarget, displayedTargets.batches]);
 
   return (
     <InstructorLayout activePage="interaction">
@@ -399,40 +461,62 @@ function InstructorInteractionPage() {
               <h3>Chủ đề trong lớp</h3>
             </div>
             <div className="instructor-filter-tabs" aria-label="Bộ lọc chủ đề">
-              <button className="active" type="button">Tất cả</button>
-              <button type="button">Cần phản hồi</button>
-              <button type="button">Đã trả lời</button>
+              <button
+                className={discussionFilter === "all" ? "active" : ""}
+                onClick={() => setDiscussionFilter("all")}
+                type="button"
+              >
+                Tất cả
+              </button>
+              <button
+                className={discussionFilter === "pending" ? "active" : ""}
+                onClick={() => setDiscussionFilter("pending")}
+                type="button"
+              >
+                Cần phản hồi
+              </button>
+              <button
+                className={discussionFilter === "answered" ? "active" : ""}
+                onClick={() => setDiscussionFilter("answered")}
+                type="button"
+              >
+                Đã trả lời
+              </button>
             </div>
           </div>
 
           <div className="instructor-thread-list">
-            {displayedThreads.map((thread) => (
-              <button
-                className={`instructor-thread-card ${selectedDiscussion?.id === thread.id ? "active" : ""}`}
-                key={thread.id ?? thread.title}
-                onClick={() => {
-                  setSelectedDiscussionId(thread.id ?? null);
-                  setDiscussionReplyError(null);
-                }}
-                type="button"
-              >
-                <div className="instructor-thread-icon">
-                  <span className="material-symbols-outlined">forum</span>
-                </div>
-                <div>
-                  <h4>{thread.title}</h4>
-                  {thread.author && <strong>{thread.author}</strong>}
-                  <p>{thread.course} · {thread.batch}</p>
-                  <div className="instructor-thread-meta">
-                    <span>{thread.replies} phản hồi</span>
-                    <span>{thread.lastActivity}</span>
+            {filteredThreads.length === 0 ? (
+              <p className="instructor-empty-state">Không có chủ đề phù hợp với bộ lọc này.</p>
+            ) : (
+              filteredThreads.map((thread) => (
+                <button
+                  className={`instructor-thread-card ${selectedDiscussion?.id === thread.id ? "active" : ""}`}
+                  key={thread.id ?? thread.title}
+                  onClick={() => {
+                    setSelectedDiscussionId(thread.id ?? null);
+                    setDiscussionReplyError(null);
+                  }}
+                  type="button"
+                >
+                  <div className="instructor-thread-icon">
+                    <span className="material-symbols-outlined">forum</span>
                   </div>
-                </div>
-                <em className={`instructor-status-pill ${getThreadStatusClass(thread.status)}`}>
-                  {thread.status}
-                </em>
-              </button>
-            ))}
+                  <div>
+                    <h4>{thread.title}</h4>
+                    {thread.author && <strong>{thread.author}</strong>}
+                    <p>{thread.course} · {thread.batch}</p>
+                    <div className="instructor-thread-meta">
+                      <span>{thread.replies} phản hồi</span>
+                      <span>{thread.lastActivity}</span>
+                    </div>
+                  </div>
+                  <em className={`instructor-status-pill ${getThreadStatusClass(thread.status)}`}>
+                    {thread.status}
+                  </em>
+                </button>
+              ))
+            )}
           </div>
         </article>
 
@@ -550,7 +634,12 @@ function InstructorInteractionPage() {
             onClick={(event) => event.stopPropagation()}
             role="dialog"
           >
-            <div className="instructor-create-course-header">
+            <div className="instructor-create-course-header instructor-compose-header">
+              <div className="instructor-compose-title-icon">
+                <span className="material-symbols-outlined">
+                  {composeMode === "announcement" ? "campaign" : "mail"}
+                </span>
+              </div>
               <div>
                 <p className="instructor-eyebrow">
                   {composeMode === "announcement" ? "Thông báo" : "Tin nhắn"}
@@ -570,6 +659,77 @@ function InstructorInteractionPage() {
 
             <div className="instructor-compose-form">
               {composeError && <p className="instructor-course-detail-error">{composeError}</p>}
+
+              <div className="instructor-create-course-field instructor-create-course-field-wide">
+                <span>Nơi nhận</span>
+                <div className="instructor-compose-target-tabs" aria-label="Chọn nơi nhận thông báo">
+                  <button
+                    className={composeTargetType === "all" ? "active" : ""}
+                    onClick={() => {
+                      setComposeTargetType("all");
+                      setComposeCourseId("");
+                      setComposeBatchId("");
+                    }}
+                    type="button"
+                  >
+                    Tất cả
+                  </button>
+                  <button
+                    className={composeTargetType === "course" ? "active" : ""}
+                    onClick={() => {
+                      setComposeTargetType("course");
+                      setComposeBatchId("");
+                    }}
+                    type="button"
+                  >
+                    Theo khóa
+                  </button>
+                  <button
+                    className={composeTargetType === "batch" ? "active" : ""}
+                    onClick={() => {
+                      setComposeTargetType("batch");
+                      setComposeCourseId("");
+                    }}
+                    type="button"
+                  >
+                    Theo lớp
+                  </button>
+                </div>
+              </div>
+
+              {composeTargetType === "course" && (
+                <label className="instructor-create-course-field instructor-create-course-field-wide">
+                  <span>Khóa học</span>
+                  <select
+                    value={composeCourseId}
+                    onChange={(event) => setComposeCourseId(event.target.value)}
+                  >
+                    <option value="">Chọn khóa học</option>
+                    {displayedTargets.courses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.title} ({course.batches.length} lớp)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {composeTargetType === "batch" && (
+                <label className="instructor-create-course-field instructor-create-course-field-wide">
+                  <span>Lớp học</span>
+                  <select
+                    value={composeBatchId}
+                    onChange={(event) => setComposeBatchId(event.target.value)}
+                  >
+                    <option value="">{composeTarget || "Chọn lớp học"}</option>
+                    {displayedTargets.batches.map((batch) => (
+                      <option key={batch.id} value={batch.id}>
+                        {batch.code} - {batch.courseTitle}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
               <label className="instructor-create-course-field instructor-create-course-field-wide">
                 <span>Lớp nhận</span>
@@ -599,7 +759,7 @@ function InstructorInteractionPage() {
                 />
               </label>
 
-              <div className="instructor-create-course-actions">
+              <div className="instructor-create-course-actions instructor-compose-actions">
                 <button type="button" onClick={closeComposeForm}>
                   Hủy
                 </button>
@@ -628,3 +788,4 @@ function InstructorInteractionPage() {
 }
 
 export default InstructorInteractionPage;
+

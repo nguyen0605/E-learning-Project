@@ -1,7 +1,8 @@
-export type StudentView =
+﻿export type StudentView =
   | "home"
   | "courses"
   | "myCourses"
+  | "schedule"
   | "categories"
   | "cart"
   | "lesson"
@@ -25,3 +26,4 @@ export type Course = {
 };
 
 export type RecommendedCourse = Omit<Course, "rating">;
+

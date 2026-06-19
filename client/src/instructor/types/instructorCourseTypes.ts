@@ -130,6 +130,8 @@ export type CourseDetail = {
     learningModeValue?: string;
     onlinePlatform?: string;
     defaultMeetingUrl?: string;
+    classroomName?: string;
+    classroomAddress?: string;
     note?: string;
     sessions?: CourseSession[];
   }>;
@@ -240,6 +242,8 @@ export type BatchFormData = {
   learningMode: string;
   onlinePlatform: string;
   defaultMeetingUrl: string;
+  classroomName: string;
+  classroomAddress: string;
   timezone: string;
   status: string;
   note: string;

@@ -26,6 +26,11 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
   const [error, setError] = useState("");
   const [cartMessage, setCartMessage] = useState("");
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
+
+  function isBatchSelectable(batch: StudentCourseDetail["batches"][number]) {
+    return batch.status === "OPEN" || batch.status === "STARTED";
+  }
 
   function formatCurrency(value: number) {
     return new Intl.NumberFormat(getIntlLocale(language), {
@@ -56,6 +61,36 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
     return new Intl.DateTimeFormat(getIntlLocale(language)).format(new Date(value));
   }
 
+  function formatTime(value: string) {
+    return new Intl.DateTimeFormat(getIntlLocale(language), {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  }
+
+  function getWeeklySchedule(batch: StudentCourseDetail["batches"][number]) {
+    const scheduleMap = new Map<string, string>();
+
+    batch.sessions.forEach((session) => {
+      if (!session.startTime || !session.endTime) return;
+
+      const startDate = new Date(session.startTime);
+      const weekday = new Intl.DateTimeFormat(getIntlLocale(language), {
+        weekday: "long",
+      }).format(startDate);
+      const timeRange = `${formatTime(session.startTime)} - ${formatTime(session.endTime)}`;
+      const key = `${startDate.getDay()}-${timeRange}`;
+
+      if (!scheduleMap.has(key)) {
+        scheduleMap.set(key, `${weekday}, ${timeRange}`);
+      }
+    });
+
+    return [...scheduleMap.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([, label]) => label);
+  }
+
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
@@ -65,6 +100,8 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
       .then((data) => {
         if (isMounted) {
           setCourse(data);
+          const defaultBatch = data.batches.find((batch) => isBatchSelectable(batch)) ?? null;
+          setSelectedBatchId(defaultBatch?.id ?? null);
         }
       })
       .catch(() => {
@@ -98,22 +135,23 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
     );
   }
 
-  const purchasableBatch =
-    course.batches.find((batch) => batch.status === "OPEN") ??
-    course.batches.find((batch) => batch.status === "STARTED");
+  const selectedBatch =
+    course.batches.find((batch) => batch.id === selectedBatchId && isBatchSelectable(batch)) ?? null;
 
   async function handleAddToCart() {
-    if (!purchasableBatch) {
+    if (!selectedBatch) {
       setCartMessage(t("courseDetail.noBatchForCart"));
       return;
     }
     setIsAddingToCart(true);
     setCartMessage("");
     try {
-      await addCartItem(purchasableBatch.id);
-      setCartMessage(t("courseDetail.addedToCart"));
-    } catch {
-      setCartMessage(t("courseDetail.addToCartError"));
+      await addCartItem(selectedBatch.id);
+      setCartMessage(`Da chon lop ${selectedBatch.name} vao gio hang.`);
+    } catch (addError) {
+      setCartMessage(
+        addError instanceof Error ? addError.message : t("courseDetail.addToCartError"),
+      );
     } finally {
       setIsAddingToCart(false);
     }
@@ -241,18 +279,29 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
         <aside className="sp-course-detail-side">
           <div className="sp-detail-price-card">
             <strong>{formatCurrency(course.price)}</strong>
-            <button type="button">{t("courseDetail.enrollNow")}</button>
             <button
-              disabled={isAddingToCart || !purchasableBatch}
+              disabled={!selectedBatch}
               onClick={() => void handleAddToCart()}
               type="button"
             >
-              {!purchasableBatch
+              {selectedBatch ? `Đăng ký lớp ${selectedBatch.code ?? selectedBatch.name}` : "Chọn lớp để đăng ký"}
+            </button>
+            <button
+              disabled={isAddingToCart || !selectedBatch}
+              onClick={() => void handleAddToCart()}
+              type="button"
+            >
+              {!selectedBatch
                 ? t("courseDetail.notForSale")
                 : isAddingToCart
                   ? t("courseDetail.adding")
                   : t("courseDetail.addToCart")}
             </button>
+            <p className="sp-batch-selection-note">
+              {selectedBatch
+                ? `Lớp đang chọn: ${selectedBatch.name}`
+                : "Mỗi khóa học chỉ được chọn 1 lớp trước khi thanh toán."}
+            </p>
             {cartMessage ? <p className="sp-cart-message">{cartMessage}</p> : null}
           </div>
 
@@ -260,7 +309,17 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
             <h2>{t("courseDetail.batches")}</h2>
             {course.batches.length ? (
               course.batches.map((batch) => (
-                <article className="sp-batch-card" key={batch.id}>
+                <article
+                  className={`sp-batch-card ${selectedBatchId === batch.id ? "selected" : ""} ${
+                    !isBatchSelectable(batch) ? "disabled" : ""
+                  }`}
+                  key={batch.id}
+                >
+                  {(() => {
+                    const weeklySchedule = getWeeklySchedule(batch);
+
+                    return (
+                      <>
                   <h3>{batch.name}</h3>
                   <p>
                     {formatDate(batch.startDate)} - {formatDate(batch.endDate)}
@@ -274,6 +333,14 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
                     {t(`courseDetail.mode.${batch.learningMode}`)} •{" "}
                     {batch.onlinePlatform}
                   </small>
+                  {batch.learningMode !== "ONLINE" && (batch.classroomName || batch.classroomAddress) ? (
+                    <small>
+                      Ph?ng h?c: {[batch.classroomName, batch.classroomAddress].filter(Boolean).join(" - ")}
+                    </small>
+                  ) : null}
+                  {batch.learningMode !== "OFFLINE" && batch.defaultMeetingUrl ? (
+                    <small>Online: {batch.defaultMeetingUrl}</small>
+                  ) : null}
                   <small>
                     {t("courseDetail.capacity", {
                       min: batch.minStudents,
@@ -289,6 +356,28 @@ function CourseDetailPage({ courseId, onBack }: CourseDetailPageProps) {
                   <small>
                     {t("courseDetail.sessions", { count: batch.sessions.length })}
                   </small>
+                  <div className="sp-batch-weekly-schedule">
+                    <strong>Lịch định kỳ</strong>
+                    {weeklySchedule.length ? (
+                      weeklySchedule.map((item) => <small key={item}>{item}</small>)
+                    ) : (
+                      <small>Giảng viên chưa tạo lịch học định kỳ.</small>
+                    )}
+                  </div>
+                  <button
+                    className="sp-batch-select-button"
+                    disabled={!isBatchSelectable(batch)}
+                    onClick={() => {
+                      setSelectedBatchId(batch.id);
+                      setCartMessage("");
+                    }}
+                    type="button"
+                  >
+                    {selectedBatchId === batch.id ? "Đang chọn lớp này" : "Chọn lớp này"}
+                  </button>
+                      </>
+                    );
+                  })()}
                 </article>
               ))
             ) : (

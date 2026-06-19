@@ -1283,13 +1283,38 @@
 }
 
 .instructor-cohort-tabs {
-  max-width: min(100%, 560px);
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: min(100%, 620px);
   flex-wrap: nowrap;
   justify-content: flex-start;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 5px;
   border-radius: 22px;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  scroll-behavior: smooth;
+  user-select: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.instructor-cohort-tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.instructor-cohort-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.instructor-cohort-tabs::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.instructor-cohort-tabs button {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .instructor-cohort-tabs::-webkit-scrollbar {
@@ -1731,14 +1756,139 @@
 }
 
 .instructor-compose-modal {
-  width: min(680px, 100%);
+  width: min(720px, calc(100vw - 36px));
+  max-height: calc(100vh - 48px);
+  padding: 24px;
+  overflow: auto;
+  border-radius: 26px;
 }
 
 .instructor-compose-form {
   display: grid;
-  gap: 16px;
-  overflow-y: auto;
-  padding: 24px 28px 28px;
+  gap: 15px;
+  overflow: visible;
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid #e6ecf5;
+  border-radius: 22px;
+  background: #f8fafc;
+}
+
+.instructor-compose-header {
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+}
+
+.instructor-compose-title-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 18px;
+  color: #004ac6;
+  background: #e8f0ff;
+}
+
+.instructor-compose-title-icon .material-symbols-outlined {
+  font-size: 1.5rem;
+}
+
+.instructor-compose-modal .instructor-create-course-header h3 {
+  margin-top: 2px;
+  font-size: clamp(1.55rem, 3vw, 2rem);
+}
+
+.instructor-compose-modal .instructor-create-course-header p:not(.instructor-eyebrow) {
+  max-width: 560px;
+}
+
+.instructor-compose-modal .instructor-course-detail-close {
+  position: static;
+  box-shadow: none;
+}
+
+.instructor-compose-modal .instructor-create-course-field input,
+.instructor-compose-modal .instructor-create-course-field textarea {
+  background: #ffffff;
+}
+
+.instructor-compose-modal .instructor-create-course-field textarea {
+  min-height: 128px;
+}
+
+.instructor-compose-form label:has(input[placeholder^="VD: WEB-TEACH"]) {
+  display: none;
+}
+
+.instructor-compose-target-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 18px;
+  background: #eef2f7;
+}
+
+.instructor-compose-target-tabs button {
+  flex: 1 1 120px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 14px;
+  color: #526071;
+  background: transparent;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.instructor-compose-target-tabs button.active {
+  color: #004ac6;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.instructor-compose-actions {
+  padding-top: 2px;
+}
+
+.instructor-compose-actions button {
+  min-width: 104px;
+}
+
+@media (max-width: 640px) {
+  .instructor-compose-modal {
+    width: min(100%, calc(100vw - 24px));
+    padding: 18px;
+  }
+
+  .instructor-compose-header {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .instructor-compose-title-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 15px;
+  }
+
+  .instructor-compose-modal .instructor-course-detail-close {
+    grid-column: 2;
+    justify-self: end;
+    margin-top: -48px;
+  }
+
+  .instructor-compose-form {
+    padding: 16px;
+  }
+
+  .instructor-compose-actions {
+    flex-direction: column-reverse;
+  }
+
+  .instructor-compose-actions button {
+    width: 100%;
+  }
 }
 
 .instructor-create-course-form {
@@ -1793,6 +1943,13 @@
   font-weight: 900;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.instructor-create-course-field small {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.5;
 }
 
 .instructor-create-course-field input,

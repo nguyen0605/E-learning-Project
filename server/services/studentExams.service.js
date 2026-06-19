@@ -1,16 +1,34 @@
 import {
   createExamAttempt,
+  createQuizAttempt,
   deleteAttemptAnswers,
+  deleteQuizAttemptAnswers,
   getAttemptAnswers,
   getAttemptRowsByStudentAndExamIds,
   getBatchRowsByCourseIds,
+  getClassQuizOverviewRows,
   getConnection,
   getEnrollmentRowsByStudentAndCourseIds,
   getExamOverviewRows,
   getQuestionRowsByExamId,
+  getQuestionRowsByQuizId,
+  getQuizAttemptAnswers,
+  getQuizAttemptRowsByStudentAndQuizIds,
   insertAttemptAnswer,
+  insertQuizAttemptAnswer,
   updateAttemptSubmission,
+  updateQuizAttemptSubmission,
 } from "./studentExams.repository.js";
+
+const CLASS_QUIZ_EXAM_ID_OFFSET = 1000000000;
+
+function toClassQuizExamId(quizId) {
+  return CLASS_QUIZ_EXAM_ID_OFFSET + Number(quizId);
+}
+
+function toSourceId(exam) {
+  return exam.source === "CLASS_QUIZ" ? exam.sourceId : exam.id;
+}
 
 function toNumber(value) {
   return value === null || value === undefined ? 0 : Number(value);
@@ -100,6 +118,19 @@ function buildAttemptMap(attemptRows, passScoreByExamId) {
     const items = attemptsByExamId.get(row.exam_id) ?? [];
     items.push(mapAttemptRow(row, passScoreByExamId.get(row.exam_id) ?? 0));
     attemptsByExamId.set(row.exam_id, items);
+  });
+
+  return attemptsByExamId;
+}
+
+function buildQuizAttemptMap(attemptRows, passScoreByExamId) {
+  const attemptsByExamId = new Map();
+
+  attemptRows.forEach((row) => {
+    const examId = toClassQuizExamId(row.quiz_id);
+    const items = attemptsByExamId.get(examId) ?? [];
+    items.push(mapAttemptRow(row, passScoreByExamId.get(examId) ?? 0));
+    attemptsByExamId.set(examId, items);
   });
 
   return attemptsByExamId;
@@ -198,11 +229,23 @@ function mapExamRowToDomain(
   const attempts = attemptsByExamId.get(row.exam_id) ?? [];
   const latestAttempt = attempts[0] ?? null;
   const enrollment = enrollmentByCourseId.get(row.course_id) ?? null;
-  const batch =
-    enrollment?.batch ?? defaultBatchByCourseId.get(row.course_id) ?? buildDefaultBatch(row);
+  const batch = row.source === "CLASS_QUIZ"
+    ? {
+        id: row.batch_id,
+        code: row.batch_code,
+        name: row.batch_name,
+        startDate: row.start_date,
+        endDate: row.end_date,
+        status: row.batch_status,
+        learningMode: row.learning_mode,
+        onlinePlatform: row.online_platform,
+      }
+    : enrollment?.batch ?? defaultBatchByCourseId.get(row.course_id) ?? buildDefaultBatch(row);
 
   const exam = {
     id: row.exam_id,
+    source: row.source ?? "COURSE_EXAM",
+    sourceId: row.source_id ?? row.exam_id,
     title: row.title,
     description: row.description,
     openAt: row.open_at,
@@ -257,7 +300,31 @@ function mapExamRowToDomain(
 }
 
 async function getStudentExamCollection(studentId) {
-  const examRows = await getExamOverviewRows();
+  const [courseExamRows, classQuizRows] = await Promise.all([
+    getExamOverviewRows(),
+    getClassQuizOverviewRows(studentId),
+  ]);
+
+  const normalizedCourseExamRows = courseExamRows.map((row) => ({
+    ...row,
+    source: "COURSE_EXAM",
+    source_id: row.exam_id,
+  }));
+  const normalizedClassQuizRows = classQuizRows.map((row) => ({
+    ...row,
+    exam_id: toClassQuizExamId(row.quiz_id),
+    source: "CLASS_QUIZ",
+    source_id: row.quiz_id,
+    open_at: null,
+    close_at: null,
+    status: "PUBLISHED",
+  }));
+  const examRows = [...normalizedCourseExamRows, ...normalizedClassQuizRows].sort((left, right) => {
+    const leftTime = Date.parse(left.open_at ?? left.created_at ?? 0);
+    const rightTime = Date.parse(right.open_at ?? right.created_at ?? 0);
+
+    return rightTime - leftTime;
+  });
 
   if (!examRows.length) {
     return {
@@ -267,20 +334,27 @@ async function getStudentExamCollection(studentId) {
   }
 
   const courseIds = [...new Set(examRows.map((row) => row.course_id))];
-  const examIds = examRows.map((row) => row.exam_id);
+  const courseExamIds = normalizedCourseExamRows.map((row) => row.exam_id);
+  const classQuizIds = normalizedClassQuizRows.map((row) => row.source_id);
   const passScoreByExamId = new Map(
     examRows.map((row) => [row.exam_id, toNumber(row.pass_score)]),
   );
 
-  const [batchRows, enrollmentRows, attemptRows] = await Promise.all([
+  const [batchRows, enrollmentRows, attemptRows, quizAttemptRows] = await Promise.all([
     getBatchRowsByCourseIds(courseIds),
     getEnrollmentRowsByStudentAndCourseIds(studentId, courseIds),
-    getAttemptRowsByStudentAndExamIds(studentId, examIds),
+    getAttemptRowsByStudentAndExamIds(studentId, courseExamIds),
+    getQuizAttemptRowsByStudentAndQuizIds(studentId, classQuizIds),
   ]);
 
   const defaultBatchByCourseId = buildBatchMaps(batchRows);
   const enrollmentByCourseId = buildEnrollmentMap(enrollmentRows);
   const attemptsByExamId = buildAttemptMap(attemptRows, passScoreByExamId);
+  const quizAttemptsByExamId = buildQuizAttemptMap(quizAttemptRows, passScoreByExamId);
+
+  quizAttemptsByExamId.forEach((attempts, examId) => {
+    attemptsByExamId.set(examId, attempts);
+  });
 
   const exams = examRows.map((row) =>
     mapExamRowToDomain(
@@ -336,7 +410,7 @@ function buildQuestionList(questionRows, answerRows = []) {
       questionMap.set(row.question_id, {
         id: row.question_id,
         examId: row.exam_id,
-        type: row.question_type,
+        type: row.question_type === "ESSAY" ? "ESSAY" : "SINGLE_CHOICE",
         orderNo: toNumber(row.order_no),
         text: row.question_text,
         score: toNumber(row.score),
@@ -361,6 +435,30 @@ function buildQuestionList(questionRows, answerRows = []) {
   return [...questionMap.values()].sort((left, right) => left.orderNo - right.orderNo);
 }
 
+async function getQuestionRowsForExam(exam) {
+  if (exam.source !== "CLASS_QUIZ") {
+    return getQuestionRowsByExamId(exam.id);
+  }
+
+  const rows = await getQuestionRowsByQuizId(toSourceId(exam));
+  return rows.map((row) => ({
+    ...row,
+    exam_id: exam.id,
+  }));
+}
+
+async function getAttemptAnswersForExam(exam, attemptId) {
+  return exam.source === "CLASS_QUIZ"
+    ? getQuizAttemptAnswers(attemptId)
+    : getAttemptAnswers(attemptId);
+}
+
+async function createAttemptForExam(connection, exam, studentId) {
+  return exam.source === "CLASS_QUIZ"
+    ? createQuizAttempt(connection, toSourceId(exam), studentId)
+    : createExamAttempt(connection, exam.id, studentId);
+}
+
 function calculateRemainingSeconds(startedAt, durationMinutes) {
   if (!startedAt) {
     return durationMinutes * 60;
@@ -381,6 +479,8 @@ function buildWorkspacePayload(exam, attempt, questions) {
   return {
     exam: {
       id: exam.id,
+      source: exam.source,
+      sourceId: exam.sourceId,
       title: exam.title,
       description: exam.description,
       durationMinutes: exam.durationMinutes,
@@ -462,12 +562,31 @@ function normalizeAnswers(answers, questionMap) {
     .filter(Boolean);
 }
 
-async function saveAnswersSnapshot(connection, attemptId, answers) {
+async function saveAnswersSnapshot(connection, attemptId, answers, source = "COURSE_EXAM") {
+  if (source === "CLASS_QUIZ") {
+    await deleteQuizAttemptAnswers(connection, attemptId);
+
+    for (const answer of answers) {
+      await insertQuizAttemptAnswer(connection, attemptId, answer);
+    }
+
+    return;
+  }
+
   await deleteAttemptAnswers(connection, attemptId);
 
   for (const answer of answers) {
     await insertAttemptAnswer(connection, attemptId, answer);
   }
+}
+
+async function updateAttemptSubmissionForExam(connection, exam, attemptId, payload) {
+  if (exam.source === "CLASS_QUIZ") {
+    await updateQuizAttemptSubmission(connection, attemptId, payload);
+    return;
+  }
+
+  await updateAttemptSubmission(connection, attemptId, payload);
 }
 
 function gradeAttempt(questions, normalizedAnswers) {
@@ -641,7 +760,7 @@ export async function startStudentExam(studentId, examId) {
 
   try {
     await connection.beginTransaction();
-    const attemptId = await createExamAttempt(connection, exam.id, studentId);
+    const attemptId = await createAttemptForExam(connection, exam, studentId);
     await connection.commit();
 
     return getStudentExamWorkspace(studentId, exam.id, attemptId);
@@ -683,8 +802,8 @@ export async function getStudentExamWorkspace(studentId, examId, attemptId) {
     };
   }
 
-  const questionRows = await getQuestionRowsByExamId(exam.id);
-  const answerRows = await getAttemptAnswers(attempt.id);
+  const questionRows = await getQuestionRowsForExam(exam);
+  const answerRows = await getAttemptAnswersForExam(exam, attempt.id);
   const questions = buildQuestionList(questionRows, answerRows);
   const workspace = buildWorkspacePayload(exam, attempt, questions);
 
@@ -718,7 +837,7 @@ export async function saveStudentExamDraft(studentId, examId, attemptId, answers
 
   try {
     await connection.beginTransaction();
-    await saveAnswersSnapshot(connection, Number(attemptId), normalizedAnswers);
+    await saveAnswersSnapshot(connection, Number(attemptId), normalizedAnswers, workspaceResult.data.exam.source);
     await connection.commit();
   } catch (error) {
     await connection.rollback();
@@ -756,8 +875,8 @@ export async function submitStudentExam(studentId, examId, attemptId, answers) {
     return getStudentExamReview(studentId, examId, attempt.id);
   }
 
-  const questionRows = await getQuestionRowsByExamId(exam.id);
-  const existingAnswerRows = await getAttemptAnswers(attempt.id);
+  const questionRows = await getQuestionRowsForExam(exam);
+  const existingAnswerRows = await getAttemptAnswersForExam(exam, attempt.id);
   const questions = buildQuestionList(questionRows, existingAnswerRows);
   const questionMap = new Map(questions.map((question) => [question.id, question]));
   const normalizedAnswers = answers.length
@@ -782,8 +901,8 @@ export async function submitStudentExam(studentId, examId, attemptId, answers) {
 
   try {
     await connection.beginTransaction();
-    await saveAnswersSnapshot(connection, attempt.id, normalizedAnswers);
-    await updateAttemptSubmission(connection, attempt.id, {
+    await saveAnswersSnapshot(connection, attempt.id, normalizedAnswers, exam.source);
+    await updateAttemptSubmissionForExam(connection, exam, attempt.id, {
       submittedAt,
       score,
       status,
@@ -841,8 +960,8 @@ export async function getStudentExamReview(studentId, examId, attemptId = null) 
     };
   }
 
-  const questionRows = await getQuestionRowsByExamId(exam.id);
-  const answerRows = await getAttemptAnswers(attempt.id);
+  const questionRows = await getQuestionRowsForExam(exam);
+  const answerRows = await getAttemptAnswersForExam(exam, attempt.id);
   const questions = buildQuestionList(questionRows, answerRows);
   const { reviewedQuestions, score, hasEssay } = gradeAttempt(questions, answerRows.map((row) => ({
     questionId: row.question_id,

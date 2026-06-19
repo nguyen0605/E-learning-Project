@@ -134,11 +134,19 @@ export async function addStudentCartItem(studentId, batchId) {
     const [batchRows] = await connection.execute(
       `SELECT
          cb.batch_id,
+         cb.course_id,
          cb.status,
+         cb.max_students,
+         COUNT(DISTINCT CASE
+           WHEN e.status IN ('PENDING', 'ACTIVE', 'COMPLETED') THEN e.enrollment_id
+           ELSE NULL
+         END) AS enrolled_count,
          COALESCE(cb.tuition_fee, c.price, 0) AS item_price
        FROM course_batches cb
        INNER JOIN courses c ON c.course_id = cb.course_id
+       LEFT JOIN enrollments e ON e.batch_id = cb.batch_id
        WHERE cb.batch_id = ? AND c.status = 'APPROVED'
+       GROUP BY cb.batch_id, cb.course_id, cb.status, cb.max_students, c.price, cb.tuition_fee
        LIMIT 1`,
       [batchId],
     );
@@ -163,11 +171,22 @@ export async function addStudentCartItem(studentId, batchId) {
       };
     }
 
+    if (
+      Number(batch.max_students ?? 0) > 0 &&
+      Number(batch.enrolled_count ?? 0) >= Number(batch.max_students ?? 0)
+    ) {
+      await connection.rollback();
+      return {
+        ok: false,
+        status: 409,
+        message: "Lớp này đã đủ số lượng học viên.",
+      };
+    }
+
     const [enrollments] = await connection.execute(
       `SELECT enrollment_id
        FROM enrollments
-       WHERE student_id = ? AND batch_id = ?
-         AND status IN ('PENDING', 'ACTIVE', 'COMPLETED')
+       WHERE student_id = ? AND batch_id = ? AND status IN ('PENDING', 'ACTIVE', 'COMPLETED')
        LIMIT 1`,
       [studentId, batchId],
     );
@@ -181,16 +200,66 @@ export async function addStudentCartItem(studentId, batchId) {
       };
     }
 
+    const [courseEnrollments] = await connection.execute(
+      `SELECT e.enrollment_id, cb.batch_id
+       FROM enrollments e
+       INNER JOIN course_batches cb ON cb.batch_id = e.batch_id
+       WHERE e.student_id = ?
+         AND cb.course_id = ?
+         AND e.status IN ('PENDING', 'ACTIVE', 'COMPLETED')
+       LIMIT 1`,
+      [studentId, batch.course_id],
+    );
+
+    if (courseEnrollments.length) {
+      await connection.rollback();
+      return {
+        ok: false,
+        status: 409,
+        message: "Bạn đã đăng ký một lớp của khóa học này rồi.",
+      };
+    }
+
     const cartId = await getOrCreateActiveCart(connection, studentId);
 
-    await connection.execute(
-      `INSERT INTO cart_items (cart_id, batch_id, price_snapshot)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         price_snapshot = VALUES(price_snapshot),
-         added_at = added_at`,
-      [cartId, batchId, batch.item_price],
+    const [existingCourseItems] = await connection.execute(
+      `SELECT ci.cart_item_id, ci.batch_id
+       FROM cart_items ci
+       INNER JOIN course_batches cb ON cb.batch_id = ci.batch_id
+       WHERE ci.cart_id = ? AND cb.course_id = ?
+       ORDER BY ci.cart_item_id ASC`,
+      [cartId, batch.course_id],
     );
+
+    if (existingCourseItems.length) {
+      const primaryItem =
+        existingCourseItems.find((item) => Number(item.batch_id) === Number(batchId)) ??
+        existingCourseItems[0];
+      const duplicateItems = existingCourseItems.filter(
+        (item) => item.cart_item_id !== primaryItem.cart_item_id,
+      );
+
+      if (duplicateItems.length) {
+        await connection.execute(
+          `DELETE FROM cart_items
+           WHERE cart_item_id IN (${duplicateItems.map(() => "?").join(", ")})`,
+          duplicateItems.map((item) => item.cart_item_id),
+        );
+      }
+
+      await connection.execute(
+        `UPDATE cart_items
+         SET batch_id = ?, price_snapshot = ?, added_at = CURRENT_TIMESTAMP
+         WHERE cart_item_id = ?`,
+        [batchId, batch.item_price, primaryItem.cart_item_id],
+      );
+    } else {
+      await connection.execute(
+        `INSERT INTO cart_items (cart_id, batch_id, price_snapshot)
+         VALUES (?, ?, ?)`,
+        [cartId, batchId, batch.item_price],
+      );
+    }
 
     await connection.commit();
 

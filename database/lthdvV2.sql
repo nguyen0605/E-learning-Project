@@ -14,7 +14,7 @@ CREATE TABLE users (
     email VARCHAR(150) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
-    avatar_url VARCHAR(255),
+    avatar_url VARCHAR(1000),
 
     role ENUM('ADMIN', 'TEACHER', 'STUDENT') NOT NULL,
     status ENUM('ACTIVE', 'INACTIVE', 'LOCKED') DEFAULT 'ACTIVE',

@@ -214,6 +214,8 @@ function mapBatchRow(row) {
     learningModeValue: row.learning_mode,
     onlinePlatform: toOnlinePlatformValue(row.online_platform),
     defaultMeetingUrl: row.default_meeting_url ?? row.defaultMeetingUrl ?? "",
+    classroomName: row.classroom_name ?? row.classroomName ?? "",
+    classroomAddress: row.classroom_address ?? row.classroomAddress ?? "",
     note: row.note ?? "",
     sessions: [],
   };
@@ -432,6 +434,9 @@ async function getInstructorBatches(teacherId) {
         b.min_students,
         b.learning_mode,
         b.online_platform,
+        b.default_meeting_url,
+        b.classroom_name,
+        b.classroom_address,
         b.tuition_fee,
         b.status,
         b.max_students,
@@ -441,7 +446,7 @@ async function getInstructorBatches(teacherId) {
       INNER JOIN courses c ON c.course_id = b.course_id
       LEFT JOIN enrollments e ON e.batch_id = b.batch_id AND e.status IN ('ACTIVE', 'COMPLETED')
       WHERE b.teacher_id = ? AND c.status <> 'HIDDEN'
-      GROUP BY b.batch_id, b.batch_code, c.course_name, b.batch_name, b.start_date, b.end_date, b.enrollment_start_date, b.enrollment_deadline, b.min_students, b.learning_mode, b.online_platform, b.tuition_fee, b.status, b.max_students, b.note
+      GROUP BY b.batch_id, b.batch_code, c.course_name, b.batch_name, b.start_date, b.end_date, b.enrollment_start_date, b.enrollment_deadline, b.min_students, b.learning_mode, b.online_platform, b.default_meeting_url, b.classroom_name, b.classroom_address, b.tuition_fee, b.status, b.max_students, b.note
       ORDER BY b.start_date DESC, b.batch_id DESC
     `,
     [teacherId],
@@ -637,6 +642,8 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
           b.learning_mode,
           b.online_platform,
           b.default_meeting_url,
+          b.classroom_name,
+          b.classroom_address,
           b.tuition_fee,
           b.status,
           b.max_students,
@@ -645,7 +652,7 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
         FROM course_batches b
         LEFT JOIN enrollments e ON e.batch_id = b.batch_id AND e.status IN ('ACTIVE', 'COMPLETED')
         WHERE b.teacher_id = ? AND b.course_id = ?
-        GROUP BY b.batch_id, b.batch_code, b.batch_name, b.start_date, b.end_date, b.enrollment_start_date, b.enrollment_deadline, b.min_students, b.learning_mode, b.online_platform, b.default_meeting_url, b.tuition_fee, b.status, b.max_students, b.note
+        GROUP BY b.batch_id, b.batch_code, b.batch_name, b.start_date, b.end_date, b.enrollment_start_date, b.enrollment_deadline, b.min_students, b.learning_mode, b.online_platform, b.default_meeting_url, b.classroom_name, b.classroom_address, b.tuition_fee, b.status, b.max_students, b.note
         ORDER BY b.start_date DESC, b.batch_id DESC
       `,
       [teacherId, courseId],
@@ -2460,6 +2467,8 @@ export async function createInstructorBatch(rawTeacherId, rawCourseId, batchData
   const learningMode = String(batchData?.learningMode ?? "ONLINE").toUpperCase();
   const onlinePlatform = String(batchData?.onlinePlatform ?? "ZOOM").toUpperCase();
   const defaultMeetingUrl = String(batchData?.defaultMeetingUrl ?? "").trim();
+  const classroomName = String(batchData?.classroomName ?? "").trim();
+  const classroomAddress = String(batchData?.classroomAddress ?? "").trim();
   const timezone = String(batchData?.timezone ?? "Asia/Ho_Chi_Minh").trim() || "Asia/Ho_Chi_Minh";
   const status = String(batchData?.status ?? "DRAFT").toUpperCase();
   const note = String(batchData?.note ?? "").trim();
@@ -2518,10 +2527,12 @@ export async function createInstructorBatch(rawTeacherId, rawCourseId, batchData
         learning_mode,
         online_platform,
         default_meeting_url,
+        classroom_name,
+        classroom_address,
         timezone,
         status,
         note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       courseId,
@@ -2538,6 +2549,8 @@ export async function createInstructorBatch(rawTeacherId, rawCourseId, batchData
       learningMode,
       onlinePlatform,
       defaultMeetingUrl || null,
+      classroomName || null,
+      classroomAddress || null,
       timezone,
       status,
       note || null,
@@ -2557,6 +2570,9 @@ export async function createInstructorBatch(rawTeacherId, rawCourseId, batchData
         b.min_students,
         b.learning_mode,
         b.online_platform,
+        b.default_meeting_url,
+        b.classroom_name,
+        b.classroom_address,
         b.tuition_fee,
         b.status,
         b.max_students,
@@ -2565,7 +2581,7 @@ export async function createInstructorBatch(rawTeacherId, rawCourseId, batchData
       FROM course_batches b
       LEFT JOIN enrollments e ON e.batch_id = b.batch_id AND e.status IN ('ACTIVE', 'COMPLETED')
       WHERE b.batch_id = ? AND b.teacher_id = ? AND b.course_id = ?
-      GROUP BY b.batch_id, b.batch_code, b.batch_name, b.start_date, b.end_date, b.enrollment_start_date, b.enrollment_deadline, b.min_students, b.learning_mode, b.online_platform, b.tuition_fee, b.status, b.max_students, b.note
+      GROUP BY b.batch_id, b.batch_code, b.batch_name, b.start_date, b.end_date, b.enrollment_start_date, b.enrollment_deadline, b.min_students, b.learning_mode, b.online_platform, b.default_meeting_url, b.classroom_name, b.classroom_address, b.tuition_fee, b.status, b.max_students, b.note
       LIMIT 1
     `,
     [result.insertId, teacherId, courseId],
@@ -2591,6 +2607,8 @@ export async function updateInstructorBatch(rawTeacherId, rawCourseId, rawBatchI
   const learningMode = String(batchData?.learningMode ?? "ONLINE").toUpperCase();
   const onlinePlatform = String(batchData?.onlinePlatform ?? "ZOOM").toUpperCase();
   const defaultMeetingUrl = String(batchData?.defaultMeetingUrl ?? "").trim();
+  const classroomName = String(batchData?.classroomName ?? "").trim();
+  const classroomAddress = String(batchData?.classroomAddress ?? "").trim();
   const timezone = String(batchData?.timezone ?? "Asia/Ho_Chi_Minh").trim() || "Asia/Ho_Chi_Minh";
   const status = String(batchData?.status ?? "DRAFT").toUpperCase();
   const note = String(batchData?.note ?? "").trim();
@@ -2661,6 +2679,8 @@ export async function updateInstructorBatch(rawTeacherId, rawCourseId, rawBatchI
         learning_mode = ?,
         online_platform = ?,
         default_meeting_url = ?,
+        classroom_name = ?,
+        classroom_address = ?,
         timezone = ?,
         status = ?,
         note = ?,
@@ -2679,6 +2699,8 @@ export async function updateInstructorBatch(rawTeacherId, rawCourseId, rawBatchI
       learningMode,
       onlinePlatform,
       defaultMeetingUrl || null,
+      classroomName || null,
+      classroomAddress || null,
       timezone,
       status,
       note || null,
@@ -2701,6 +2723,9 @@ export async function updateInstructorBatch(rawTeacherId, rawCourseId, rawBatchI
         b.min_students,
         b.learning_mode,
         b.online_platform,
+        b.default_meeting_url,
+        b.classroom_name,
+        b.classroom_address,
         b.tuition_fee,
         b.status,
         b.max_students,
@@ -2709,7 +2734,7 @@ export async function updateInstructorBatch(rawTeacherId, rawCourseId, rawBatchI
       FROM course_batches b
       LEFT JOIN enrollments e ON e.batch_id = b.batch_id AND e.status IN ('ACTIVE', 'COMPLETED')
       WHERE b.batch_id = ? AND b.teacher_id = ? AND b.course_id = ?
-      GROUP BY b.batch_id, b.batch_code, b.batch_name, b.start_date, b.end_date, b.enrollment_start_date, b.enrollment_deadline, b.min_students, b.learning_mode, b.online_platform, b.tuition_fee, b.status, b.max_students, b.note
+      GROUP BY b.batch_id, b.batch_code, b.batch_name, b.start_date, b.end_date, b.enrollment_start_date, b.enrollment_deadline, b.min_students, b.learning_mode, b.online_platform, b.default_meeting_url, b.classroom_name, b.classroom_address, b.tuition_fee, b.status, b.max_students, b.note
       LIMIT 1
     `,
     [batchId, teacherId, courseId],

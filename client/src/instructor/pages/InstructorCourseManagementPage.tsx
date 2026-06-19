@@ -308,6 +308,8 @@ function InstructorCourseManagementPage() {
     learningMode: "ONLINE",
     onlinePlatform: "ZOOM",
     defaultMeetingUrl: "",
+    classroomName: "",
+    classroomAddress: "",
     timezone: "Asia/Ho_Chi_Minh",
     status: "OPEN",
     note: "",
@@ -1062,6 +1064,8 @@ function InstructorCourseManagementPage() {
       learningMode: "ONLINE",
       onlinePlatform: "ZOOM",
       defaultMeetingUrl: "",
+      classroomName: "",
+      classroomAddress: "",
       timezone: "Asia/Ho_Chi_Minh",
       status: "OPEN",
       note: "",
@@ -1178,6 +1182,8 @@ function InstructorCourseManagementPage() {
       learningMode: "ONLINE",
       onlinePlatform: "ZOOM",
       defaultMeetingUrl: "",
+      classroomName: "",
+      classroomAddress: "",
       timezone: "Asia/Ho_Chi_Minh",
       status: "OPEN",
       note: "",
@@ -1202,6 +1208,8 @@ function InstructorCourseManagementPage() {
       learningMode: batch.learningModeValue ?? "ONLINE",
       onlinePlatform: batch.onlinePlatform ?? "ZOOM",
       defaultMeetingUrl: batch.defaultMeetingUrl ?? "",
+      classroomName: batch.classroomName ?? "",
+      classroomAddress: batch.classroomAddress ?? "",
       timezone: "Asia/Ho_Chi_Minh",
       status: batch.statusValue ?? "OPEN",
       note: batch.note ?? "",
@@ -1223,6 +1231,8 @@ function InstructorCourseManagementPage() {
       learningMode: batchFormData.learningMode,
       onlinePlatform: batchFormData.onlinePlatform,
       defaultMeetingUrl: batchFormData.defaultMeetingUrl.trim(),
+      classroomName: batchFormData.classroomName.trim(),
+      classroomAddress: batchFormData.classroomAddress.trim(),
       timezone: batchFormData.timezone.trim() || "Asia/Ho_Chi_Minh",
       status: batchFormData.status,
       note: batchFormData.note.trim(),
@@ -2797,7 +2807,7 @@ function InstructorCourseManagementPage() {
                       />
                       <div>
                         <span>Ảnh này sẽ hiển thị trên card khóa học và phần đầu modal.</span>
-                        <span>Ảnh này sẽ hiển thị trên card khóa học và phần đầu modal.</span>
+                     
                       </div>
                     </div>
 
@@ -3914,7 +3924,7 @@ function InstructorCourseManagementPage() {
                               }
                             >
                               <option value="VIDEO">Video</option>
-                              <option value="TEXT">VĒn bản</option>
+                              <option value="TEXT">Văn bản</option>
                               <option value="PDF">Tài liệu PDF</option>
                               <option value="LIVE">Buổi live</option>
                             </select>
@@ -3936,15 +3946,16 @@ function InstructorCourseManagementPage() {
                         </div>
 
                         <label className="instructor-create-course-field">
-                          <span>Nội dung</span>
+                          <span>Nội dung bài đọc</span>
                           <textarea
-                            placeholder="Tóm tắt nội dung bài học"
-                            rows={3}
+                            placeholder="Nhập phần bài đọc học viên sẽ thấy trong trang học bài. Có thể viết tóm tắt, hướng dẫn thực hành, ghi chú hoặc nội dung dài."
+                            rows={7}
                             value={lessonFormData.content}
                             onChange={(event) =>
                               setLessonFormData({ ...lessonFormData, content: event.target.value })
                             }
                           />
+                          <small>Phần này lưu vào database cột lessons.content và hiển thị ở giao diện học viên.</small>
                         </label>
 
                         <label className="instructor-create-course-field">
@@ -4627,13 +4638,33 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
                   </select>
                 </label>
                 <label className="instructor-create-course-field instructor-create-course-field-wide">
-                  <span>Link phòng học</span>
+                  <span>Link phòng học online</span>
                   <input
                     value={batchFormData.defaultMeetingUrl}
                     onChange={(event) =>
                       setBatchFormData({ ...batchFormData, defaultMeetingUrl: event.target.value })
                     }
                     placeholder="https://..."
+                  />
+                </label>
+                <label className="instructor-create-course-field">
+                  <span>Phòng học trực tiếp</span>
+                  <input
+                    value={batchFormData.classroomName}
+                    onChange={(event) =>
+                      setBatchFormData({ ...batchFormData, classroomName: event.target.value })
+                    }
+                    placeholder="VD: Phòng A203"
+                  />
+                </label>
+                <label className="instructor-create-course-field">
+                  <span>Địa chỉ/cơ sở</span>
+                  <input
+                    value={batchFormData.classroomAddress}
+                    onChange={(event) =>
+                      setBatchFormData({ ...batchFormData, classroomAddress: event.target.value })
+                    }
+                    placeholder="VD: Cơ sở 1, 97 Man Thiện"
                   />
                 </label>
                 <label className="instructor-create-course-field instructor-create-course-field-wide">

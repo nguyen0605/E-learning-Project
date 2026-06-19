@@ -297,7 +297,11 @@ function LearningPage({ courseId, onBack }: LearningPageProps) {
   const currentProgress = activeLesson
     ? progress[activeLesson.lesson.id] ?? {}
     : {};
-  const activeQuiz = activeLesson?.lesson.quizzes[0] ?? null;
+  const activeLessonQuizzes = activeLesson?.lesson.quizzes ?? [];
+  const activeQuiz =
+    activeLessonQuizzes.find((quiz) => quiz.questions.length > 0) ??
+    activeLessonQuizzes[0] ??
+    null;
   const activeQuizQuestion =
     activeQuiz?.questions[Math.min(quizQuestionIndex, activeQuiz.questions.length - 1)] ??
     null;

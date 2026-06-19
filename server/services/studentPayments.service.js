@@ -44,10 +44,22 @@ function sortObject(source) {
     }, {});
 }
 
+function sortVnpayObject(source) {
+  const sortedKeys = Object.keys(source)
+    .filter((key) => source[key] !== undefined && source[key] !== null && source[key] !== "")
+    .map((key) => encodeURIComponent(key))
+    .sort();
+
+  return sortedKeys.reduce((result, encodedKey) => {
+    result[encodedKey] = encodeURIComponent(source[encodedKey]).replace(/%20/g, "+");
+    return result;
+  }, {});
+}
+
 function createSecureHash(params, hashSecret) {
-  const sortedParams = sortObject(params);
+  const sortedParams = sortVnpayObject(params);
   const signData = querystring.stringify(sortedParams, null, null, {
-    encodeURIComponent: querystring.unescape,
+    encodeURIComponent: (value) => value,
   });
 
   return crypto
@@ -147,12 +159,12 @@ export async function createStudentVnpayPayment(studentId, req) {
       vnp_Version: VNPAY_VERSION,
     };
     const secureHash = createSecureHash(vnpParams, config.hashSecret);
-    const signedParams = sortObject({
+    const signedParams = sortVnpayObject({
       ...vnpParams,
       vnp_SecureHash: secureHash,
     });
     const paymentUrl = `${config.paymentUrl}?${querystring.stringify(signedParams, null, null, {
-      encodeURIComponent: querystring.unescape,
+      encodeURIComponent: (value) => value,
     })}`;
 
     return {
@@ -283,6 +295,30 @@ export async function verifyStudentVnpayReturn(studentId, query) {
     );
 
     if (!items.length) {
+      const [existingPayments] = await connection.execute(
+        `SELECT COUNT(*) AS paymentCount
+         FROM payments
+         WHERE student_id = ? AND transaction_code LIKE ?`,
+        [studentId, `${txnRef}-%`],
+      );
+      const processedCount = Number(existingPayments[0]?.paymentCount ?? 0);
+
+      if (processedCount > 0) {
+        await connection.commit();
+
+        return {
+          ok: true,
+          data: {
+            amount: Number(query.vnp_Amount ?? 0) / 100,
+            enrolledCount: processedCount,
+            message: "Giao dịch đã được xử lý trước đó.",
+            responseCode: query.vnp_ResponseCode,
+            status: "SUCCESS",
+            txnRef,
+          },
+        };
+      }
+
       await connection.rollback();
 
       return {

@@ -10,4 +10,7 @@ export default defineConfig({
     emptyOutDir: false,
   },
   plugins: [react()],
+  server: {
+    allowedHosts: ["demetrice-atomistical-georgene.ngrok-free.dev"],
+  },
 })

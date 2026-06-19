@@ -15,7 +15,16 @@ const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 app.use(express.json());
 
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "http://localhost:5173");
+  const allowedOrigins = new Set([
+    "http://localhost:5173",
+    "https://demetrice-atomistical-georgene.ngrok-free.dev",
+  ]);
+  const requestOrigin = req.headers.origin;
+
+  if (allowedOrigins.has(requestOrigin)) {
+    res.header("Access-Control-Allow-Origin", requestOrigin);
+  }
+
   res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
 

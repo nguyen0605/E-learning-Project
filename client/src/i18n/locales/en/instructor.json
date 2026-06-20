@@ -79,6 +79,7 @@
     "fullName": "Full name",
     "expertise": "Expertise",
     "email": "Email",
+    "emailPlaceholder": "Example: instructor@learnx.vn",
     "password": "Password",
     "phone": "Phone number",
     "workplacePlaceholder": "Example: LearnX Center",

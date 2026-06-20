@@ -211,6 +211,11 @@ export async function createStudentVnpayPayment(studentId, req) {
       };
     }
 
+    const validation = await validateCartItemsForEnrollment(connection, studentId, cartItems);
+    if (!validation.ok) {
+      return validation;
+    }
+
     const cartId = cartItems[0].cart_id;
     const totalAmount = cartItems.reduce(
       (sum, item) => sum + Number(item.price_snapshot ?? 0),

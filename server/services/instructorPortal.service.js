@@ -603,6 +603,8 @@ export async function getInstructorQuizzesData(rawTeacherId) {
 
 export async function createInstructorAssignment(rawTeacherId, assignmentData) {
   const teacherId = normalizeTeacherId(rawTeacherId);
+  const normalizedBatchScope = String(assignmentData?.batchScope ?? "SINGLE").trim().toUpperCase();
+  const batchScope = normalizedBatchScope === "ALL" ? "ALL" : "SINGLE";
   const batchId = Number(assignmentData?.batchId);
   const lessonId = Number(assignmentData?.lessonId);
   const title = String(assignmentData?.title ?? "").trim();
@@ -641,16 +643,33 @@ export async function createInstructorAssignment(rawTeacherId, assignmentData) {
 
   if (!lessonRows[0]) throw new Error("Lesson not found for this batch course.");
 
-  const [result] = await db.query(
+  const [targetBatchRows] = await db.query(
     `
-      INSERT INTO assignments (batch_id, lesson_id, title, description, due_date, max_score)
-      VALUES (?, ?, ?, ?, ?, ?)
+      SELECT batch_id AS id
+      FROM course_batches
+      WHERE teacher_id = ? AND course_id = ?
+        ${batchScope === "ALL" ? "" : "AND batch_id = ?"}
+      ORDER BY batch_id ASC
     `,
-    [batchId, lessonId, title, description, dueDate, maxScore],
+    batchScope === "ALL" ? [teacherId, batchRows[0].courseId] : [teacherId, batchRows[0].courseId, batchId],
   );
 
+  if (targetBatchRows.length === 0) throw new Error("Batch not found for this instructor.");
+
+  const createdAssignmentIds = [];
+  for (const targetBatch of targetBatchRows) {
+    const [result] = await db.query(
+      `
+        INSERT INTO assignments (batch_id, lesson_id, title, description, due_date, max_score)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [targetBatch.id, lessonId, title, description, dueDate, maxScore],
+    );
+    createdAssignmentIds.push(result.insertId);
+  }
+
   return {
-    id: result.insertId,
+    id: createdAssignmentIds[0],
     batchId,
     lessonId,
     title,
@@ -658,6 +677,7 @@ export async function createInstructorAssignment(rawTeacherId, assignmentData) {
     dueDate,
     dueDateInput: formatDateTimeInput(dueDate),
     maxScore: String(maxScore),
+    createdCount: createdAssignmentIds.length,
   };
 }
 
@@ -821,18 +841,22 @@ export async function getInstructorInteractionData(rawTeacherId) {
         c.course_name AS course,
         b.batch_code AS batch,
         d.created_at,
-        COUNT(dc.comment_id) AS replies
+        COALESCE(d.updated_at, d.created_at) AS updated_at,
+        COUNT(DISTINCT dc.comment_id) AS replies,
+        COUNT(DISTINCT CASE WHEN dc.user_id = ? OR dc.is_instructor_answer = TRUE THEN dc.comment_id END) AS teacherReplies,
+        MAX(COALESCE(dc.created_at, d.updated_at, d.created_at)) AS last_activity
       FROM discussions d
       INNER JOIN course_batches b ON b.batch_id = d.batch_id
       INNER JOIN courses c ON c.course_id = b.course_id
       INNER JOIN users u ON u.user_id = d.user_id
-      LEFT JOIN discussion_comments dc ON dc.discussion_id = d.discussion_id
-      WHERE b.teacher_id = ?
-      GROUP BY d.discussion_id, d.title, d.content, d.user_id, u.full_name, c.course_name, b.batch_code, d.created_at
-      ORDER BY d.created_at DESC
-      LIMIT 5
+      LEFT JOIN discussion_comments dc
+        ON dc.discussion_id = d.discussion_id
+       AND dc.status = 'VISIBLE'
+      WHERE b.teacher_id = ? AND d.status <> 'HIDDEN'
+      GROUP BY d.discussion_id, d.title, d.content, d.user_id, u.full_name, c.course_name, b.batch_code, d.created_at, d.updated_at
+      ORDER BY last_activity DESC
     `,
-    [teacherId],
+    [teacherId, teacherId],
   );
 
   const [commentRows] = await db.query(
@@ -843,12 +867,13 @@ export async function getInstructorInteractionData(rawTeacherId) {
         dc.user_id AS userId,
         u.full_name AS author,
         dc.content,
+        dc.is_instructor_answer,
         dc.created_at
       FROM discussion_comments dc
       INNER JOIN discussions d ON d.discussion_id = dc.discussion_id
       INNER JOIN course_batches b ON b.batch_id = d.batch_id
       INNER JOIN users u ON u.user_id = dc.user_id
-      WHERE b.teacher_id = ?
+      WHERE b.teacher_id = ? AND dc.status = 'VISIBLE'
       ORDER BY dc.created_at ASC, dc.comment_id ASC
     `,
     [teacherId],
@@ -948,7 +973,7 @@ export async function getInstructorInteractionData(rawTeacherId) {
       time: relativeTime(row.updated_at),
     })),
     ...threadRows
-      .filter((row) => Number(row.replies) === 0)
+      .filter((row) => Number(row.teacherReplies) === 0)
       .slice(0, 4)
       .map((row) => ({
         id: `discussion-${row.discussion_id}`,
@@ -957,7 +982,7 @@ export async function getInstructorInteractionData(rawTeacherId) {
         category: "Học viên hỏi",
         tone: "blue",
         icon: "forum",
-        time: relativeTime(row.created_at),
+        time: relativeTime(row.last_activity ?? row.updated_at ?? row.created_at),
       })),
     ...gradingRows.map((row) => ({
       id: `grading-${row.id}`,
@@ -1011,7 +1036,7 @@ export async function getInstructorInteractionData(rawTeacherId) {
     interactionStats: [
       { label: "Chủ đề đang mở", value: String(threadRows.length), icon: "forum", tone: "blue" },
       { label: "Tin chưa đọc", value: String(unreadNotifications), icon: "mark_chat_unread", tone: "amber" },
-      { label: "Đã xử lý hôm nay", value: String(threadRows.filter((row) => Number(row.replies) > 0).length), icon: "task_alt", tone: "green" },
+      { label: "Da tra loi", value: String(threadRows.filter((row) => Number(row.teacherReplies) > 0).length), icon: "task_alt", tone: "green" },
       { label: "Nhắc việc", value: String(reminderTasks.length), icon: "notifications_active", tone: "slate" },
     ],
     discussionThreads: threadRows.map((row) => ({
@@ -1022,14 +1047,16 @@ export async function getInstructorInteractionData(rawTeacherId) {
       course: row.course,
       batch: row.batch,
       replies: Number(row.replies),
-      lastActivity: relativeTime(row.created_at),
-      status: Number(row.replies) === 0 ? "Cần phản hồi" : "Đang thảo luận",
+      teacherReplies: Number(row.teacherReplies),
+      needsReply: Number(row.teacherReplies) === 0,
+      lastActivity: relativeTime(row.last_activity ?? row.updated_at ?? row.created_at),
+      status: Number(row.teacherReplies) === 0 ? "Can phan hoi" : "Da tra loi",
       comments: commentRows
         .filter((comment) => comment.discussionId === row.discussion_id)
         .map((comment) => ({
           id: comment.id,
           author: comment.author,
-          isTeacher: Number(comment.userId) === teacherId,
+          isTeacher: Number(comment.userId) === teacherId || Boolean(comment.is_instructor_answer),
           content: comment.content,
           time: relativeTime(comment.created_at),
         })),
@@ -1117,10 +1144,19 @@ export async function createInstructorDiscussionComment(rawTeacherId, rawDiscuss
 
   const [result] = await db.query(
     `
-      INSERT INTO discussion_comments (discussion_id, user_id, content, created_at)
-      VALUES (?, ?, ?, NOW())
+      INSERT INTO discussion_comments (discussion_id, user_id, content, is_instructor_answer, created_at)
+      VALUES (?, ?, ?, TRUE, NOW())
     `,
     [discussionId, teacherId, content],
+  );
+
+  await db.query(
+    `
+      UPDATE discussions
+      SET status = 'RESOLVED', updated_at = NOW()
+      WHERE discussion_id = ?
+    `,
+    [discussionId],
   );
 
   return {

@@ -79,6 +79,7 @@
     "fullName": "Họ tên",
     "expertise": "Chuyên môn",
     "email": "Email",
+    "emailPlaceholder": "VD: giangvien@learnx.vn",
     "password": "Mật khẩu",
     "phone": "Số điện thoại",
     "workplacePlaceholder": "VD: LearnX Center",

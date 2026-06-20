@@ -115,8 +115,62 @@ function CourseDetailPage({
       .map(([, label]) => label);
   }
 
-  function isBatchSelectable(batch: StudentCourseDetail["batches"][number]) {
-    return batch.status === "OPEN" || batch.status === "STARTED";
+  function hasBatchReachedCapacity(batch: StudentCourseDetail["batches"][number]) {
+    return batch.maxStudents > 0 && batch.stats.enrollmentCount >= batch.maxStudents;
+  }
+
+  function getBatchDisabledReason(
+    batch: StudentCourseDetail["batches"][number],
+    eligibility: StudentCourseReviewEligibility | null = reviewEligibility,
+  ) {
+    if (!isPublic && eligibility?.hasEnrollment) {
+      return "Bạn đã ghi danh một lớp của khóa học này rồi.";
+    }
+
+    if (hasBatchReachedCapacity(batch) || batch.status === "FULL") {
+      return "Lớp này đã đủ số lượng học viên.";
+    }
+
+    if (batch.status === "DRAFT") {
+      return "Lớp này đang ở trạng thái bản nháp, chưa mở đăng ký.";
+    }
+
+    if (batch.status === "CANCELLED") {
+      return "Lớp này đã bị hủy.";
+    }
+
+    if (batch.status === "FINISHED") {
+      return "Lớp này đã kết thúc tuyển sinh.";
+    }
+
+    if (!["OPEN", "STARTED"].includes(batch.status)) {
+      return "Lớp này hiện chưa thể đăng ký.";
+    }
+
+    const now = Date.now();
+    const enrollmentStart = batch.enrollmentStartDate
+      ? new Date(batch.enrollmentStartDate).getTime()
+      : null;
+    const enrollmentDeadline = batch.enrollmentDeadline
+      ? new Date(batch.enrollmentDeadline).getTime()
+      : null;
+
+    if (enrollmentStart && enrollmentStart > now) {
+      return "Lớp này chưa tới thời gian mở đăng ký.";
+    }
+
+    if (enrollmentDeadline && enrollmentDeadline < now) {
+      return "Lớp này đã hết hạn đăng ký.";
+    }
+
+    return "";
+  }
+
+  function isBatchSelectable(
+    batch: StudentCourseDetail["batches"][number],
+    eligibility: StudentCourseReviewEligibility | null = reviewEligibility,
+  ) {
+    return !getBatchDisabledReason(batch, eligibility);
   }
 
   useEffect(() => {
@@ -134,8 +188,8 @@ function CourseDetailPage({
         if (isMounted) {
           setCourse(data);
           const defaultBatch =
-            data.batches.find((batch) => batch.id === selectedBatchId && isBatchSelectable(batch)) ??
-            data.batches.find((batch) => isBatchSelectable(batch)) ??
+            data.batches.find((batch) => batch.id === selectedBatchId && isBatchSelectable(batch, eligibility)) ??
+            data.batches.find((batch) => isBatchSelectable(batch, eligibility)) ??
             null;
           setSelectedBatchId(defaultBatch?.id ?? null);
 
@@ -189,8 +243,8 @@ function CourseDetailPage({
     );
   }
 
-  const selectedBatch =
-    course.batches.find((batch) => batch.id === selectedBatchId && isBatchSelectable(batch)) ?? null;
+  const selectedBatch = course.batches.find((batch) => batch.id === selectedBatchId) ?? null;
+  const selectedBatchDisabledReason = selectedBatch ? getBatchDisabledReason(selectedBatch) : "";
   const purchasableBatch = selectedBatch;
 
   async function handleAddToCart() {
@@ -202,6 +256,10 @@ function CourseDetailPage({
     if (!purchasableBatch) {
 
       setCartMessage(t("courseDetail.noBatchForCart"));
+      return;
+    }
+    if (selectedBatchDisabledReason) {
+      setCartMessage(selectedBatchDisabledReason);
       return;
     }
     setIsAddingToCart(true);

@@ -57,6 +57,7 @@ type LessonOption = {
   moduleTitle: string;
 };
 type AssignmentFormData = {
+  batchScope: string;
   batchId: string;
   lessonId: string;
   title: string;
@@ -133,6 +134,7 @@ function InstructorQuizTestsPage() {
   const [isDeletingAssignment, setIsDeletingAssignment] = useState(false);
   const { toast, setToast } = useInstructorToast();
   const [assignmentFormData, setAssignmentFormData] = useState<AssignmentFormData>({
+    batchScope: "SINGLE",
     batchId: "",
     lessonId: "",
     title: "",
@@ -199,6 +201,7 @@ function InstructorQuizTestsPage() {
     setEditingAssignmentId(assignment?.id ?? null);
     setAssignmentFormError(null);
     setAssignmentFormData({
+      batchScope: "SINGLE",
       batchId: matchedBatchId,
       lessonId: assignment?.lessonId ? String(assignment.lessonId) : String(batchLessonOptions[0]?.id ?? ""),
       title: assignment?.title ?? "",
@@ -214,6 +217,7 @@ function InstructorQuizTestsPage() {
     setAssignmentFormError(null);
     setAssignmentFormData((current) => ({
       ...current,
+      batchScope: "SINGLE",
       title: "",
       description: "",
       dueDate: "",
@@ -224,7 +228,7 @@ function InstructorQuizTestsPage() {
 
   async function handleSubmitAssignment() {
     if (!assignmentFormData.batchId) {
-      setAssignmentFormError("Hãy chọn khóa nhận bài tập.");
+      setAssignmentFormError("H?y ch?n l?p thu?c kh?a nh?n b?i t?p.");
       return;
     }
     if (!assignmentFormData.lessonId) {
@@ -232,11 +236,11 @@ function InstructorQuizTestsPage() {
       return;
     }
     if (!assignmentFormData.title.trim()) {
-      setAssignmentFormError("Tiêu đề bài tập không được để trống.");
+      setAssignmentFormError("Ti?u ?? b?i t?p kh?ng ???c ?? tr?ng.");
       return;
     }
     if (!assignmentFormData.dueDate) {
-      setAssignmentFormError("Hãy chọn hạn nộp.");
+      setAssignmentFormError("H?y ch?n h?n n?p.");
       return;
     }
 
@@ -253,6 +257,7 @@ function InstructorQuizTestsPage() {
           method: isEditing ? "PATCH" : "POST",
           query: { teacherId: DEFAULT_TEACHER_ID },
           body: {
+            batchScope: assignmentFormData.batchScope,
             batchId: Number(assignmentFormData.batchId),
             lessonId: Number(assignmentFormData.lessonId),
             title: assignmentFormData.title,
@@ -267,7 +272,12 @@ function InstructorQuizTestsPage() {
       closeAssignmentForm();
       setToast({
         type: "success",
-        message: editingAssignmentId ? "Đã lưu thay đổi bài tập." : "Đã tạo bài tập mới.",
+        message:
+          editingAssignmentId
+            ? "?? l?u thay ??i b?i t?p."
+            : assignmentFormData.batchScope === "ALL"
+              ? "?? t?o b?i t?p cho t?t c? l?p trong kh?a."
+              : "?? t?o b?i t?p m?i.",
       });
     } catch (error) {
       console.error(error);
@@ -899,8 +909,30 @@ function InstructorQuizTestsPage() {
               {assignmentFormError && <p className="instructor-course-detail-error">{assignmentFormError}</p>}
 
               <div className="instructor-create-course-grid">
+                {editingAssignmentId == null && (
+                  <label className="instructor-create-course-field instructor-create-course-field-wide">
+                    <span>Ph?m vi giao b?i</span>
+                    <select
+                      value={assignmentFormData.batchScope}
+                      onChange={(event) =>
+                        setAssignmentFormData({
+                          ...assignmentFormData,
+                          batchScope: event.target.value,
+                        })
+                      }
+                    >
+                      <option value="SINGLE">M?t l?p c? th?</option>
+                      <option value="ALL">T?t c? l?p trong c?ng kh?a</option>
+                    </select>
+                  </label>
+                )}
+
                 <label className="instructor-create-course-field instructor-create-course-field-wide">
-                  <span>Khóa nhận bài tập *</span>
+                  <span>
+                    {editingAssignmentId == null && assignmentFormData.batchScope === "ALL"
+                      ? "Ch?n m?t l?p trong kh?a *"
+                      : "Kh?a nh?n b?i t?p *"}
+                  </span>
                   <select
                     value={assignmentFormData.batchId || displayedBatchOptions[0]?.id || ""}
                     onChange={(event) => {
@@ -916,7 +948,7 @@ function InstructorQuizTestsPage() {
                     }}
                   >
                     {displayedBatchOptions.length === 0 ? (
-                      <option value="">Chưa có lớp</option>
+                      <option value="">Ch?a c? l?p</option>
                     ) : (
                       displayedBatchOptions.map((batch) => (
                         <option key={batch.id} value={batch.id}>
@@ -925,10 +957,13 @@ function InstructorQuizTestsPage() {
                       ))
                     )}
                   </select>
+                  {editingAssignmentId == null && assignmentFormData.batchScope === "ALL" && (
+                    <small>H? th?ng s? nh?n b?n b?i t?p n?y cho m?i l?p c?a c?ng kh?a h?c.</small>
+                  )}
                 </label>
 
                 <label className="instructor-create-course-field instructor-create-course-field-wide">
-                  <span>Bài học nhận bài tập *</span>
+                  <span>B?i h?c nh?n b?i t?p *</span>
                   <select
                     value={assignmentFormData.lessonId || assignmentLessonOptions[0]?.id || ""}
                     onChange={(event) =>
@@ -936,7 +971,7 @@ function InstructorQuizTestsPage() {
                     }
                   >
                     {assignmentLessonOptions.length === 0 ? (
-                      <option value="">Chưa có bài học trong lớp này</option>
+                      <option value="">Ch?a c? b?i h?c trong l?p n?y</option>
                     ) : (
                       assignmentLessonOptions.map((lesson) => (
                         <option key={lesson.id} value={lesson.id}>

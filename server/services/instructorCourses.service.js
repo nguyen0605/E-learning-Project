@@ -182,6 +182,74 @@ function timeToMinutes(value) {
   return hours * 60 + minutes;
 }
 
+function hasTimeRangeOverlap(startA, endA, startB, endB) {
+  return startA < endB && endA > startB;
+}
+
+function createEndOfDay(date) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    23,
+    59,
+    59,
+    999,
+  );
+}
+
+function assertSessionWithinBatchRange(startTime, endTime, batchStartDate, batchEndDate) {
+  const sessionStart = new Date(startTime);
+  const sessionEnd = new Date(endTime);
+  const batchStart = parseDateOnly(batchStartDate);
+  const batchEnd = parseDateOnly(batchEndDate);
+
+  if (
+    Number.isNaN(sessionStart.getTime()) ||
+    Number.isNaN(sessionEnd.getTime()) ||
+    !batchStart ||
+    !batchEnd
+  ) {
+    throw new Error("Invalid schedule date.");
+  }
+
+  const allowedStart = combineDateAndTime(batchStart, "00:00");
+  const allowedEnd = createEndOfDay(batchEnd);
+  if (!allowedStart) {
+    throw new Error("Invalid batch start date.");
+  }
+
+  if (sessionStart < allowedStart || sessionEnd > allowedEnd) {
+    throw new Error("Session time must stay within the batch date range.");
+  }
+}
+
+async function findBatchSessionConflict(batchId, teacherId, startTime, endTime, excludeSessionId = null) {
+  const params = [batchId, teacherId, endTime, startTime];
+  let query = `
+    SELECT
+      session_id AS id,
+      session_title AS title,
+      start_time,
+      end_time
+    FROM class_sessions
+    WHERE batch_id = ?
+      AND teacher_id = ?
+      AND start_time < ?
+      AND end_time > ?
+  `;
+
+  if (excludeSessionId != null) {
+    query += " AND session_id <> ?";
+    params.push(excludeSessionId);
+  }
+
+  query += " ORDER BY start_time ASC LIMIT 1";
+
+  const [rows] = await db.query(query, params);
+  return rows[0] ?? null;
+}
+
 function mapBatchRow(row) {
   const start = row.start_date ? new Date(row.start_date) : null;
   const end = row.end_date ? new Date(row.end_date) : null;
@@ -718,10 +786,8 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
       `
         SELECT
           q.quiz_id AS id,
-          (SELECT MIN(b.batch_id) FROM course_batches b
-           WHERE b.course_id = c.course_id AND b.teacher_id = c.teacher_id) AS batchId,
-          (SELECT MIN(b.batch_code) FROM course_batches b
-           WHERE b.course_id = c.course_id AND b.teacher_id = c.teacher_id) AS batchCode,
+          q.batch_id AS batchId,
+          b.batch_code AS batchCode,
           q.lesson_id AS lessonId,
           l.lesson_title AS lessonTitle,
           q.title,
@@ -734,15 +800,15 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
           COUNT(DISTINCT qu.question_id) AS questions,
           COUNT(DISTINCT qa.attempt_id) AS attempts
         FROM quizzes q
-        INNER JOIN lessons l ON l.lesson_id = q.lesson_id
-        INNER JOIN course_modules m ON m.module_id = l.module_id
-        INNER JOIN courses c ON c.course_id = m.course_id
+        INNER JOIN course_batches b ON b.batch_id = q.batch_id
+        INNER JOIN courses c ON c.course_id = b.course_id
+        LEFT JOIN lessons l ON l.lesson_id = q.lesson_id
         LEFT JOIN questions qu ON qu.quiz_id = q.quiz_id
         LEFT JOIN quiz_attempts qa ON qa.quiz_id = q.quiz_id
         WHERE c.teacher_id = ? AND c.course_id = ?
-        GROUP BY q.quiz_id, q.lesson_id, l.lesson_title, q.title, q.description,
+        GROUP BY q.quiz_id, q.batch_id, b.batch_code, q.lesson_id, l.lesson_title, q.title, q.description,
                  q.duration_minutes, q.max_score, q.pass_score,
-                 q.attempt_limit, q.created_at, c.course_id, c.teacher_id
+                 q.attempt_limit, q.created_at
         ORDER BY q.created_at DESC, q.quiz_id DESC
       `,
       [teacherId, courseId],
@@ -757,9 +823,8 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
           q.score
         FROM questions q
         INNER JOIN quizzes qu ON qu.quiz_id = q.quiz_id
-        INNER JOIN lessons l ON l.lesson_id = qu.lesson_id
-        INNER JOIN course_modules m ON m.module_id = l.module_id
-        INNER JOIN courses c ON c.course_id = m.course_id
+        INNER JOIN course_batches b ON b.batch_id = qu.batch_id
+        INNER JOIN courses c ON c.course_id = b.course_id
         WHERE c.teacher_id = ? AND c.course_id = ?
         ORDER BY q.question_id ASC
       `,
@@ -775,9 +840,8 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
         FROM answer_options o
         INNER JOIN questions q ON q.question_id = o.question_id
         INNER JOIN quizzes qu ON qu.quiz_id = q.quiz_id
-        INNER JOIN lessons l ON l.lesson_id = qu.lesson_id
-        INNER JOIN course_modules m ON m.module_id = l.module_id
-        INNER JOIN courses c ON c.course_id = m.course_id
+        INNER JOIN course_batches b ON b.batch_id = qu.batch_id
+        INNER JOIN courses c ON c.course_id = b.course_id
         WHERE c.teacher_id = ? AND c.course_id = ?
         ORDER BY o.option_id ASC
       `,
@@ -796,9 +860,8 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
           qa.status
         FROM quiz_attempts qa
         INNER JOIN quizzes q ON q.quiz_id = qa.quiz_id
-        INNER JOIN lessons l ON l.lesson_id = q.lesson_id
-        INNER JOIN course_modules m ON m.module_id = l.module_id
-        INNER JOIN courses c ON c.course_id = m.course_id
+        INNER JOIN course_batches b ON b.batch_id = q.batch_id
+        INNER JOIN courses c ON c.course_id = b.course_id
         INNER JOIN users u ON u.user_id = qa.student_id
         WHERE c.teacher_id = ? AND c.course_id = ?
         ORDER BY qa.submitted_at DESC, qa.started_at DESC, qa.attempt_id DESC
@@ -820,9 +883,8 @@ export async function getInstructorCourseDetail(rawTeacherId, rawCourseId) {
         FROM quiz_answers a
         INNER JOIN questions q ON q.question_id = a.question_id
         INNER JOIN quizzes qu ON qu.quiz_id = q.quiz_id
-        INNER JOIN lessons l ON l.lesson_id = qu.lesson_id
-        INNER JOIN course_modules m ON m.module_id = l.module_id
-        INNER JOIN courses c ON c.course_id = m.course_id
+        INNER JOIN course_batches b ON b.batch_id = qu.batch_id
+        INNER JOIN courses c ON c.course_id = b.course_id
         LEFT JOIN answer_options o ON o.option_id = a.option_id
         WHERE c.teacher_id = ? AND c.course_id = ?
         ORDER BY a.answer_id ASC
@@ -1864,7 +1926,9 @@ export async function reorderInstructorLessons(rawTeacherId, rawCourseId, rawMod
 }
 
 function parseQuizPayload(quizData) {
-  const batchId = Number(quizData?.batchId);
+  const normalizedBatchScope = String(quizData?.batchScope ?? "SINGLE").trim().toUpperCase();
+  const batchScope = normalizedBatchScope === "ALL" ? "ALL" : "SINGLE";
+  const batchId = quizData?.batchId == null || quizData?.batchId === "" ? null : Number(quizData?.batchId);
   const lessonId = quizData?.lessonId === "" || quizData?.lessonId == null ? null : Number(quizData?.lessonId);
   const title = String(quizData?.title ?? "").trim();
   const description = String(quizData?.description ?? "").trim();
@@ -1875,7 +1939,7 @@ function parseQuizPayload(quizData) {
   const passScore = quizData?.passScore === "" || quizData?.passScore == null ? 5 : Number(quizData.passScore);
   const attemptLimit = quizData?.attemptLimit === "" || quizData?.attemptLimit == null ? 1 : Number(quizData.attemptLimit);
 
-  return { batchId, lessonId, title, description, durationMinutes, maxScore, passScore, attemptLimit };
+  return { batchScope, batchId, lessonId, title, description, durationMinutes, maxScore, passScore, attemptLimit };
 }
 
 function parseQuestionPayload(questionData) {
@@ -1900,17 +1964,22 @@ async function assertQuizTarget(teacherId, courseId, batchId, lessonId) {
   const course = await assertInstructorCourseOwnership(teacherId, courseId);
   if (!course) throw new Error("Course not found for this instructor.");
 
-  const [batchRows] = await db.query(
-    `
-      SELECT batch_id AS id
-      FROM course_batches
-      WHERE batch_id = ? AND teacher_id = ? AND course_id = ?
-      LIMIT 1
-    `,
-    [batchId, teacherId, courseId],
-  );
+  if (batchId != null) {
+    const [batchRows] = await db.query(
+      `
+        SELECT
+          batch_id AS id,
+          start_date,
+          end_date
+        FROM course_batches
+        WHERE batch_id = ? AND teacher_id = ? AND course_id = ?
+        LIMIT 1
+      `,
+      [batchId, teacherId, courseId],
+    );
 
-  if (!batchRows[0]) throw new Error("Batch not found for this course.");
+    if (!batchRows[0]) throw new Error("Batch not found for this course.");
+  }
 
   if (lessonId != null) {
     const [lessonRows] = await db.query(
@@ -1926,6 +1995,22 @@ async function assertQuizTarget(teacherId, courseId, batchId, lessonId) {
 
     if (!lessonRows[0]) throw new Error("Lesson not found for this course.");
   }
+}
+
+async function getInstructorCourseBatches(teacherId, courseId) {
+  const [rows] = await db.query(
+    `
+      SELECT
+        batch_id AS id,
+        batch_code AS batchCode
+      FROM course_batches
+      WHERE teacher_id = ? AND course_id = ?
+      ORDER BY batch_id ASC
+    `,
+    [teacherId, courseId],
+  );
+
+  return rows;
 }
 
 async function getInstructorQuizById(teacherId, courseId, quizId) {
@@ -2008,9 +2093,12 @@ export async function createInstructorQuiz(rawTeacherId, rawCourseId, quizData) 
   const teacherId = normalizeTeacherId(rawTeacherId);
   const courseId = Number(rawCourseId);
   const payload = parseQuizPayload(quizData);
+  const isAllBatches = payload.batchScope === "ALL";
 
   if (!Number.isFinite(courseId) || courseId <= 0) throw new Error("Invalid course id.");
-  if (!Number.isFinite(payload.batchId) || payload.batchId <= 0) throw new Error("Batch is required.");
+  if (!isAllBatches && (!Number.isFinite(payload.batchId) || payload.batchId <= 0)) {
+    throw new Error("Batch is required.");
+  }
   if (!payload.title) throw new Error("Quiz title is required.");
   if (payload.durationMinutes != null && (!Number.isFinite(payload.durationMinutes) || payload.durationMinutes <= 0)) {
     throw new Error("Duration must be greater than zero.");
@@ -2023,32 +2111,52 @@ export async function createInstructorQuiz(rawTeacherId, rawCourseId, quizData) 
 
   await assertQuizTarget(teacherId, courseId, payload.batchId, payload.lessonId);
 
-  const [result] = await db.query(
-    `
-      INSERT INTO quizzes (
-        batch_id,
-        lesson_id,
-        title,
-        description,
-        duration_minutes,
-        max_score,
-        pass_score,
-        attempt_limit
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    [
-      payload.batchId,
-      payload.lessonId,
-      payload.title,
-      payload.description || null,
-      payload.durationMinutes,
-      payload.maxScore,
-      payload.passScore,
-      payload.attemptLimit,
-    ],
-  );
+  const targetBatches = isAllBatches
+    ? await getInstructorCourseBatches(teacherId, courseId)
+    : [{ id: payload.batchId }];
 
-  return getInstructorQuizById(teacherId, courseId, result.insertId);
+  if (targetBatches.length === 0) {
+    throw new Error("No classes found for this course.");
+  }
+
+  const createdQuizIds = [];
+  for (const batch of targetBatches) {
+    const [result] = await db.query(
+      `
+        INSERT INTO quizzes (
+          batch_id,
+          lesson_id,
+          title,
+          description,
+          duration_minutes,
+          max_score,
+          pass_score,
+          attempt_limit
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        batch.id,
+        payload.lessonId,
+        payload.title,
+        payload.description || null,
+        payload.durationMinutes,
+        payload.maxScore,
+        payload.passScore,
+        payload.attemptLimit,
+      ],
+    );
+    createdQuizIds.push(result.insertId);
+  }
+
+  if (createdQuizIds.length === 1) {
+    return getInstructorQuizById(teacherId, courseId, createdQuizIds[0]);
+  }
+
+  return {
+    createdCount: createdQuizIds.length,
+    quizIds: createdQuizIds,
+    batchIds: targetBatches.map((batch) => batch.id),
+  };
 }
 
 export async function updateInstructorQuiz(rawTeacherId, rawCourseId, rawQuizId, quizData) {
@@ -2850,6 +2958,23 @@ export async function createInstructorSession(rawTeacherId, rawCourseId, rawBatc
 
   if (!batchRows[0]) throw new Error("Batch not found for this course.");
 
+  assertSessionWithinBatchRange(
+    startTime,
+    endTime,
+    batchRows[0].start_date,
+    batchRows[0].end_date,
+  );
+
+  const conflictingSession = await findBatchSessionConflict(
+    batchId,
+    teacherId,
+    startTime,
+    endTime,
+  );
+  if (conflictingSession) {
+    throw new Error("Session time overlaps with another session in this batch.");
+  }
+
   const [result] = await db.query(
     `
       INSERT INTO class_sessions (
@@ -2964,7 +3089,9 @@ export async function generateInstructorRecurringSessions(rawTeacherId, rawCours
 
   const [existingRows] = await db.query(
     `
-      SELECT start_time
+      SELECT
+        start_time,
+        end_time
       FROM class_sessions
       WHERE batch_id = ? AND teacher_id = ? AND start_time BETWEEN ? AND ?
     `,
@@ -2976,9 +3103,16 @@ export async function generateInstructorRecurringSessions(rawTeacherId, rawCours
     ],
   );
 
-  const existingStarts = new Set(existingRows.map((row) => formatDateTimeSql(new Date(row.start_time))));
+  const existingStarts = new Set(
+    existingRows.map((row) => formatDateTimeSql(new Date(row.start_time))),
+  );
+  const existingIntervals = existingRows.map((row) => ({
+    start: new Date(row.start_time),
+    end: new Date(row.end_time),
+  }));
   const rowsToInsert = [];
   const createdStartTimes = [];
+  const createdIntervals = [];
   let sessionIndex = 1;
   let skippedCount = 0;
 
@@ -2991,13 +3125,21 @@ export async function generateInstructorRecurringSessions(rawTeacherId, rawCours
 
     const startSql = formatDateTimeSql(sessionStart);
     const endSql = formatDateTimeSql(sessionEnd);
-    if (existingStarts.has(startSql)) {
+    const overlapsExisting = existingIntervals.some((interval) =>
+      hasTimeRangeOverlap(sessionStart, sessionEnd, interval.start, interval.end),
+    );
+    const overlapsCreated = createdIntervals.some((interval) =>
+      hasTimeRangeOverlap(sessionStart, sessionEnd, interval.start, interval.end),
+    );
+
+    if (existingStarts.has(startSql) || overlapsExisting || overlapsCreated) {
       skippedCount += 1;
       continue;
     }
 
     existingStarts.add(startSql);
     createdStartTimes.push(startSql);
+    createdIntervals.push({ start: sessionStart, end: sessionEnd });
     rowsToInsert.push([
       batchId,
       teacherId,
@@ -3101,7 +3243,10 @@ export async function updateInstructorSession(rawTeacherId, rawCourseId, rawBatc
 
   const [sessionRows] = await db.query(
     `
-      SELECT s.session_id AS id
+      SELECT
+        s.session_id AS id,
+        b.start_date,
+        b.end_date
       FROM class_sessions s
       INNER JOIN course_batches b ON b.batch_id = s.batch_id
       WHERE s.session_id = ? AND s.teacher_id = ? AND s.batch_id = ? AND b.course_id = ?
@@ -3111,6 +3256,24 @@ export async function updateInstructorSession(rawTeacherId, rawCourseId, rawBatc
   );
 
   if (!sessionRows[0]) throw new Error("Session not found for this batch.");
+
+  assertSessionWithinBatchRange(
+    startTime,
+    endTime,
+    sessionRows[0].start_date,
+    sessionRows[0].end_date,
+  );
+
+  const conflictingSession = await findBatchSessionConflict(
+    batchId,
+    teacherId,
+    startTime,
+    endTime,
+    sessionId,
+  );
+  if (conflictingSession) {
+    throw new Error("Session time overlaps with another session in this batch.");
+  }
 
   await db.query(
     `

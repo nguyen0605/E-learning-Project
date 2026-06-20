@@ -1,7 +1,11 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import Icon from "../components/Icon";
 import { getCourseDetail, getMyCourses } from "../services/studentCoursesApi";
-import type { StudentClassSession, StudentCourseDetail } from "../types/course.types";
+import type {
+  StudentClassSession,
+  StudentCourseDetail,
+  StudentEnrolledCourse,
+} from "../types/course.types";
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("vi-VN", {
@@ -14,8 +18,17 @@ function getSessionState(session: StudentClassSession) {
   const now = Date.now();
   const start = new Date(session.startTime).getTime();
   const end = new Date(session.endTime).getTime();
+  const status = String(session.status ?? "").toUpperCase();
 
-  if (session.status === "LIVE" || (now >= start && now <= end)) {
+  if (status === "CANCELLED") {
+    return { label: "Đã hủy", tone: "cancelled" };
+  }
+
+  if (status === "COMPLETED") {
+    return { label: "Đã xong", tone: "done" };
+  }
+
+  if (status === "LIVE" || (now >= start && now <= end)) {
     return { label: "Đang học", tone: "live" };
   }
 
@@ -45,6 +58,32 @@ function buildScheduleItems(courses: StudentCourseDetail[]) {
   );
 }
 
+function filterCoursesByEnrollments(
+  courses: StudentCourseDetail[],
+  enrollments: StudentEnrolledCourse[],
+) {
+  const enrolledBatchIdsByCourseId = enrollments.reduce<Map<number, Set<number>>>(
+    (result, item) => {
+      const courseId = item.course.id;
+      const batchIds = result.get(courseId) ?? new Set<number>();
+      batchIds.add(item.batch.id);
+      result.set(courseId, batchIds);
+      return result;
+    },
+    new Map<number, Set<number>>(),
+  );
+
+  return courses
+    .map((course) => {
+      const enrolledBatchIds = enrolledBatchIdsByCourseId.get(course.id) ?? new Set<number>();
+      return {
+        ...course,
+        batches: course.batches.filter((batch) => enrolledBatchIds.has(batch.id)),
+      };
+    })
+    .filter((course) => course.batches.length > 0);
+}
+
 function SchedulePage() {
   const [courses, setCourses] = useState<StudentCourseDetail[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,7 +105,7 @@ function SchedulePage() {
         );
 
         if (mounted) {
-          setCourses(details);
+          setCourses(filterCoursesByEnrollments(details, enrolledCourses));
         }
       } catch (loadError) {
         if (mounted) {

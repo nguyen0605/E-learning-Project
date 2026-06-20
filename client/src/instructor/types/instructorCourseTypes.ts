@@ -266,6 +266,7 @@ export type LessonImportFormData = {
   defaultVideoUrl: string;
 };
 export type QuizFormData = {
+  batchScope: string;
   batchId: string;
   lessonId: string;
   title: string;

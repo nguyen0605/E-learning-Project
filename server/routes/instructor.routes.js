@@ -403,7 +403,8 @@ router.post("/courses/:courseId/batches/:batchId/sessions/generate", async (req,
       (error.message.includes("required") ||
         error.message.includes("Invalid") ||
         error.message.includes("not found") ||
-        error.message.includes("later"))
+        error.message.includes("later") ||
+        error.message.includes("overlaps"))
     ) {
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -424,7 +425,13 @@ router.post("/courses/:courseId/batches/:batchId/sessions", async (req, res) => 
 
     res.status(201).json({ success: true, data });
   } catch (error) {
-    if (error instanceof Error && (error.message.includes("required") || error.message.includes("Invalid"))) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("required") ||
+        error.message.includes("Invalid") ||
+        error.message.includes("within the batch date range") ||
+        error.message.includes("overlaps"))
+    ) {
       return res.status(400).json({ success: false, message: error.message });
     }
 
@@ -445,7 +452,13 @@ router.put("/courses/:courseId/batches/:batchId/sessions/:sessionId", async (req
 
     res.json({ success: true, data });
   } catch (error) {
-    if (error instanceof Error && (error.message.includes("required") || error.message.includes("Invalid"))) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("required") ||
+        error.message.includes("Invalid") ||
+        error.message.includes("within the batch date range") ||
+        error.message.includes("overlaps"))
+    ) {
       return res.status(400).json({ success: false, message: error.message });
     }
 

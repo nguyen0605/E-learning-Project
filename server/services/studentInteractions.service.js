@@ -31,14 +31,6 @@ export async function getStudentInteractionData(studentId, filters = {}) {
     params.push(`%${filters.search}%`, `%${filters.search}%`);
   }
 
-  const [courseRows] = await db.query(
-    `SELECT DISTINCT c.course_id id, c.course_name name
-     FROM discussions d
-     INNER JOIN course_batches b ON b.batch_id=d.batch_id
-     INNER JOIN courses c ON c.course_id=b.course_id
-     WHERE d.status <> 'HIDDEN'
-     ORDER BY c.course_name`,
-  );
   const [enrolledCourseRows] = await db.query(
     `SELECT DISTINCT c.course_id id, c.course_name name, b.batch_id batchId,
             b.batch_name batchName
@@ -48,6 +40,9 @@ export async function getStudentInteractionData(studentId, filters = {}) {
      WHERE e.student_id=? AND e.status IN ('ACTIVE','COMPLETED')
      ORDER BY c.course_name`,
     [studentId],
+  );
+  const courseRows = Array.from(
+    new Map(enrolledCourseRows.map((row) => [row.id, { id: row.id, name: row.name }])).values(),
   );
   const [lessonRows] = await db.query(
     `SELECT l.lesson_id id, l.lesson_title title, b.batch_id batchId
@@ -71,6 +66,10 @@ export async function getStudentInteractionData(studentId, filters = {}) {
      FROM discussions d
      INNER JOIN course_batches b ON b.batch_id=d.batch_id
      INNER JOIN courses c ON c.course_id=b.course_id
+     INNER JOIN enrollments viewer_enrollment
+       ON viewer_enrollment.batch_id=d.batch_id
+      AND viewer_enrollment.student_id=?
+      AND viewer_enrollment.status IN ('ACTIVE','COMPLETED')
      LEFT JOIN users author ON author.user_id=d.user_id
      LEFT JOIN lessons l ON l.lesson_id=d.lesson_id
      LEFT JOIN discussion_comments dc
@@ -79,7 +78,7 @@ export async function getStudentInteractionData(studentId, filters = {}) {
      WHERE ${where.join(" AND ")}
      GROUP BY d.discussion_id
      ORDER BY d.is_pinned DESC,d.updated_at DESC`,
-    [studentId, ...params],
+    [studentId, studentId, ...params],
   );
   const ids = rows.map((row) => row.discussion_id);
   let comments = [];
@@ -139,6 +138,23 @@ export async function getStudentInteractionData(studentId, filters = {}) {
   };
 }
 
+async function getAccessibleDiscussion(studentId, discussionId) {
+  const [rows] = await db.query(
+    `SELECT d.discussion_id, d.batch_id, b.teacher_id
+     FROM discussions d
+     INNER JOIN course_batches b ON b.batch_id = d.batch_id
+     INNER JOIN enrollments e ON e.batch_id = d.batch_id
+     WHERE d.discussion_id = ?
+       AND e.student_id = ?
+       AND e.status IN ('ACTIVE','COMPLETED')
+       AND d.status <> 'HIDDEN'
+     LIMIT 1`,
+    [discussionId, studentId],
+  );
+
+  return rows[0] ?? null;
+}
+
 export async function createStudentDiscussion(studentId, payload) {
   const batchId = Number(payload.batchId);
   const enrollment = await getEnrollment(studentId, batchId);
@@ -147,6 +163,20 @@ export async function createStudentDiscussion(studentId, payload) {
   const title = String(payload.title ?? "").trim();
   const content = String(payload.content ?? "").trim();
   const lessonId = payload.lessonId ? Number(payload.lessonId) : null;
+  if (lessonId) {
+    const [lessonRows] = await db.query(
+      `SELECT l.lesson_id
+       FROM lessons l
+       INNER JOIN course_modules m ON m.module_id = l.module_id
+       WHERE l.lesson_id = ? AND m.course_id = ?
+       LIMIT 1`,
+      [lessonId, enrollment.course_id],
+    );
+
+    if (!lessonRows[0]) {
+      throw new Error("Lesson does not belong to this class course.");
+    }
+  }
   if (!title || !content) throw new Error("Tiêu đề và nội dung là bắt buộc.");
   const [result] = await db.query(
     `INSERT INTO discussions
@@ -199,6 +229,9 @@ export async function createStudentDiscussionComment(studentId, discussionId, pa
 }
 
 export async function toggleDiscussionReaction(studentId, discussionId) {
+  const discussion = await getAccessibleDiscussion(studentId, discussionId);
+  if (!discussion) return null;
+
   const [existing] = await db.query(
     "SELECT reaction_id FROM discussion_reactions WHERE discussion_id=? AND user_id=?",
     [discussionId, studentId],
@@ -225,7 +258,8 @@ export async function updateOwnDiscussion(studentId, discussionId, payload) {
   if (!fields.length) throw new Error("Không có dữ liệu cập nhật.");
   values.push(discussionId, studentId);
   const [result] = await db.query(
-    `UPDATE discussions SET ${fields.join(",")} WHERE discussion_id=? AND user_id=?`,
+    `UPDATE discussions SET ${fields.join(",")}, updated_at=NOW()
+     WHERE discussion_id=? AND user_id=? AND status <> 'HIDDEN'`,
     values,
   );
   return result.affectedRows > 0;

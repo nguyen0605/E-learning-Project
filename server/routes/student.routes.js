@@ -721,6 +721,7 @@ router.post("/interactions/:id/comments", requireAuth, requireRole("STUDENT"), a
 router.post("/interactions/:id/reaction", requireAuth, requireRole("STUDENT"), async (req, res) => {
   try {
     const data = await toggleDiscussionReaction(req.auth.user.id, req.params.id);
+    if (!data) return res.status(403).json({ success: false, message: "Bạn không thuộc lớp học của thảo luận này." });
     res.json({ success: true, data });
   } catch (error) {
     handleRouteError(res, error, "Failed to update discussion reaction.");

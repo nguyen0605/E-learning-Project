@@ -455,7 +455,7 @@ export async function getStudentCourseDetail(courseId, studentId) {
        note
      FROM course_batches
      WHERE course_id = ?
-       AND status IN ('OPEN', 'STARTED', 'FULL', 'FINISHED')
+       AND status IN ('DRAFT', 'OPEN', 'STARTED', 'FULL', 'FINISHED', 'CANCELLED')
      ORDER BY start_date DESC, batch_id DESC`,
     [courseId],
   );

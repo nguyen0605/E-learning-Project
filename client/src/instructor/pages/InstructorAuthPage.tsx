@@ -29,8 +29,8 @@ function InstructorAuthPage({ mode }: InstructorAuthPageProps) {
   const { t } = useTranslation("instructor");
   const [formData, setFormData] = useState({
     name: "",
-    email: mode === "login" ? "gv04@elearning.vn" : "",
-    password: mode === "login" ? "Password123" : "",
+    email: "",
+    password: "",
     phone: "",
     specialization: "",
     workplace: "E-learning Center",
@@ -128,7 +128,7 @@ function InstructorAuthPage({ mode }: InstructorAuthPageProps) {
               type="email"
               value={formData.email}
               onChange={(event) => updateField("email", event.target.value)}
-              placeholder="gv04@elearning.vn"
+              placeholder={t("auth.emailPlaceholder")}
             />
           </label>
 
@@ -167,14 +167,6 @@ function InstructorAuthPage({ mode }: InstructorAuthPageProps) {
             {isRegister ? t("auth.loginButton") : t("auth.registerButton")}
           </NavLink>
         </p>
-
-        {!isRegister && (
-          <div className="instructor-auth-demo">
-            <strong>{t("auth.demoAccount")}</strong>
-            <span>Email: gv04@elearning.vn</span>
-            <span>{t("auth.password")}: Password123</span>
-          </div>
-        )}
       </section>
     </main>
   );

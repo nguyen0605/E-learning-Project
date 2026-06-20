@@ -399,6 +399,7 @@ function InstructorCourseManagementPage() {
     trueFalseAnswer: "true",
   });
   const [quizFormData, setQuizFormData] = useState<QuizFormData>({
+    batchScope: "SINGLE",
     batchId: "",
     lessonId: "",
     title: "",
@@ -1130,6 +1131,7 @@ function InstructorCourseManagementPage() {
     setQuizFormTargetId(null);
     setQuizFormError(null);
     setQuizFormData({
+      batchScope: "SINGLE",
       batchId: batchId ? String(batchId) : "",
       lessonId: "",
       title: "",
@@ -1349,6 +1351,10 @@ function InstructorCourseManagementPage() {
   }
 
   function openCreateSessionForm(batchId?: number) {
+    const targetBatch =
+      selectedCourseDetail?.batches.find((batch) => batch.id === batchId) ?? null;
+    const isOfflineBatch = String(targetBatch?.learningModeValue ?? "").toUpperCase() === "OFFLINE";
+
     setSessionFormMode("create");
     setSessionFormTarget(batchId ? { batchId } : null);
     setSessionFormError(null);
@@ -1357,9 +1363,9 @@ function InstructorCourseManagementPage() {
       description: "",
       startTime: "",
       endTime: "",
-      meetingUrl: "",
+      meetingUrl: isOfflineBatch ? targetBatch?.classroomName ?? "" : targetBatch?.defaultMeetingUrl ?? "",
       meetingPassword: "",
-      platform: "ZOOM",
+      platform: isOfflineBatch ? "INTERNAL_ROOM" : targetBatch?.onlinePlatform ?? "ZOOM",
       status: "SCHEDULED",
       recordingUrl: "",
       note: "",
@@ -1370,15 +1376,16 @@ function InstructorCourseManagementPage() {
   function openRecurringScheduleForm(batch: CourseDetail["batches"][number]) {
     setRecurringScheduleTarget({ batchId: batch.id });
     setRecurringScheduleError(null);
+    const isOfflineBatch = String(batch.learningModeValue ?? "").toUpperCase() === "OFFLINE";
     setRecurringScheduleFormData({
       weekdays: ["1", "3", "5"],
       startTime: "19:00",
       endTime: "20:30",
       titlePrefix: "Buổi học",
       description: "",
-      meetingUrl: batch.defaultMeetingUrl ?? "",
+      meetingUrl: isOfflineBatch ? batch.classroomName ?? "" : batch.defaultMeetingUrl ?? "",
       meetingPassword: "",
-      platform: batch.onlinePlatform ?? "ZOOM",
+      platform: isOfflineBatch ? "INTERNAL_ROOM" : batch.onlinePlatform ?? "ZOOM",
       status: "SCHEDULED",
       note: "",
     });
@@ -1691,6 +1698,7 @@ function InstructorCourseManagementPage() {
     setQuizFormTargetId(quiz.id);
     setQuizFormError(null);
     setQuizFormData({
+      batchScope: "SINGLE",
       batchId: String(quiz.batchId),
       lessonId: quiz.lessonId ? String(quiz.lessonId) : "",
       title: quiz.title ?? "",
@@ -1708,8 +1716,9 @@ function InstructorCourseManagementPage() {
   async function handleSaveQuiz() {
     if (!selectedCourseDetail?.id) return;
 
+    const isCreateForAllBatches = quizFormMode === "create" && quizFormData.batchScope === "ALL";
     const batchId = Number(quizFormData.batchId);
-    if (!Number.isFinite(batchId) || batchId <= 0) {
+    if (!isCreateForAllBatches && (!Number.isFinite(batchId) || batchId <= 0)) {
       setQuizFormError("Hãy chọn lớp cho quiz.");
       return;
     }
@@ -1744,7 +1753,7 @@ function InstructorCourseManagementPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...quizFormData,
-            batchId,
+            batchId: Number.isFinite(batchId) && batchId > 0 ? batchId : null,
             lessonId: quizFormData.lessonId ? Number(quizFormData.lessonId) : null,
             durationMinutes: Number(quizFormData.durationMinutes) || 30,
             maxScore,
@@ -1764,7 +1773,12 @@ function InstructorCourseManagementPage() {
       setCourseDetailTab("quizzes");
       resetQuizForm(batchId);
       setToast({
-        message: quizFormMode === "edit" ? "Đã cập nhật quiz." : "Đã tạo quiz mới.",
+        message:
+          quizFormMode === "edit"
+            ? "Đã cập nhật quiz."
+            : isCreateForAllBatches
+              ? "Đã tạo quiz cho tất cả lớp trong khóa."
+              : "Đã tạo quiz mới.",
         type: "success",
       });
     } catch (error) {
@@ -2069,6 +2083,18 @@ function InstructorCourseManagementPage() {
     selectedCourseDetail?.batches.find((batch) => batch.id === selectedBatchId) ??
     selectedCourseDetail?.batches[0] ??
     null;
+  const sessionFormBatch =
+    selectedCourseDetail?.batches.find((batch) => batch.id === sessionFormTarget?.batchId) ??
+    activeBatch;
+  const isOfflineSessionBatch =
+    String(sessionFormBatch?.learningModeValue ?? sessionFormBatch?.mode ?? "").toUpperCase() ===
+    "OFFLINE";
+  const recurringScheduleBatch =
+    selectedCourseDetail?.batches.find((batch) => batch.id === recurringScheduleTarget?.batchId) ??
+    null;
+  const isOfflineRecurringBatch =
+    String(recurringScheduleBatch?.learningModeValue ?? recurringScheduleBatch?.mode ?? "").toUpperCase() ===
+    "OFFLINE";
   const autoAssignPriorityBatchId = selectedCourseDetail
     ? getAutoAssignPriorityBatchId(selectedCourseDetail.batches)
     : null;
@@ -2958,11 +2984,22 @@ function InstructorCourseManagementPage() {
                           <div className="instructor-course-batch-meta">
                             <span>{batch.dates}</span>
                             <div className="instructor-course-batch-capacity">
+                              <em>Sĩ số {batch.minStudents ?? 1}-{batch.maxStudents ?? "?"}</em>
                               <em>Đã xếp {enrolled} / {max || "?"}</em>
                               <em>{remainingSlots == null ? "Chưa đặt sĩ số" : `Còn ${remainingSlots} chỗ`}</em>
                             </div>
                             <div className="instructor-course-batch-status">
-                              <b>{batch.mode} · {getBatchReceivingStatus(batch)}</b>
+                              <b>{batch.mode} · {batch.platform}</b>
+                              <small>
+                                {batch.classroomName
+                                  ? `Phòng học: ${batch.classroomName}${
+                                      batch.classroomAddress ? ` - ${batch.classroomAddress}` : ""
+                                    }`
+                                  : batch.defaultMeetingUrl
+                                    ? `Link phòng học: ${batch.defaultMeetingUrl}`
+                                    : "Chưa có thông tin phòng học."}
+                              </small>
+                              <small>{getBatchReceivingStatus(batch)}</small>
                               <small>
                                 {isFull
                                   ? "Lớp đã đủ chỗ, học viên mới sẽ được chuyển sang lớp còn chỗ."
@@ -3159,26 +3196,54 @@ function InstructorCourseManagementPage() {
                         handleSaveQuiz();
                       }}>
                         {quizFormError && <p className="instructor-course-detail-error">{quizFormError}</p>}
-                        <label className="instructor-create-course-field">
-                          <span>Lớp *</span>
-                          <select
-                            disabled={selectedCourseDetail.batches.length === 0}
-                            value={quizFormData.batchId || selectedCourseDetail.batches[0]?.id || ""}
-                            onChange={(event) =>
-                              setQuizFormData({ ...quizFormData, batchId: event.target.value })
-                            }
-                          >
-                            {selectedCourseDetail.batches.length === 0 ? (
-                              <option value="">Chưa có lớp</option>
-                            ) : (
-                            selectedCourseDetail.batches.map((batch) => (
-                              <option key={batch.id} value={batch.id}>
-                                  {getBatchLabel(batch)}
-                              </option>
-                            ))
-                            )}
-                          </select>
-                        </label>
+                        {quizFormMode === "create" && (
+                          <label className="instructor-create-course-field">
+                            <span>Phạm vi áp dụng</span>
+                            <select
+                              value={quizFormData.batchScope}
+                              onChange={(event) =>
+                                setQuizFormData({
+                                  ...quizFormData,
+                                  batchScope: event.target.value,
+                                  batchId:
+                                    event.target.value === "ALL"
+                                      ? ""
+                                      : quizFormData.batchId || String(selectedCourseDetail.batches[0]?.id ?? ""),
+                                })
+                              }
+                            >
+                              <option value="SINGLE">Một lớp cụ thể</option>
+                              <option value="ALL">Tất cả lớp trong khóa</option>
+                            </select>
+                          </label>
+                        )}
+                        {(quizFormMode === "edit" || quizFormData.batchScope !== "ALL") && (
+                          <label className="instructor-create-course-field">
+                            <span>Lớp *</span>
+                            <select
+                              disabled={selectedCourseDetail.batches.length === 0}
+                              value={quizFormData.batchId || selectedCourseDetail.batches[0]?.id || ""}
+                              onChange={(event) =>
+                                setQuizFormData({ ...quizFormData, batchId: event.target.value })
+                              }
+                            >
+                              {selectedCourseDetail.batches.length === 0 ? (
+                                <option value="">Chưa có lớp</option>
+                              ) : (
+                                selectedCourseDetail.batches.map((batch) => (
+                                  <option key={batch.id} value={batch.id}>
+                                    {getBatchLabel(batch)}
+                                  </option>
+                                ))
+                              )}
+                            </select>
+                          </label>
+                        )}
+                        {quizFormMode === "create" && quizFormData.batchScope === "ALL" && (
+                          <p className="instructor-inline-helper">
+                            Hệ thống sẽ tạo một quiz giống nhau cho từng lớp hiện có trong khóa này.
+                          </p>
+                        )}
 
                         <label className="instructor-create-course-field">
                           <span>Bài học liên kết</span>
@@ -4726,7 +4791,11 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
                 <div>
                   <p className="instructor-eyebrow">{t("coursesPage.scheduleEyebrow")}</p>
                   <h3>{t("coursesPage.createSchedule")}</h3>
-                  <p>Chọn các ngày học trong tuần, hệ thống sẽ tự sinh buổi học từ ngày bắt đầu đến ngày kết thúc lớp.</p>
+                  <p>
+                    {isOfflineRecurringBatch
+                      ? "Lớp trực tiếp sẽ tự sinh lịch theo phòng học nội bộ của lớp."
+                      : "Lớp trực tuyến sẽ tự sinh buổi học theo link họp đã chọn."}
+                  </p>
                 </div>
                 <button
                   aria-label="Đóng form lịch định kỳ"
@@ -4796,44 +4865,71 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
                   />
                 </label>
                 <label className="instructor-create-course-field instructor-create-course-field-wide">
-                  <span>Meeting URL</span>
+                  <span>{isOfflineRecurringBatch ? "Phòng học / mã vào lớp" : "Meeting URL"}</span>
                   <input
                     value={recurringScheduleFormData.meetingUrl}
                     onChange={(event) =>
                       setRecurringScheduleFormData({ ...recurringScheduleFormData, meetingUrl: event.target.value })
                     }
-                    placeholder="https://..."
+                    placeholder={isOfflineRecurringBatch ? "VD: Phòng A203" : "https://..."}
                   />
                 </label>
-                <label className="instructor-create-course-field">
-                  <span>Mật khẩu</span>
-                  <input
-                    value={recurringScheduleFormData.meetingPassword}
-                    onChange={(event) =>
-                      setRecurringScheduleFormData({
-                        ...recurringScheduleFormData,
-                        meetingPassword: event.target.value,
-                      })
-                    }
-                    placeholder="Nếu có"
-                  />
-                </label>
-                <label className="instructor-create-course-field">
-                  <span>Nền tảng</span>
-                  <select
-                    value={recurringScheduleFormData.platform}
-                    onChange={(event) =>
-                      setRecurringScheduleFormData({ ...recurringScheduleFormData, platform: event.target.value })
-                    }
-                  >
-                    <option value="ZOOM">Zoom</option>
-                    <option value="GOOGLE_MEET">Google Meet</option>
-                    <option value="MICROSOFT_TEAMS">Microsoft Teams</option>
-                    <option value="JITSI">Jitsi</option>
-                    <option value="INTERNAL_ROOM">Phòng nội bộ</option>
-                    <option value="OTHER">Khác</option>
-                  </select>
-                </label>
+                {isOfflineRecurringBatch ? (
+                  <label className="instructor-create-course-field">
+                    <span>Mã phòng / ghi chú vào lớp</span>
+                    <input
+                      value={recurringScheduleFormData.meetingPassword}
+                      onChange={(event) =>
+                        setRecurringScheduleFormData({
+                          ...recurringScheduleFormData,
+                          meetingPassword: event.target.value,
+                        })
+                      }
+                      placeholder="Nếu có"
+                    />
+                  </label>
+                ) : (
+                  <>
+                    <label className="instructor-create-course-field">
+                      <span>Mật khẩu</span>
+                      <input
+                        value={recurringScheduleFormData.meetingPassword}
+                        onChange={(event) =>
+                          setRecurringScheduleFormData({
+                            ...recurringScheduleFormData,
+                            meetingPassword: event.target.value,
+                          })
+                        }
+                        placeholder="Nếu có"
+                      />
+                    </label>
+                    <label className="instructor-create-course-field">
+                      <span>Nền tảng</span>
+                      <select
+                        value={recurringScheduleFormData.platform}
+                        onChange={(event) =>
+                          setRecurringScheduleFormData({
+                            ...recurringScheduleFormData,
+                            platform: event.target.value,
+                          })
+                        }
+                      >
+                        <option value="ZOOM">Zoom</option>
+                        <option value="GOOGLE_MEET">Google Meet</option>
+                        <option value="MICROSOFT_TEAMS">Microsoft Teams</option>
+                        <option value="JITSI">Jitsi</option>
+                        <option value="INTERNAL_ROOM">Phòng nội bộ</option>
+                        <option value="OTHER">Khác</option>
+                      </select>
+                    </label>
+                  </>
+                )}
+                {isOfflineRecurringBatch && (
+                  <label className="instructor-create-course-field">
+                    <span>Nền tảng</span>
+                    <input value="Phòng nội bộ" readOnly />
+                  </label>
+                )}
                 <label className="instructor-create-course-field instructor-create-course-field-wide">
                   <span>Ghi chú</span>
                   <textarea
@@ -4878,9 +4974,17 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
             >
               <div className="instructor-create-course-header">
                 <div>
-                  <p>Thêm lịch dạy, link họp và trạng thái của từng buổi trong lớp.</p>
+                  <p>
+                    {isOfflineSessionBatch
+                      ? "Lớp trực tiếp sẽ dùng phòng học nội bộ, huynh chỉ cần nhập phòng học và thời gian buổi dạy."
+                      : "Lớp trực tuyến sẽ dùng link họp, mật khẩu và nền tảng phù hợp cho từng buổi."}
+                  </p>
                   <h3>{sessionFormMode === "edit" ? t("coursesPage.editSession") : t("coursesPage.newSession")}</h3>
-                  <p>Thêm lịch dạy, link họp và trạng thái của từng buổi trong lớp.</p>
+                  <p>
+                    {isOfflineSessionBatch
+                      ? "Thiết lập buổi dạy trực tiếp, phòng học và trạng thái của buổi học."
+                      : "Thiết lập link họp, nền tảng và trạng thái của buổi học."}
+                  </p>
                 </div>
                 <button
                   aria-label="Đóng form buổi học"
@@ -4937,41 +5041,68 @@ CSS cơ bản | 40 | TEXT | no | Các khái niệm nền tảng`}
                   />
                 </label>
                 <label className="instructor-create-course-field instructor-create-course-field-wide">
-                  <span>Meeting URL</span>
+                  <span>{isOfflineSessionBatch ? "Phòng học / mã vào lớp" : "Meeting URL"}</span>
                   <input
                     value={sessionFormData.meetingUrl}
                     onChange={(event) =>
                       setSessionFormData({ ...sessionFormData, meetingUrl: event.target.value })
                     }
-                    placeholder="https://..."
+                    placeholder={isOfflineSessionBatch ? "VD: Phòng A203" : "https://..."}
                   />
                 </label>
-                <label className="instructor-create-course-field">
-                  <span>Mật khẩu</span>
-                  <input
-                    value={sessionFormData.meetingPassword}
-                    onChange={(event) =>
-                      setSessionFormData({ ...sessionFormData, meetingPassword: event.target.value })
-                    }
-                    placeholder="Nếu có"
-                  />
-                </label>
-                <label className="instructor-create-course-field">
-                  <span>Nền tảng</span>
-                  <select
-                    value={sessionFormData.platform}
-                    onChange={(event) =>
-                      setSessionFormData({ ...sessionFormData, platform: event.target.value })
-                    }
-                  >
-                    <option value="ZOOM">Zoom</option>
-                    <option value="GOOGLE_MEET">Google Meet</option>
-                    <option value="MICROSOFT_TEAMS">Microsoft Teams</option>
-                    <option value="JITSI">Jitsi</option>
-                    <option value="INTERNAL_ROOM">Phòng nội bộ</option>
-                    <option value="OTHER">Khác</option>
-                  </select>
-                </label>
+                {isOfflineSessionBatch ? (
+                  <label className="instructor-create-course-field">
+                    <span>Mã phòng / ghi chú vào lớp</span>
+                    <input
+                      value={sessionFormData.meetingPassword}
+                      onChange={(event) =>
+                        setSessionFormData({
+                          ...sessionFormData,
+                          meetingPassword: event.target.value,
+                        })
+                      }
+                      placeholder="Nếu có"
+                    />
+                  </label>
+                ) : (
+                  <>
+                    <label className="instructor-create-course-field">
+                      <span>Mật khẩu</span>
+                      <input
+                        value={sessionFormData.meetingPassword}
+                        onChange={(event) =>
+                          setSessionFormData({
+                            ...sessionFormData,
+                            meetingPassword: event.target.value,
+                          })
+                        }
+                        placeholder="Nếu có"
+                      />
+                    </label>
+                    <label className="instructor-create-course-field">
+                      <span>Nền tảng</span>
+                      <select
+                        value={sessionFormData.platform}
+                        onChange={(event) =>
+                          setSessionFormData({ ...sessionFormData, platform: event.target.value })
+                        }
+                      >
+                        <option value="ZOOM">Zoom</option>
+                        <option value="GOOGLE_MEET">Google Meet</option>
+                        <option value="MICROSOFT_TEAMS">Microsoft Teams</option>
+                        <option value="JITSI">Jitsi</option>
+                        <option value="INTERNAL_ROOM">Phòng nội bộ</option>
+                        <option value="OTHER">Khác</option>
+                      </select>
+                    </label>
+                  </>
+                )}
+                {isOfflineSessionBatch && (
+                  <label className="instructor-create-course-field">
+                    <span>Nền tảng</span>
+                    <input value="Phòng nội bộ" readOnly />
+                  </label>
+                )}
                 <label className="instructor-create-course-field">
                   <span>Trạng thái</span>
                   <select

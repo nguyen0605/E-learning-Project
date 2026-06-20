@@ -26,6 +26,8 @@ type DiscussionThread = {
   course: string;
   batch: string;
   replies: number;
+  teacherReplies?: number;
+  needsReply?: boolean;
   lastActivity: string;
   status: string;
   comments?: Array<{
@@ -95,9 +97,26 @@ type InstructorInteractionApiResponse = {
 };
 
 function getThreadStatusClass(status: string) {
-  if (status === "Can phan hoi" || status === "Cần phản hồi") return "risk";
-  if (status === "Da tra loi" || status === "Đã trả lời") return "track";
+  const normalizedStatus = status.toLowerCase();
+  if (
+    normalizedStatus.includes("can phan hoi") ||
+    normalizedStatus.includes("c?n ph?n h?i") ||
+    normalizedStatus.includes("c???n")
+  ) {
+    return "risk";
+  }
+  if (
+    normalizedStatus.includes("da tra loi") ||
+    normalizedStatus.includes("?? tr? l?i") ||
+    normalizedStatus.includes("tr???")
+  ) {
+    return "track";
+  }
   return "excellent";
+}
+
+function getThreadStatusLabel(status: string) {
+  return getThreadStatusClass(status) === "risk" ? "Cần phản hồi" : "Đã trả lời";
 }
 
 function InstructorInteractionPage() {
@@ -416,8 +435,9 @@ function InstructorInteractionPage() {
   const displayedStats = pageData?.interactionStats ?? interactionStats;
   const displayedThreads: DiscussionThread[] = pageData?.discussionThreads ?? discussionThreads;
   const filteredThreads = displayedThreads.filter((thread) => {
-    if (discussionFilter === "pending") return Number(thread.replies) === 0;
-    if (discussionFilter === "answered") return Number(thread.replies) > 0;
+    const needsReply = thread.needsReply ?? Number(thread.teacherReplies ?? thread.replies) === 0;
+    if (discussionFilter === "pending") return needsReply;
+    if (discussionFilter === "answered") return !needsReply;
     return true;
   });
   const displayedMessages = pageData?.directMessages ?? directMessages;
@@ -637,7 +657,7 @@ function InstructorInteractionPage() {
                   </div>
                 </div>
                 <em className={`instructor-status-pill ${getThreadStatusClass(thread.status)}`}>
-                  {thread.status}
+                  {getThreadStatusLabel(thread.status)}
                 </em>
               </button>
               ))
